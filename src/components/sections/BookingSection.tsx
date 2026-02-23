@@ -25,94 +25,110 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* ===================== Injected Styles (memoized) ===================== */
+/* ===================== Injected Styles (full fallback stacks) ===================== */
 const bookingStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+
+  .booking-section {
+    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
 
   .bs-card {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(245, 158, 11, 0.15);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(245, 158, 11, 0.2);
     box-shadow:
-      0 4px 6px -1px rgba(0,0,0,0.05),
-      0 20px 60px -10px rgba(245,158,11,0.12),
+      0 8px 30px rgba(0,0,0,0.04),
+      0 20px 60px -10px rgba(245,158,11,0.15),
       0 0 0 1px rgba(255,255,255,0.8) inset;
   }
 
   .bs-input-wrap {
     border: 1.5px solid rgba(209,213,219,0.8);
-    border-radius: 14px;
-    background: rgba(255,255,255,0.9);
-    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    border-radius: 16px;
+    background: white;
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
   .bs-input-wrap:focus-within {
     border-color: #f59e0b;
-    box-shadow: 0 0 0 3px rgba(245,158,11,0.10);
-    background: #fff;
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.12);
   }
 
   .bs-swap-btn {
-    background: linear-gradient(135deg, #fff 60%, #fffbeb 100%);
-    border: 1.5px solid rgba(245,158,11,0.25);
-    box-shadow: 0 2px 10px rgba(245,158,11,0.12);
+    background: white;
+    border: 1.5px solid rgba(245,158,11,0.3);
+    box-shadow: 0 2px 8px rgba(245,158,11,0.1);
     transition: all 0.2s;
+    width: 40px;
+    height: 40px;
+    border-radius: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f59e0b;
   }
   .bs-swap-btn:hover {
-    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-    border-color: rgba(245,158,11,0.5);
-    box-shadow: 0 4px 18px rgba(245,158,11,0.22);
-    transform: rotate(180deg) scale(1.08);
+    background: #fffbeb;
+    border-color: #f59e0b;
+    box-shadow: 0 4px 12px rgba(245,158,11,0.2);
+    transform: scale(1.05);
+  }
+  .bs-swap-btn:active {
+    transform: scale(0.98);
   }
 
   .bs-tab {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 600;
     border-radius: 12px;
-    transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: all 0.2s ease;
     border: 1.5px solid transparent;
+    padding: 0.5rem 1rem;
+    letter-spacing: 0.3px;
   }
   .bs-tab-active {
     background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
-    color: #1a0800 !important;
+    color: #1a0800;
     border-color: #f59e0b;
-    box-shadow: 0 4px 16px rgba(245,158,11,0.30);
+    box-shadow: 0 4px 12px rgba(245,158,11,0.3);
   }
   .bs-tab-inactive {
     background: rgba(245,158,11,0.06);
-    color: #78716c !important;
+    color: #78716c;
     border-color: rgba(245,158,11,0.15);
   }
   .bs-tab-inactive:hover {
     background: rgba(245,158,11,0.12);
-    border-color: rgba(245,158,11,0.30);
-    color: #44403c !important;
+    border-color: rgba(245,158,11,0.3);
+    color: #44403c;
   }
 
   .bs-book-btn {
     background: linear-gradient(110deg, #f59e0b 0%, #fbbf24 40%, #fde68a 60%, #fbbf24 80%, #f59e0b 100%);
     background-size: 200% auto;
-    animation: bs-shimmer 2.8s linear infinite;
-    color: #1a0800 !important;
-    font-family: 'DM Sans', sans-serif;
+    animation: bs-shimmer 3s linear infinite;
+    color: #1a0800;
+    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 700;
-    font-size: 1.05rem;
-    letter-spacing: 0.01em;
+    font-size: 1.1rem;
     border: none;
-    border-radius: 14px;
-    box-shadow: 0 4px 24px rgba(245,158,11,0.35), 0 1px 0 rgba(255,255,255,0.3) inset;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(245,158,11,0.4), 0 1px 0 rgba(255,255,255,0.3) inset;
     transition: filter 0.2s, box-shadow 0.2s, transform 0.15s;
+    height: 56px;
+    letter-spacing: 0.5px;
   }
   .bs-book-btn:hover:not(:disabled) {
-    filter: brightness(1.06);
-    box-shadow: 0 8px 36px rgba(245,158,11,0.50), 0 1px 0 rgba(255,255,255,0.3) inset;
-    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow: 0 8px 30px rgba(245,158,11,0.5), 0 1px 0 rgba(255,255,255,0.3) inset;
+    transform: translateY(-2px);
   }
   .bs-book-btn:active:not(:disabled) { transform: translateY(0); }
   .bs-book-btn:disabled {
     animation: none;
-    background: #e5e7eb !important;
-    color: #9ca3af !important;
+    background: #e5e7eb;
+    color: #9ca3af;
     box-shadow: none;
     cursor: not-allowed;
   }
@@ -125,39 +141,93 @@ const bookingStyles = `
   .bs-suggestion-item {
     transition: background 0.15s;
     cursor: pointer;
+    padding: 0.75rem 1rem;
   }
   .bs-suggestion-item:hover { background: rgba(245,158,11,0.07); }
 
   .bs-stat {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.78rem;
+    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: #78716c;
+    color: #57534e;
     padding: 6px 14px;
-    border-radius: 999px;
-    background: rgba(0,0,0,0.03);
-    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 40px;
+    background: rgba(0,0,0,0.02);
+    border: 1px solid rgba(0,0,0,0.04);
     transition: background 0.2s;
+    letter-spacing: 0.2px;
   }
-  .bs-stat:hover { background: rgba(245,158,11,0.08); }
+  .bs-stat:hover { background: rgba(245,158,11,0.05); }
 
   .bs-connector {
     width: 2px;
     height: 24px;
-    background: linear-gradient(to bottom, #f59e0b55, transparent);
+    background: linear-gradient(to bottom, #f59e0b 20%, rgba(245,158,11,0.2));
     border-radius: 2px;
-    margin: -6px auto;
-    position: relative;
-    z-index: 1;
+    margin-left: 24px;
+  }
+
+  .tricolor-text {
+    background: linear-gradient(to right, #FF9933, #FFFFFF, #138808);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    display: inline-block;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-weight: 900;
+  }
+
+  /* suggestion list scroll */
+  .suggestion-list {
+    max-height: 280px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #f59e0b #f1f5f9;
+  }
+  .suggestion-list::-webkit-scrollbar {
+    width: 5px;
+  }
+  .suggestion-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+  .suggestion-list::-webkit-scrollbar-thumb {
+    background: #f59e0b;
+    border-radius: 10px;
+  }
+
+  /* Professional typography refinements */
+  h2, .heading-professional {
+    font-family: 'Syne', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .caption-professional {
+    font-family: inherit;  /* inherit DM Sans stack from parent */
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #a8a29e;
+  }
+
+  .input-label-professional {
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #f59e0b;
+    text-transform: uppercase;
   }
 `;
 
 /* ===================== Utils ===================== */
 
-function useDebounce<T>(value: T, delay = 300) {
+function useDebounce<T>(value: T, delay = 300): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(value), delay);
@@ -178,7 +248,14 @@ const sectionVariant = {
   visible: { transition: { staggerChildren: 0.09 } },
 };
 
-/* ===================== Main ===================== */
+/* ===================== Types ===================== */
+
+interface DateTimeInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  icon: React.ReactNode;
+  label: string;
+}
+
+/* ===================== Main Component ===================== */
 
 const BookingSection = () => {
   const [pickupLocation, setPickupLocation] = useState("");
@@ -193,7 +270,7 @@ const BookingSection = () => {
   const pickupRef = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  /* ── Locations ── */
+  /* ── Locations list (could be moved to a constant file) ── */
   const locations = useMemo(() => [
     "Chennai, Tamil Nadu",
     "Coimbatore, Tamil Nadu",
@@ -211,15 +288,19 @@ const BookingSection = () => {
 
   const pickupSuggestions = useMemo(() => {
     if (activeBox !== "pickup" || !debouncedPickup) return locations.slice(0, 5);
-    return locations.filter((l) => l.toLowerCase().includes(debouncedPickup.toLowerCase())).slice(0, 5);
+    return locations.filter((l) =>
+      l.toLowerCase().includes(debouncedPickup.toLowerCase())
+    ).slice(0, 5);
   }, [debouncedPickup, activeBox, locations]);
 
   const dropSuggestions = useMemo(() => {
     if (activeBox !== "drop" || !debouncedDrop) return locations.slice(0, 5);
-    return locations.filter((l) => l.toLowerCase().includes(debouncedDrop.toLowerCase())).slice(0, 5);
+    return locations.filter((l) =>
+      l.toLowerCase().includes(debouncedDrop.toLowerCase())
+    ).slice(0, 5);
   }, [debouncedDrop, activeBox, locations]);
 
-  /* ── Defaults ── */
+  /* ── Default date/time ── */
   useEffect(() => {
     const now = new Date();
     setPickupDate(now.toISOString().split("T")[0]);
@@ -234,7 +315,7 @@ const BookingSection = () => {
     }
   }, [rideType]);
 
-  /* ── Outside Click ── */
+  /* ── Close suggestions on outside click ── */
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (!pickupRef.current?.contains(e.target as Node) && !dropRef.current?.contains(e.target as Node)) {
@@ -245,7 +326,6 @@ const BookingSection = () => {
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  /* ── Helpers ── */
   const isToday = pickupDate === new Date().toISOString().split("T")[0];
 
   const canBook =
@@ -254,7 +334,6 @@ const BookingSection = () => {
     pickupLocation !== dropLocation &&
     (rideType === "now" || (pickupDate && pickupTime));
 
-  // ✅ Fixed: simple swap using both current values
   const swapLocations = useCallback(() => {
     setPickupLocation(dropLocation);
     setDropLocation(pickupLocation);
@@ -269,8 +348,6 @@ const BookingSection = () => {
     }, 700);
   }, []);
 
-  /* ── UI ── */
-  // ✅ Memoize style tag to avoid recreation
   const styleElement = useMemo(() => <style>{bookingStyles}</style>, []);
 
   return (
@@ -279,10 +356,10 @@ const BookingSection = () => {
 
       <section
         id="booking-section"
-        className="py-14 sm:py-20 scroll-mt-20 relative overflow-hidden"
+        className="booking-section py-14 sm:py-20 scroll-mt-20 relative overflow-hidden"
         style={{ background: "#FEF9EE" }}
       >
-        {/* Layer 1 — dot grid */}
+        {/* Dot grid background */}
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none"
@@ -292,7 +369,7 @@ const BookingSection = () => {
           }}
         />
 
-        {/* Layer 2 — warm orange-gold radial glow (top centre) */}
+        {/* Warm glow */}
         <div
           aria-hidden="true"
           className="absolute pointer-events-none"
@@ -302,7 +379,7 @@ const BookingSection = () => {
             transform: "translateX(-50%)",
             width: 700,
             height: 420,
-            background: "radial-gradient(ellipse, rgba(255,179,0,0.20) 0%, transparent 70%)",
+            background: "radial-gradient(ellipse, rgba(255,179,0,0.18) 0%, transparent 70%)",
             filter: "blur(52px)",
           }}
         />
@@ -318,26 +395,22 @@ const BookingSection = () => {
             {/* Header */}
             <motion.div variants={fadeUp} className="text-center mb-8">
               <p
-                className="text-xs font-semibold tracking-widest uppercase text-amber-600 mb-3"
-                style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.12em" }}
+                className="caption-professional text-amber-600 mb-3"
               >
                 Instant booking
               </p>
               <h2
-                className="text-3xl sm:text-4xl font-black text-gray-900 mb-2"
-                style={{ fontFamily: "'Syne', sans-serif" }}
+                className="heading-professional text-3xl sm:text-4xl font-black text-gray-900 mb-2 leading-tight"
               >
-                India Moves On{" "}
-                <span
-                  className="text-amber-500"
-                  style={{ textShadow: "0 2px 0 rgba(160,80,0,0.12)" }}
-                >
-                  Xpool
+                <span className="tricolor-text">India</span> Moves On{" "}
+                <span>
+                  <span className="text-amber-500">X</span>
+                  <span className="text-black">pool</span>
                 </span>
               </h2>
               <p
-                className="text-sm text-gray-400"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
+                className="text-sm text-gray-500"
+                style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
               >
                 Book your ride in under 30 seconds
               </p>
@@ -345,7 +418,7 @@ const BookingSection = () => {
 
             {/* Card */}
             <motion.div variants={fadeUp}>
-              <div className="bs-card rounded-2xl p-6 sm:p-8">
+              <div className="bs-card rounded-3xl p-6 sm:p-8">
 
                 {/* Ride Type Toggle */}
                 <div className="grid grid-cols-2 gap-2 mb-6 p-1 rounded-xl bg-gray-50 border border-gray-100">
@@ -353,7 +426,7 @@ const BookingSection = () => {
                     <button
                       key={type}
                       onClick={() => setRideType(type)}
-                      className={`bs-tab h-11 flex items-center justify-center gap-2 text-sm ${rideType === type ? "bs-tab-active" : "bs-tab-inactive"
+                      className={`bs-tab flex items-center justify-center gap-2 text-sm ${rideType === type ? "bs-tab-active" : "bs-tab-inactive"
                         }`}
                     >
                       {type === "now" ? <Timer className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
@@ -388,25 +461,16 @@ const BookingSection = () => {
 
                   {/* Connector + Swap */}
                   <div className="flex items-center justify-between px-2">
-                    <div
-                      className="bs-connector"
-                      style={{
-                        width: 2,
-                        height: 20,
-                        background: "linear-gradient(to bottom, rgba(245,158,11,0.4), rgba(245,158,11,0.1))",
-                        borderRadius: 2,
-                        marginLeft: 19,
-                      }}
-                    />
+                    <div className="bs-connector" />
                     <motion.button
-                      whileHover={{ rotate: 180, scale: 1.1 }}
+                      whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                      transition={{ duration: 0.2 }}
                       onClick={swapLocations}
-                      className="bs-swap-btn h-9 w-9 rounded-xl flex items-center justify-center"
+                      className="bs-swap-btn"
                       aria-label="Swap pickup and drop locations"
                     >
-                      <ArrowUpDown className="h-4 w-4 text-amber-600" />
+                      <ArrowUpDown className="h-4 w-4" />
                     </motion.button>
                   </div>
 
@@ -441,14 +505,13 @@ const BookingSection = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -6 }}
                       className="text-xs text-red-500 text-center mt-3 font-medium"
-                      style={{ fontFamily: "'DM Sans', sans-serif" }}
                     >
                       Pickup and drop must be different locations
                     </motion.p>
                   )}
                 </AnimatePresence>
 
-                {/* Schedule DateTime — shown only for "later" */}
+                {/* Schedule DateTime — only for "later" */}
                 <AnimatePresence>
                   {rideType === "later" && (
                     <motion.div
@@ -486,7 +549,7 @@ const BookingSection = () => {
                   onClick={handleBook}
                   whileHover={canBook && !loading ? { scale: 1.02 } : undefined}
                   whileTap={canBook && !loading ? { scale: 0.98 } : undefined}
-                  className="bs-book-btn w-full h-14 mt-5 flex items-center justify-center gap-2"
+                  className="bs-book-btn w-full mt-5 flex items-center justify-center gap-2"
                   aria-label="Book your ride"
                 >
                   {loading ? (
@@ -512,10 +575,10 @@ const BookingSection = () => {
                     <Zap className="h-3.5 w-3.5 text-amber-500" /> Avg. 4 min pickup
                   </span>
                   <span className="bs-stat">
-                    <IndianRupee className="h-3.5 w-3.5 text-green-500" /> Best fare
+                    <IndianRupee className="h-3.5 w-3.5 text-green-600" /> Best fare
                   </span>
                   <span className="bs-stat">
-                    <ShieldCheck className="h-3.5 w-3.5 text-blue-500" /> Verified drivers
+                    <ShieldCheck className="h-3.5 w-3.5 text-blue-600" /> Verified drivers
                   </span>
                 </div>
 
@@ -532,7 +595,7 @@ const BookingSection = () => {
 
 export default BookingSection;
 
-/* ===================== Location Input ===================== */
+/* ===================== Subcomponents ===================== */
 
 const LocationInput = memo(({
   icon, label, value, active, onFocus, onChange, placeholder,
@@ -545,15 +608,11 @@ const LocationInput = memo(({
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder: string;
 }) => (
-  // ✅ Removed unnecessary 'ring-0' class
   <div className="bs-input-wrap flex items-center gap-3 px-4 py-3.5">
     <span className="flex-shrink-0">{icon}</span>
     <div className="flex-1 min-w-0">
       {value && (
-        <p
-          className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-0.5"
-          style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.08em" }}
-        >
+        <p className="input-label-professional mb-0.5">
           {label}
         </p>
       )}
@@ -563,7 +622,7 @@ const LocationInput = memo(({
         onChange={onChange}
         placeholder={placeholder}
         className="border-0 p-0 h-auto text-sm font-medium text-gray-800 placeholder:text-gray-400 focus-visible:ring-0 bg-transparent"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
         autoComplete="off"
       />
     </div>
@@ -571,30 +630,22 @@ const LocationInput = memo(({
 ));
 LocationInput.displayName = "LocationInput";
 
-/* ===================== Date/Time Input ===================== */
-
-const DateTimeInput = ({ icon, label, ...props }: any) => (
+const DateTimeInput: React.FC<DateTimeInputProps> = ({ icon, label, ...props }) => (
   <div className="bs-input-wrap flex items-center gap-3 px-4 py-3.5">
-    {icon}
+    <span className="flex-shrink-0">{icon}</span>
     <div className="flex-1 min-w-0">
-      <p
-        className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-0.5"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
-      >
+      <p className="input-label-professional mb-0.5">
         {label}
       </p>
       <Input
         {...props}
         className="border-0 p-0 h-auto text-sm font-medium text-gray-800 focus-visible:ring-0 bg-transparent"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
       />
     </div>
   </div>
 );
 
-/* ===================== Suggestion List ===================== */
-
-// ✅ Removed unused 'query' prop
 const SuggestionList = ({
   visible, suggestions, onSelect, icon,
 }: {
@@ -611,39 +662,40 @@ const SuggestionList = ({
         exit={{ opacity: 0, y: -6, scale: 0.98 }}
         transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
         className="absolute z-50 mt-2 w-full rounded-2xl border border-gray-100 bg-white shadow-xl overflow-hidden"
-        style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06)" }}
       >
-        <div className="px-3 py-2 border-b border-gray-50">
-          <p
-            className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}
-          >
+        <div className="px-4 py-2 border-b border-gray-50">
+          <p className="caption-professional">
             Suggested locations
           </p>
         </div>
-        {suggestions.map((item) => (
-          <div
-            key={item}
-            onClick={() => onSelect(item)}
-            className="bs-suggestion-item flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 last:border-0"
-          >
-            <span className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-xl bg-amber-50">
-              {icon}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p
-                className="text-sm font-semibold text-gray-800 truncate"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                {item.split(",")[0]}
-              </p>
-              <p className="text-xs text-gray-400 truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                {item.includes(",") ? item.split(",").slice(1).join(",").trim() : ""}
-              </p>
+        <div className="suggestion-list">
+          {suggestions.map((item) => (
+            <div
+              key={item}
+              onClick={() => onSelect(item)}
+              className="bs-suggestion-item flex items-center gap-3 border-b border-gray-50 last:border-0"
+            >
+              <span className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-xl bg-amber-50">
+                {icon}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p
+                  className="text-sm font-semibold text-gray-800 truncate"
+                  style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                >
+                  {item.split(",")[0]}
+                </p>
+                <p
+                  className="text-xs text-gray-400 truncate"
+                  style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                >
+                  {item.includes(",") ? item.split(",").slice(1).join(",").trim() : ""}
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
             </div>
-            <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
-          </div>
-        ))}
+          ))}
+        </div>
       </motion.div>
     )}
   </AnimatePresence>
