@@ -13,6 +13,7 @@ const TOKENS = {
   orange: "#FF9500",
   orangeDark: "#E07800",
   gold: "#E8A000",
+  yellow: "#FFD700",          // added for mobile X
   white: "#FFFFFF",
   offWhite: "#FAFAF8",
   ivory: "#FFF8ED",
@@ -200,10 +201,10 @@ const Navbar = () => {
               transition: "height 0.3s ease",
             }}
           >
-
-            {/* ── Logo ── */}
+            {/* ── Logo – always on the left ── */}
             <Link
               to="/"
+              className="navbar-logo"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -233,13 +234,13 @@ const Navbar = () => {
                   fontFamily: "'Syne', sans-serif",
                   fontWeight: 800,
                   fontSize: "1.4rem",
-                  color: TOKENS.navy,
                   letterSpacing: "-0.03em",
                   lineHeight: 1,
                   userSelect: "none",
                 }}
               >
-                X<span style={{ color: TOKENS.orange }}>pool</span>
+                <span className="logo-x" style={{ color: TOKENS.navy }}>X</span>
+                <span className="logo-pool" style={{ color: TOKENS.orange }}>pool</span>
               </span>
             </Link>
 
@@ -263,19 +264,16 @@ const Navbar = () => {
               className="hidden md:flex"
               style={{ alignItems: "center", gap: 10 }}
             >
-              {/* Support */}
               <SupportButton />
-
-              {/* Download */}
               <DownloadButton />
             </div>
 
-            {/* ── Mobile Hamburger ── */}
+            {/* ── Mobile Hamburger – stays on the right, hidden on desktop via CSS ── */}
             <button
               aria-label={isOpen ? "Close menu" : "Open menu"}
               aria-expanded={isOpen}
               onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden"
+              className="navbar-hamburger md:hidden"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -296,7 +294,6 @@ const Navbar = () => {
                 : <Menu style={{ width: 20, height: 20 }} />
               }
             </button>
-
           </div>
         </div>
       </nav>
@@ -361,11 +358,11 @@ const Navbar = () => {
                 fontFamily: "'Syne', sans-serif",
                 fontWeight: 800,
                 fontSize: "1.2rem",
-                color: TOKENS.navy,
                 letterSpacing: "-0.03em",
               }}
             >
-              X<span style={{ color: TOKENS.orange }}>pool</span>
+              <span className="logo-x" style={{ color: TOKENS.navy }}>X</span>
+              <span className="logo-pool" style={{ color: TOKENS.orange }}>pool</span>
             </span>
           </Link>
 
@@ -450,11 +447,28 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Keyframe animation for slide-in */}
+      {/* Keyframe animation and responsive overrides */}
       <style>{`
         @keyframes slideIn {
           from { opacity: 0; transform: translateX(16px); }
           to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* 🔧 Force hamburger to be hidden on desktop (screens ≥ 768px) */
+        @media (min-width: 768px) {
+          .navbar-hamburger {
+            display: none !important;
+          }
+        }
+
+        /* Mobile-only adjustments – logo colours */
+        @media (max-width: 768px) {
+          .logo-x {
+            color: ${TOKENS.yellow} !important;
+          }
+          .logo-pool {
+            color: ${TOKENS.navy} !important;
+          }
         }
       `}</style>
     </>

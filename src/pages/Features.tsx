@@ -1,6 +1,7 @@
 import Navbar from "@/components/ui/navbar";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import {
   Smartphone,
   MapPin,
@@ -14,6 +15,7 @@ import {
   Gift,
   Settings,
   ArrowRight,
+  Zap,
 } from "lucide-react";
 
 /* ---------------------------------- */
@@ -25,6 +27,7 @@ interface Feature {
   title: string;
   description: string;
   icon: React.ElementType;
+  accent: string;
 }
 
 /* ---------------------------------- */
@@ -38,13 +41,15 @@ const features: Feature[] = [
     description:
       "Book your ride in seconds. Enter pickup and drop locations and get instantly matched with nearby drivers.",
     icon: Smartphone,
+    accent: "#FF6B35",
   },
   {
     id: 2,
     title: "Real-Time Location Tracking",
     description:
-      "Track your driver’s live location from acceptance to destination with precise GPS updates.",
+      "Track your driver's live location from acceptance to destination with precise GPS updates.",
     icon: MapPin,
+    accent: "#FF8C42",
   },
   {
     id: 3,
@@ -52,6 +57,7 @@ const features: Feature[] = [
     description:
       "Chat or call drivers securely within the app—no need to share personal phone numbers.",
     icon: MessageCircle,
+    accent: "#FFA552",
   },
   {
     id: 4,
@@ -59,6 +65,7 @@ const features: Feature[] = [
     description:
       "Every ride starts with OTP verification to ensure rider safety and prevent misuse.",
     icon: KeyRound,
+    accent: "#FF6B35",
   },
   {
     id: 5,
@@ -66,6 +73,7 @@ const features: Feature[] = [
     description:
       "Real-time fare calculation with zero hidden charges. What you see is what you pay.",
     icon: DollarSign,
+    accent: "#FF8C42",
   },
   {
     id: 6,
@@ -73,6 +81,7 @@ const features: Feature[] = [
     description:
       "Pay via UPI, Wallet, Debit/Credit Card, or Cash—whatever suits you best.",
     icon: CreditCard,
+    accent: "#FFA552",
   },
   {
     id: 7,
@@ -80,6 +89,7 @@ const features: Feature[] = [
     description:
       "Verified drivers, SOS support, and strict safety protocols for peace of mind.",
     icon: Shield,
+    accent: "#FF6B35",
   },
   {
     id: 8,
@@ -87,6 +97,7 @@ const features: Feature[] = [
     description:
       "Access trip history, download invoices, and manage ride expenses easily.",
     icon: Clock,
+    accent: "#FF8C42",
   },
   {
     id: 9,
@@ -94,6 +105,7 @@ const features: Feature[] = [
     description:
       "Rate drivers and provide feedback to improve service quality across the platform.",
     icon: Star,
+    accent: "#FFA552",
   },
   {
     id: 10,
@@ -101,6 +113,7 @@ const features: Feature[] = [
     description:
       "Get exclusive discounts, referral rewards, and seasonal offers directly in-app.",
     icon: Gift,
+    accent: "#FF6B35",
   },
   {
     id: 11,
@@ -108,73 +121,475 @@ const features: Feature[] = [
     description:
       "Advanced admin tools for monitoring rides, managing drivers, and maintaining quality.",
     icon: Settings,
+    accent: "#FF8C42",
   },
 ];
+
+/* ---------------------------------- */
+/* Intersection Observer Hook         */
+/* ---------------------------------- */
+
+function useInView(threshold = 0.15) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [threshold]);
+
+  return { ref, inView };
+}
+
+/* ---------------------------------- */
+/* Animated Counter                   */
+/* ---------------------------------- */
+
+function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const { ref, inView } = useInView();
+
+  useEffect(() => {
+    if (!inView) return;
+    let start = 0;
+    const step = Math.ceil(target / 60);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= target) {
+        setCount(target);
+        clearInterval(timer);
+      } else {
+        setCount(start);
+      }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [inView, target]);
+
+  return (
+    <span ref={ref}>
+      {count.toLocaleString()}
+      {suffix}
+    </span>
+  );
+}
 
 /* ---------------------------------- */
 /* Page Component                     */
 /* ---------------------------------- */
 
 const Features = (): JSX.Element => {
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!heroRef.current) return;
+      const { clientX, clientY } = e;
+      const { innerWidth, innerHeight } = window;
+      const x = (clientX / innerWidth - 0.5) * 30;
+      const y = (clientY / innerHeight - 0.5) * 30;
+      heroRef.current.style.setProperty("--mouse-x", `${x}px`);
+      heroRef.current.style.setProperty("--mouse-y", `${y}px`);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ background: "#0A0A0F", fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=Bebas+Neue&display=swap');
+
+        * { box-sizing: border-box; }
+
+        :root {
+          --orange: #FF6B35;
+          --orange-mid: #FF8C42;
+          --orange-light: #FFA552;
+          --bg: #0A0A0F;
+          --bg-card: #111118;
+          --bg-card-hover: #16161F;
+          --border: rgba(255,107,53,0.12);
+          --border-hover: rgba(255,107,53,0.35);
+          --text: #F0EEE9;
+          --text-muted: #6E6C7A;
+          --text-mid: #A8A6B5;
+        }
+
+        .hero-bg {
+          position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+        }
+        .hero-orb {
+          position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.35;
+        }
+        .hero-orb-1 {
+          width: 600px; height: 600px; top: -150px; left: -100px;
+          background: radial-gradient(circle, #FF6B35 0%, transparent 70%);
+          transform: translate(var(--mouse-x, 0), var(--mouse-y, 0));
+          transition: transform 0.8s ease;
+        }
+        .hero-orb-2 {
+          width: 400px; height: 400px; bottom: -80px; right: -80px;
+          background: radial-gradient(circle, #FF8C42 0%, transparent 70%);
+          transform: translate(calc(var(--mouse-x, 0) * -0.6), calc(var(--mouse-y, 0) * -0.6));
+          transition: transform 1s ease;
+        }
+        .hero-grid {
+          position: absolute; inset: 0;
+          background-image: linear-gradient(rgba(255,107,53,0.04) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(255,107,53,0.04) 1px, transparent 1px);
+          background-size: 60px 60px;
+          mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 20%, transparent 100%);
+        }
+
+        .hero-label {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 6px 16px; border-radius: 100px;
+          border: 1px solid rgba(255,107,53,0.25);
+          background: rgba(255,107,53,0.08);
+          color: var(--orange-mid);
+          font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+          margin-bottom: 28px;
+        }
+
+        .hero-title {
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: clamp(64px, 10vw, 120px);
+          line-height: 0.92;
+          color: var(--text);
+          letter-spacing: 0.01em;
+          margin: 0 0 28px;
+        }
+        .hero-title .gradient-word {
+          background: linear-gradient(135deg, #FF6B35 0%, #FFA552 50%, #FF6B35 100%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: shimmer 3s linear infinite;
+        }
+        @keyframes shimmer {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+
+        .hero-sub {
+          font-size: 18px; font-weight: 300;
+          color: var(--text-mid); max-width: 520px; margin: 0 auto; line-height: 1.7;
+        }
+
+        /* Stats bar */
+        .stats-bar {
+          display: flex; align-items: center; justify-content: center; gap: 0;
+          margin-top: 56px; border-radius: 16px;
+          border: 1px solid var(--border);
+          background: rgba(255,255,255,0.02);
+          backdrop-filter: blur(20px);
+          overflow: hidden; max-width: 680px; margin-left: auto; margin-right: auto;
+        }
+        .stat-item {
+          flex: 1; padding: 20px 24px; text-align: center;
+          border-right: 1px solid var(--border);
+          position: relative;
+        }
+        .stat-item:last-child { border-right: none; }
+        .stat-value {
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 36px; color: var(--orange); letter-spacing: 0.02em; line-height: 1;
+        }
+        .stat-label {
+          font-size: 11px; color: var(--text-muted); letter-spacing: 0.08em;
+          text-transform: uppercase; margin-top: 4px;
+        }
+
+        /* Section heading */
+        .section-eyebrow {
+          font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+          text-transform: uppercase; color: var(--orange);
+          margin-bottom: 12px;
+        }
+        .section-title {
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: clamp(42px, 6vw, 72px);
+          color: var(--text); line-height: 1; letter-spacing: 0.01em; margin: 0;
+        }
+
+        /* Feature card */
+        .feature-card {
+          position: relative; border-radius: 20px;
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          padding: 32px;
+          transition: border-color 0.3s ease, background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+          overflow: hidden; cursor: default;
+        }
+        .feature-card::before {
+          content: ''; position: absolute; inset: 0; border-radius: 20px; opacity: 0;
+          background: radial-gradient(circle at var(--cx,50%) var(--cy,50%), rgba(255,107,53,0.08) 0%, transparent 60%);
+          transition: opacity 0.4s ease;
+        }
+        .feature-card:hover {
+          border-color: var(--border-hover);
+          background: var(--bg-card-hover);
+          transform: translateY(-4px);
+          box-shadow: 0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,107,53,0.08);
+        }
+        .feature-card:hover::before { opacity: 1; }
+
+        .feature-card .card-number {
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 80px; line-height: 1;
+          color: rgba(255,107,53,0.06);
+          position: absolute; top: 16px; right: 20px;
+          pointer-events: none; user-select: none;
+          transition: color 0.3s ease;
+        }
+        .feature-card:hover .card-number { color: rgba(255,107,53,0.12); }
+
+        .icon-wrap {
+          width: 52px; height: 52px; border-radius: 14px;
+          display: flex; align-items: center; justify-content: center;
+          position: relative; margin-bottom: 20px;
+          background: rgba(255,107,53,0.1);
+          border: 1px solid rgba(255,107,53,0.15);
+          transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+        }
+        .feature-card:hover .icon-wrap {
+          background: rgba(255,107,53,0.15);
+          border-color: rgba(255,107,53,0.3);
+          box-shadow: 0 0 20px rgba(255,107,53,0.2);
+        }
+
+        .card-title {
+          font-size: 17px; font-weight: 600; color: var(--text);
+          margin: 0 0 10px; letter-spacing: -0.01em;
+        }
+        .card-desc {
+          font-size: 14px; color: var(--text-muted); line-height: 1.65; margin: 0;
+          font-weight: 300;
+        }
+
+        .card-shine {
+          position: absolute; inset: 0; border-radius: 20px; opacity: 0;
+          background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 50%);
+          transition: opacity 0.3s ease;
+        }
+        .feature-card:hover .card-shine { opacity: 1; }
+
+        /* Stagger animation */
+        .stagger-in {
+          opacity: 0; transform: translateY(28px);
+          animation: fadeUp 0.6s ease forwards;
+        }
+        @keyframes fadeUp {
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* CTA */
+        .cta-section {
+          position: relative; overflow: hidden;
+          background: linear-gradient(135deg, #0E0A08 0%, #150F09 50%, #0A0A0F 100%);
+          border-top: 1px solid rgba(255,107,53,0.1);
+        }
+        .cta-bg-glow {
+          position: absolute; width: 800px; height: 400px;
+          top: 50%; left: 50%; transform: translate(-50%, -50%);
+          background: radial-gradient(ellipse, rgba(255,107,53,0.1) 0%, transparent 70%);
+          pointer-events: none;
+        }
+
+        .btn-primary {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 14px 32px; border-radius: 12px;
+          background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+          color: #fff; font-weight: 600; font-size: 15px;
+          text-decoration: none; transition: all 0.2s ease;
+          box-shadow: 0 4px 24px rgba(255,107,53,0.3);
+          position: relative; overflow: hidden;
+        }
+        .btn-primary::after {
+          content: ''; position: absolute; inset: 0;
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+          opacity: 0; transition: opacity 0.2s;
+        }
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 32px rgba(255,107,53,0.45);
+        }
+        .btn-primary:hover::after { opacity: 1; }
+
+        .btn-secondary {
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 14px 32px; border-radius: 12px;
+          border: 1px solid rgba(255,107,53,0.25);
+          color: var(--text); font-weight: 500; font-size: 15px;
+          text-decoration: none;
+          background: rgba(255,107,53,0.05);
+          transition: all 0.2s ease;
+        }
+        .btn-secondary:hover {
+          border-color: rgba(255,107,53,0.5);
+          background: rgba(255,107,53,0.1);
+          transform: translateY(-2px);
+        }
+
+        /* Featured card (larger) */
+        .feature-card.featured {
+          grid-column: span 1;
+          background: linear-gradient(135deg, #111118 0%, #130E0B 100%);
+        }
+
+        /* Floating tag strip */
+        .tag-strip {
+          display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px;
+        }
+        .tag {
+          font-size: 11px; font-weight: 500; letter-spacing: 0.06em;
+          text-transform: uppercase; color: var(--orange-mid);
+          padding: 4px 10px; border-radius: 6px;
+          background: rgba(255,107,53,0.08); border: 1px solid rgba(255,107,53,0.15);
+        }
+
+        /* Divider line */
+        .divider {
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,107,53,0.3), transparent);
+          margin: 0;
+        }
+      `}</style>
+
       <Navbar />
 
-      {/* Hero */}
-      <section className="pt-28 pb-20 bg-gradient-to-br from-background via-background to-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6">
-              Powerful{" "}
-              <span className="bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
-                Features
-              </span>
-            </h1>
-            <p className="text-xl text-muted-foreground leading-relaxed">
-              Everything you need for a safe, affordable, and seamless ride-sharing experience—built for both riders and drivers.
-            </p>
+      {/* ── Hero ── */}
+      <section
+        ref={heroRef}
+        style={{ position: "relative", paddingTop: "140px", paddingBottom: "100px", textAlign: "center" }}
+      >
+        <div className="hero-bg">
+          <div className="hero-grid" />
+          <div className="hero-orb hero-orb-1" />
+          <div className="hero-orb hero-orb-2" />
+        </div>
+
+        <div style={{ position: "relative", zIndex: 1, maxWidth: "900px", margin: "0 auto", padding: "0 24px" }}>
+          <div className="hero-label" style={{ display: "inline-flex" }}>
+            <Zap size={12} />
+            11 Powerful Capabilities
+          </div>
+
+          <h1 className="hero-title">
+            BUILT FOR <span className="gradient-word">SPEED</span>
+            <br />& SAFETY
+          </h1>
+
+          <p className="hero-sub">
+            Everything you need for a safe, affordable, and seamless ride-sharing experience—engineered for riders and drivers alike.
+          </p>
+
+          {/* Stats */}
+          <div className="stats-bar" style={{ marginTop: "48px" }}>
+            <div className="stat-item">
+              <div className="stat-value">
+                <AnimatedCounter target={50} suffix="K+" />
+              </div>
+              <div className="stat-label">Active Riders</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-value">
+                <AnimatedCounter target={12} suffix="K+" />
+              </div>
+              <div className="stat-label">Verified Drivers</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-value">
+                <AnimatedCounter target={99} suffix="%" />
+              </div>
+              <div className="stat-label">Safety Score</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-value">
+                <AnimatedCounter target={11} />
+              </div>
+              <div className="stat-label">Core Features</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
-            {features.map((feature) => (
-              <FeatureCard key={feature.id} feature={feature} />
+      <div className="divider" />
+
+      {/* ── Features Grid ── */}
+      <section style={{ padding: "100px 24px" }}>
+        <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+
+          {/* Section header */}
+          <div style={{ marginBottom: "64px" }}>
+            <p className="section-eyebrow">Platform Features</p>
+            <h2 className="section-title">WHAT SETS<br />XPOOL APART</h2>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+              gap: "20px",
+            }}
+          >
+            {features.map((feature, i) => (
+              <FeatureCard key={feature.id} feature={feature} delay={i * 60} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-muted/40">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
-              Ready to experience smarter ride-sharing?
-            </h2>
-            <p className="text-xl text-muted-foreground mb-10">
-              Join thousands who rely on Xpool for safe, reliable, and affordable rides.
-            </p>
+      <div className="divider" />
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/download"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition"
-              >
-                Download App
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+      {/* ── CTA ── */}
+      <section className="cta-section" style={{ padding: "120px 24px" }}>
+        <div className="cta-bg-glow" />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: "700px", margin: "0 auto", textAlign: "center" }}>
+          <p className="section-eyebrow">Get Started Today</p>
+          <h2
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: "clamp(48px,8vw,88px)",
+              color: "var(--text)",
+              lineHeight: 0.95,
+              letterSpacing: "0.01em",
+              margin: "0 0 24px",
+            }}
+          >
+            SMARTER RIDES
+            <br />
+            <span style={{ color: "var(--orange)" }}>START HERE</span>
+          </h2>
 
-              <Link
-                to="/contact"
-                className="inline-flex items-center justify-center px-8 py-4 border border-border rounded-lg font-semibold hover:bg-accent transition"
-              >
-                Become a Driver
-              </Link>
-            </div>
+          <p style={{ fontSize: "17px", color: "var(--text-muted)", fontWeight: 300, lineHeight: 1.7, marginBottom: "48px" }}>
+            Join thousands who rely on Xpool for safe, reliable, and affordable rides every day.
+          </p>
+
+          <div style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap" }}>
+            <Link to="/download" className="btn-primary">
+              Download App
+              <ArrowRight size={16} />
+            </Link>
+            <Link to="/contact" className="btn-secondary">
+              Become a Driver
+            </Link>
+          </div>
+
+          <div className="tag-strip" style={{ justifyContent: "center", marginTop: "40px" }}>
+            {["Free to Download", "OTP Verified", "24/7 Support", "Secure Payments"].map((t) => (
+              <span key={t} className="tag">{t}</span>
+            ))}
           </div>
         </div>
       </section>
@@ -190,33 +605,66 @@ export default Features;
 
 interface FeatureCardProps {
   feature: Feature;
+  delay?: number;
 }
 
-const FeatureCard = ({ feature }: FeatureCardProps): JSX.Element => {
+const FeatureCard = ({ feature, delay = 0 }: FeatureCardProps): JSX.Element => {
   const Icon = feature.icon;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const { ref: inViewRef, inView } = useInViewSimple();
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const cx = ((e.clientX - rect.left) / rect.width) * 100;
+    const cy = ((e.clientY - rect.top) / rect.height) * 100;
+    card.style.setProperty("--cx", `${cx}%`);
+    card.style.setProperty("--cy", `${cy}%`);
+  };
 
   return (
-    <Card className="p-8 bg-card/80 backdrop-blur-sm border-border/50 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group h-full">
-      <div className="flex flex-col h-full">
-        <div className="flex items-start gap-4 mb-5">
-          <div className="p-4 rounded-2xl bg-primary/10 group-hover:bg-primary/20 transition">
-            <Icon className="h-8 w-8 text-primary" />
-          </div>
+    <div
+      ref={(el) => {
+        (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+        (inViewRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      }}
+      className="feature-card stagger-in"
+      onMouseMove={handleMouseMove}
+      style={{
+        animationDelay: inView ? `${delay}ms` : "9999s",
+        animationPlayState: inView ? "running" : "paused",
+      }}
+    >
+      {/* Large ghost number */}
+      <span className="card-number">{String(feature.id).padStart(2, "0")}</span>
 
-          <div>
-            <span className="text-sm font-medium text-primary">
-              {String(feature.id).padStart(2, "0")}
-            </span>
-            <h3 className="text-xl font-semibold text-card-foreground mt-1">
-              {feature.title}
-            </h3>
-          </div>
-        </div>
+      {/* Shine layer */}
+      <div className="card-shine" />
 
-        <p className="text-muted-foreground leading-relaxed">
-          {feature.description}
-        </p>
+      {/* Icon */}
+      <div className="icon-wrap">
+        <Icon size={22} color="var(--orange)" strokeWidth={1.8} />
       </div>
-    </Card>
+
+      {/* Content */}
+      <h3 className="card-title">{feature.title}</h3>
+      <p className="card-desc">{feature.description}</p>
+    </div>
   );
 };
+
+/* Simple useInView for cards */
+function useInViewSimple() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
+      { threshold: 0.1 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, inView };
+}

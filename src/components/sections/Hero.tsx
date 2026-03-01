@@ -1,4 +1,4 @@
-import { FC, useCallback, useRef, memo } from "react";
+import { FC, useCallback, useRef, memo, useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
@@ -353,6 +353,184 @@ TrustBadgeCard.displayName = "TrustBadgeCard";
 // ─────────────────────────────────────────────────────────────────────────────
 const Hero: FC = () => {
   const prefersReducedMotion = useReducedMotion();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const autoScrollIndexRef = useRef(0); // persists across renders
+  const autoScrollTimer = useRef<NodeJS.Timeout>();
+  const resumeTimer = useRef<NodeJS.Timeout>();
+
+  // Real badge count and duplicated list for infinite loop
+  const totalReal = TRUST_BADGES.length;
+  const duplicatedBadges = useMemo(
+    () => [...TRUST_BADGES, ...TRUST_BADGES, ...TRUST_BADGES],
+    []
+  );
+
+  // Check if mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640); // Tailwind's sm breakpoint
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Initial scroll position to the second copy (infinite loop starting point)
+  useEffect(() => {
+    if (!isMobile || prefersReducedMotion) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    const children = Array.from(container.children) as HTMLElement[];
+    if (children.length === 0) return;
+    // Scroll to the first badge of the second copy
+    const startIndex = totalReal;
+    if (children[startIndex]) {
+      container.scrollLeft = children[startIndex].offsetLeft;
+      autoScrollIndexRef.current = startIndex;
+    }
+  }, [isMobile, prefersReducedMotion, totalReal]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Infinite loop jump: when user scrolls into a cloned copy, instantly jump
+  // to the corresponding real badge in the middle copy.
+  // ───────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isMobile || prefersReducedMotion) return;
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const handleScrollJump = () => {
+      const children = Array.from(container.children) as HTMLElement[];
+      if (children.length === 0) return;
+
+      // Find the most visible badge (same logic as before)
+      const scrollLeft = container.scrollLeft;
+      let closestIndex = 0;
+      let minDiff = Infinity;
+      children.forEach((child, idx) => {
+        const diff = Math.abs(child.offsetLeft - scrollLeft);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIndex = idx;
+        }
+      });
+
+      // If we're in the first copy (index < totalReal)
+      if (closestIndex < totalReal) {
+        const targetIndex = closestIndex + totalReal; // move to second copy
+        container.scrollLeft = children[targetIndex].offsetLeft;
+        autoScrollIndexRef.current = targetIndex;
+      }
+      // If we're in the third copy (index >= totalReal * 2)
+      else if (closestIndex >= totalReal * 2) {
+        const targetIndex = closestIndex - totalReal; // move back to second copy
+        container.scrollLeft = children[targetIndex].offsetLeft;
+        autoScrollIndexRef.current = targetIndex;
+      } else {
+        // Update the ref to the current visible index (in second copy)
+        autoScrollIndexRef.current = closestIndex;
+      }
+    };
+
+    container.addEventListener("scroll", handleScrollJump);
+    return () => container.removeEventListener("scroll", handleScrollJump);
+  }, [isMobile, prefersReducedMotion, totalReal]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Auto‑scroll logic (continuous loop with pause on interaction)
+  // ───────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isMobile || prefersReducedMotion) return;
+
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const children = Array.from(container.children) as HTMLElement[];
+    if (children.length === 0) return;
+
+    const totalItems = children.length; // now 3 * totalReal
+
+    // Scroll to a given index with smooth behavior
+    const scrollToIndex = (index: number) => {
+      if (!container) return;
+      const child = children[index];
+      if (!child) return;
+      container.scrollTo({
+        left: child.offsetLeft,
+        behavior: "smooth",
+      });
+    };
+
+    // Determine which badge is most visible based on scroll position
+    const getCurrentIndexFromScroll = () => {
+      if (!container) return autoScrollIndexRef.current;
+      const scrollLeft = container.scrollLeft;
+      let closestIndex = 0;
+      let minDiff = Infinity;
+      children.forEach((child, idx) => {
+        const diff = Math.abs(child.offsetLeft - scrollLeft);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIndex = idx;
+        }
+      });
+      return closestIndex;
+    };
+
+    // Set up the interval for auto‑advance
+    let interval: NodeJS.Timeout | null = null;
+
+    const startAutoScroll = () => {
+      if (interval) clearInterval(interval);
+      interval = setInterval(() => {
+        if (!autoScrollEnabled) return; // pause if user interacting
+        // Always move forward (increment index), wrapping around within totalItems
+        autoScrollIndexRef.current = (autoScrollIndexRef.current + 1) % totalItems;
+        scrollToIndex(autoScrollIndexRef.current);
+      }, 4000);
+    };
+
+    if (autoScrollEnabled) {
+      startAutoScroll();
+    }
+
+    // Handle manual scroll: pause auto‑scroll and then resume after a delay
+    const onScroll = () => {
+      setAutoScrollEnabled(false); // pause
+      // Clear any pending resume timer
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+      // Schedule resume after 3 seconds of inactivity
+      resumeTimer.current = setTimeout(() => {
+        // Update current index to the one now visible (should be in second copy due to jump handler)
+        autoScrollIndexRef.current = getCurrentIndexFromScroll();
+        setAutoScrollEnabled(true);
+      }, 3000);
+    };
+
+    // Pause on hover/touch (immediate)
+    const pause = () => setAutoScrollEnabled(false);
+    const resume = () => {
+      // Resume is handled by the scroll timer
+    };
+
+    container.addEventListener("scroll", onScroll);
+    container.addEventListener("mouseenter", pause);
+    container.addEventListener("mouseleave", resume);
+    container.addEventListener("touchstart", pause);
+    container.addEventListener("touchend", resume);
+
+    return () => {
+      if (interval) clearInterval(interval);
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+      container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("mouseenter", pause);
+      container.removeEventListener("mouseleave", resume);
+      container.removeEventListener("touchstart", pause);
+      container.removeEventListener("touchend", resume);
+    };
+  }, [isMobile, prefersReducedMotion, autoScrollEnabled, totalReal]);
 
   const scrollToBooking = useCallback(() => {
     document.getElementById("booking-section")?.scrollIntoView({ behavior: "smooth" });
@@ -501,17 +679,34 @@ const Hero: FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Trust badges – responsive grid */}
+          {/* Trust badges – responsive grid with auto‑scroll on mobile */}
           <div
-            className="flex flex-wrap items-stretch justify-center gap-3 w-full"
+            ref={scrollRef}
+            className={`relative flex items-stretch gap-3 w-full ${isMobile
+                ? "overflow-x-auto scroll-smooth snap-x snap-mandatory flex-nowrap"
+                : "flex-wrap justify-center"
+              }`}
             role="list"
             aria-label="Platform statistics"
           >
-            {TRUST_BADGES.map((badge, i) => (
-              <div key={badge.label} role="listitem">
-                <TrustBadgeCard badge={badge} index={i} />
-              </div>
-            ))}
+            {isMobile
+              ? duplicatedBadges.map((badge, idx) => (
+                <div
+                  key={idx}
+                  role="listitem"
+                  className="snap-start shrink-0"
+                >
+                  <TrustBadgeCard
+                    badge={badge}
+                    index={idx % totalReal} // preserve staggered animation per real badge
+                  />
+                </div>
+              ))
+              : TRUST_BADGES.map((badge, i) => (
+                <div key={badge.label} role="listitem">
+                  <TrustBadgeCard badge={badge} index={i} />
+                </div>
+              ))}
           </div>
         </motion.div>
 
