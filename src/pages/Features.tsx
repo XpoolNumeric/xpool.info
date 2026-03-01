@@ -224,6 +224,58 @@ const Features = (): JSX.Element => {
           --text-mid: #A8A6B5;
         }
 
+        /* Mobile-first adjustments */
+        @media (max-width: 600px) {
+          .hero-title {
+            font-size: clamp(48px, 12vw, 80px) !important;
+          }
+          .hero-sub {
+            font-size: 16px !important;
+            padding: 0 16px;
+          }
+          .stats-bar {
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+          }
+          .stat-item {
+            flex: 1 1 calc(50% - 16px);
+            padding: 12px 8px !important;
+            border-right: none !important;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+          }
+          .stat-value {
+            font-size: 28px !important;
+          }
+          .stat-label {
+            font-size: 10px !important;
+          }
+          .section-title {
+            font-size: clamp(32px, 8vw, 56px) !important;
+          }
+          .feature-card {
+            padding: 24px !important;
+          }
+          .icon-wrap {
+            width: 44px !important;
+            height: 44px !important;
+          }
+          .card-title {
+            font-size: 16px !important;
+          }
+          .card-desc {
+            font-size: 13px !important;
+          }
+          .cta-section {
+            padding: 80px 16px !important;
+          }
+          .btn-primary, .btn-secondary {
+            width: 100%;
+            justify-content: center;
+          }
+        }
+
         .hero-bg {
           position: absolute; inset: 0; overflow: hidden; pointer-events: none;
         }
@@ -539,7 +591,7 @@ const Features = (): JSX.Element => {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
               gap: "20px",
             }}
           >

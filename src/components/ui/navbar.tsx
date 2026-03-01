@@ -1,51 +1,123 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Menu, X, Phone, Download, ChevronDown } from "lucide-react";
+import { Phone, Download, Menu, X, Sparkles, ChevronRight } from "lucide-react";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
 
-/* ─────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────
    Design Tokens
-───────────────────────────────────────── */
-const TOKENS = {
-  navy: "#0F1623",
-  navyLight: "#1a2438",
+───────────────────────────────────────────────────────── */
+const T = {
+  navy: "#0A0F1C",
+  navyMid: "#111827",
   orange: "#FF9500",
-  orangeDark: "#E07800",
-  gold: "#E8A000",
-  yellow: "#FFD700",          // added for mobile X
+  orangeDeep: "#E07800",
+  orangeGlow: "rgba(255,149,0,0.22)",
+  gold: "#FFBA00",
+  amber: "#FFD060",
   white: "#FFFFFF",
-  offWhite: "#FAFAF8",
   ivory: "#FFF8ED",
-  glass: "rgba(255,255,255,0.82)",
-  glassBorder: "rgba(255,149,0,0.14)",
-  shadow: "0 4px 32px rgba(15,22,35,0.08), 0 1px 4px rgba(255,149,0,0.06)",
-  shadowHover: "0 8px 48px rgba(15,22,35,0.12), 0 2px 8px rgba(255,149,0,0.10)",
+  muted: "#6B7280",
+  border: "rgba(229,231,235,0.55)",
+  borderHover: "rgba(255,149,0,0.35)",
 };
 
-/* ─────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────
    Nav Items
-───────────────────────────────────────── */
+───────────────────────────────────────────────────────── */
 const NAV_ITEMS = [
-  { label: "Home", to: "/" },
-  { label: "How it Works", to: "/how-it-works" },
-  { label: "Features", to: "/features" },
-  { label: "Download", to: "/download" },
-  { label: "Contact", to: "/contact" },
+  { label: "Home", to: "/", icon: "●", badge: false },
+  { label: "How it Works", to: "/how-it-works", icon: "◆", badge: false },
+  { label: "Features", to: "/features", icon: "▲", badge: false },
+  { label: "Download", to: "/download", icon: "⬇", badge: true },
+  { label: "Contact", to: "/contact", icon: "◉", badge: false },
 ];
 
-/* ─────────────────────────────────────────
-   Animated NavLink
-───────────────────────────────────────── */
-const NavLink = ({
-  item,
-  isActive,
-  onClick,
-}: {
-  item: (typeof NAV_ITEMS)[0];
+/* ─────────────────────────────────────────────────────────
+   Scroll Progress Bar
+───────────────────────────────────────────────────────── */
+const ScrollProgress = () => {
+  const [pct, setPct] = useState(0);
+
+  useEffect(() => {
+    const fn = () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      setPct(h > 0 ? (window.scrollY / h) * 100 : 0);
+    };
+    window.addEventListener("scroll", fn, { passive: true });
+    return () => window.removeEventListener("scroll", fn);
+  }, []);
+
+  return (
+    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, overflow: "hidden" }}>
+      <div
+        style={{
+          height: "100%",
+          width: `${pct}%`,
+          background: `linear-gradient(90deg, ${T.orange}, ${T.gold}, ${T.amber})`,
+          boxShadow: `0 0 12px ${T.orange}88`,
+          transition: "width 0.08s linear",
+        }}
+      />
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
+   Active Pip
+───────────────────────────────────────────────────────── */
+const ActivePip = () => (
+  <span
+    style={{
+      display: "inline-block",
+      width: 5,
+      height: 5,
+      borderRadius: "50%",
+      background: `radial-gradient(circle, ${T.amber} 0%, ${T.orange} 100%)`,
+      boxShadow: `0 0 8px ${T.orange}, 0 0 16px ${T.orangeGlow}`,
+      marginRight: 6,
+      animation: "pipPulse 2s ease-in-out infinite",
+      flexShrink: 0,
+    }}
+  />
+);
+
+/* ─────────────────────────────────────────────────────────
+   New Badge (enhanced for better visibility)
+───────────────────────────────────────────────────────── */
+const NewBadge = () => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "2px 8px",
+      borderRadius: 999,
+      background: `linear-gradient(135deg, ${T.orange}60, ${T.gold}70)`, // increased opacity
+      border: `1px solid ${T.orange}`,
+      fontSize: "0.6rem",
+      fontWeight: 800,
+      letterSpacing: "0.1em",
+      color: T.navy, // darker text for contrast
+      textTransform: "uppercase" as const,
+      fontFamily: "'DM Sans', sans-serif",
+      marginLeft: 6,
+      boxShadow: `0 2px 6px ${T.orange}40`,
+      animation: "badgePop 3s ease-in-out infinite",
+    }}
+  >
+    New
+  </span>
+);
+
+/* ─────────────────────────────────────────────────────────
+   Desktop NavLink
+───────────────────────────────────────────────────────── */
+interface NavLinkProps {
+  item: typeof NAV_ITEMS[0];
   isActive: boolean;
   onClick?: () => void;
-}) => {
+}
+
+const NavLink = ({ item, isActive, onClick }: NavLinkProps) => {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -58,97 +130,264 @@ const NavLink = ({
       style={{
         position: "relative",
         fontFamily: "'DM Sans', sans-serif",
-        fontWeight: isActive ? 600 : 500,
+        fontWeight: isActive ? 700 : 500,
         fontSize: "0.875rem",
-        letterSpacing: "0.01em",
-        color: isActive ? TOKENS.orange : hovered ? TOKENS.navyLight : "#4B5563",
+        letterSpacing: "0.015em",
+        color: isActive ? T.orange : hovered ? T.navyMid : T.muted,
         textDecoration: "none",
-        padding: "4px 2px",
+        padding: "6px 4px",
         transition: "color 0.2s ease",
-        display: "inline-block",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
       }}
     >
+      {isActive && (
+        <span
+          style={{
+            position: "absolute",
+            inset: "0 -8px",
+            borderRadius: 8,
+            background: `radial-gradient(ellipse at 50% 100%, ${T.orangeGlow} 0%, transparent 70%)`,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+      {isActive && <ActivePip />}
       {item.label}
-
-      {/* Underline indicator */}
+      {item.badge && <NewBadge />}
       <span
         style={{
           position: "absolute",
-          bottom: -2,
+          bottom: 0,
           left: 0,
           right: 0,
-          height: 2,
+          height: 1.5,
           borderRadius: 2,
-          background: `linear-gradient(90deg, ${TOKENS.orange}, ${TOKENS.gold})`,
+          background: `linear-gradient(90deg, ${T.orange}, ${T.gold})`,
           transform: isActive || hovered ? "scaleX(1)" : "scaleX(0)",
-          transformOrigin: "left center",
-          transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)",
+          transformOrigin: "left",
+          transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+          boxShadow: `0 0 6px ${T.orange}88`,
         }}
       />
     </Link>
   );
 };
 
-/* ─────────────────────────────────────────
-   Pill Badge
-───────────────────────────────────────── */
-const NewBadge = () => (
-  <span
+/* ─────────────────────────────────────────────────────────
+   Logo (with swapped colors)
+───────────────────────────────────────────────────────── */
+interface LogoProps {
+  small?: boolean;
+  mobileStyle?: boolean;
+  onClick?: () => void;
+}
+
+const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => (
+  <Link
+    to="/"
+    onClick={onClick}
     style={{
-      display: "inline-flex",
+      display: "flex",
       alignItems: "center",
-      padding: "1px 6px",
-      borderRadius: 999,
-      background: `linear-gradient(135deg, ${TOKENS.orange}22, ${TOKENS.gold}33)`,
-      border: `1px solid ${TOKENS.orange}44`,
-      fontSize: "0.6rem",
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      color: TOKENS.orangeDark,
-      textTransform: "uppercase",
-      fontFamily: "'DM Sans', sans-serif",
-      marginLeft: 6,
-      verticalAlign: "middle",
+      gap: small ? 8 : 10,
+      textDecoration: "none",
+      flexShrink: 0,
     }}
   >
-    New
-  </span>
+    <div
+      style={{
+        position: "relative",
+        width: small ? 28 : 36,
+        height: small ? 28 : 36,
+        borderRadius: small ? 8 : 10,
+        overflow: "hidden",
+        boxShadow: `0 2px 12px ${T.orange}40, 0 0 0 1px ${T.orange}20`,
+        flexShrink: 0,
+      }}
+    >
+      <img
+        src={xpoolLogo}
+        alt="Xpool logo"
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 2,
+          left: 3,
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.35)",
+          filter: "blur(2px)",
+          pointerEvents: "none",
+        }}
+      />
+    </div>
+    <span
+      style={{
+        fontFamily: "'Syne', sans-serif",
+        fontWeight: 800,
+        fontSize: small ? "1.15rem" : "1.4rem",
+        letterSpacing: "-0.03em",
+        lineHeight: 1,
+        userSelect: "none" as const,
+      }}
+    >
+      {/* Swapped colors: X now orange, pool navy on desktop; on mobile X navy, pool gold */}
+      <span style={{ color: mobileStyle ? T.navy : T.orange }}>X</span>
+      <span style={{ color: mobileStyle ? "#FFD700" : T.navy }}>pool</span>
+    </span>
+  </Link>
 );
 
-/* ─────────────────────────────────────────
-   Navbar
-───────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   Support Button
+───────────────────────────────────────────────────────── */
+const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 7,
+        padding: "9px 20px",
+        borderRadius: 999,
+        fontFamily: "'DM Sans', sans-serif",
+        fontWeight: 600,
+        fontSize: "0.83rem",
+        letterSpacing: "0.01em",
+        color: hovered ? T.orange : "#374151",
+        background: hovered ? T.ivory : T.white,
+        border: `1.5px solid ${hovered ? T.borderHover : T.border}`,
+        cursor: "pointer",
+        transition: "all 0.22s ease",
+        width: fullWidth ? "100%" : "auto",
+        whiteSpace: "nowrap" as const,
+        boxShadow: hovered ? `0 0 0 3px ${T.orangeGlow}` : "none",
+      }}
+    >
+      <Phone
+        style={{
+          width: 14,
+          height: 14,
+          color: T.orange,
+          transition: "transform 0.2s ease",
+          transform: hovered ? "rotate(-15deg) scale(1.1)" : "rotate(0deg) scale(1)",
+          flexShrink: 0,
+        }}
+      />
+      Support
+    </button>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
+   Download Button
+───────────────────────────────────────────────────────── */
+const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 7,
+        padding: "9px 22px",
+        borderRadius: 999,
+        fontFamily: "'DM Sans', sans-serif",
+        fontWeight: 800,
+        fontSize: "0.83rem",
+        letterSpacing: "0.02em",
+        color: T.navy,
+        background: hovered
+          ? `linear-gradient(135deg, ${T.orangeDeep} 0%, #F0A000 100%)`
+          : `linear-gradient(135deg, ${T.orange} 0%, ${T.gold} 100%)`,
+        border: "none",
+        boxShadow: hovered
+          ? `0 8px 30px ${T.orange}55, 0 0 0 3px ${T.orangeGlow}, inset 0 1px 0 rgba(255,255,255,0.3)`
+          : `0 4px 16px ${T.orange}40, inset 0 1px 0 rgba(255,255,255,0.2)`,
+        cursor: "pointer",
+        transform: hovered ? "translateY(-2px) scale(1.02)" : "translateY(0) scale(1)",
+        transition: "all 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+        width: fullWidth ? "100%" : "auto",
+        whiteSpace: "nowrap" as const,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.4) 50%, transparent 70%)",
+          backgroundSize: "200% 100%",
+          backgroundPosition: hovered ? "100% 0" : "-100% 0",
+          transition: "background-position 0.55s ease",
+          borderRadius: 999,
+          pointerEvents: "none",
+        }}
+      />
+      <Download
+        style={{
+          width: 14,
+          height: 14,
+          color: T.navy,
+          flexShrink: 0,
+          position: "relative",
+        }}
+      />
+      <span style={{ position: "relative" }}>Download App</span>
+    </button>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
+   Main Navbar
+───────────────────────────────────────────────────────── */
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hideBar, setHideBar] = useState(false);
+  const [mouseX, setMouseX] = useState(0.5);
   const lastScrollY = useRef(0);
   const location = useLocation();
 
-  /* Smart hide-on-scroll */
   useEffect(() => {
-    const onScroll = () => {
+    const fn = () => {
       const y = window.scrollY;
-      setScrolled(y > 16);
-      setHideBar(y > lastScrollY.current && y > 80);
+      setScrolled(y > 20);
+      setHideBar(y > lastScrollY.current && y > 90);
       lastScrollY.current = y;
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("scroll", fn, { passive: true });
+    return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  /* Lock body scroll when mobile menu open */
+  useEffect(() => {
+    const fn = (e: MouseEvent) => setMouseX(e.clientX / window.innerWidth);
+    window.addEventListener("mousemove", fn, { passive: true });
+    return () => window.removeEventListener("mousemove", fn);
+  }, []);
+
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  const handleNavClick = (to: string) => {
-    setIsOpen(false);
-    if (to.startsWith("#")) {
-      document.querySelector(to)?.scrollIntoView({ behavior: "smooth" });
-    }
-  };
+  useEffect(() => { setIsOpen(false); }, [location.pathname]);
+
+  const glowX = 20 + mouseX * 60;
 
   return (
     <>
@@ -161,17 +400,20 @@ const Navbar = () => {
           top: 0,
           left: 0,
           right: 0,
-          zIndex: 100,
-          transform: hideBar && !isOpen ? "translateY(-100%)" : "translateY(0)",
-          transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1), background 0.3s ease, box-shadow 0.3s ease",
-          background: scrolled ? TOKENS.glass : TOKENS.white,
-          backdropFilter: scrolled ? "blur(16px) saturate(180%)" : "none",
-          WebkitBackdropFilter: scrolled ? "blur(16px) saturate(180%)" : "none",
-          borderBottom: `1px solid ${scrolled ? TOKENS.glassBorder : "rgba(229,231,235,0.6)"}`,
-          boxShadow: scrolled ? TOKENS.shadow : "none",
+          zIndex: 1000,
+          transform: hideBar && !isOpen ? "translateY(-110%)" : "translateY(0)",
+          transition:
+            "transform 0.38s cubic-bezier(0.4,0,0.2,1), background 0.3s ease, box-shadow 0.3s ease",
+          background: scrolled ? "rgba(255,255,255,0.90)" : T.white,
+          backdropFilter: scrolled ? "blur(20px) saturate(200%)" : "none",
+          WebkitBackdropFilter: scrolled ? "blur(20px) saturate(200%)" : "none",
+          borderBottom: `1px solid ${scrolled ? "rgba(255,149,0,0.12)" : T.border}`,
+          boxShadow: scrolled
+            ? "0 4px 40px rgba(15,22,35,0.08), 0 1px 0 rgba(255,149,0,0.08)"
+            : "none",
         }}
       >
-        {/* Thin accent line at top */}
+        {/* Mouse-tracking top accent */}
         <div
           style={{
             position: "absolute",
@@ -179,19 +421,14 @@ const Navbar = () => {
             left: 0,
             right: 0,
             height: 2,
-            background: `linear-gradient(90deg, transparent 0%, ${TOKENS.orange} 30%, ${TOKENS.gold} 70%, transparent 100%)`,
-            opacity: scrolled ? 1 : 0,
+            background: `linear-gradient(90deg, transparent ${glowX - 25}%, ${T.orange} ${glowX}%, ${T.gold} ${glowX + 15}%, transparent ${glowX + 40}%)`,
+            opacity: scrolled ? 1 : 0.45,
             transition: "opacity 0.4s ease",
+            pointerEvents: "none",
           }}
         />
 
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: "0 auto",
-            padding: "0 24px",
-          }}
-        >
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
           <div
             style={{
               display: "flex",
@@ -201,171 +438,125 @@ const Navbar = () => {
               transition: "height 0.3s ease",
             }}
           >
-            {/* ── Logo – always on the left ── */}
-            <Link
-              to="/"
-              className="navbar-logo"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                textDecoration: "none",
-                flexShrink: 0,
-              }}
-            >
-              <div
-                style={{
-                  position: "relative",
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  overflow: "hidden",
-                  boxShadow: `0 2px 10px ${TOKENS.orange}30`,
-                }}
-              >
-                <img
-                  src={xpoolLogo}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-              <span
-                style={{
-                  fontFamily: "'Syne', sans-serif",
-                  fontWeight: 800,
-                  fontSize: "1.4rem",
-                  letterSpacing: "-0.03em",
-                  lineHeight: 1,
-                  userSelect: "none",
-                }}
-              >
-                <span className="logo-x" style={{ color: TOKENS.navy }}>X</span>
-                <span className="logo-pool" style={{ color: TOKENS.orange }}>pool</span>
-              </span>
-            </Link>
+            {/* Logo */}
+            <Logo />
 
-            {/* ── Desktop Nav Links ── */}
-            <div
-              className="hidden md:flex"
-              style={{ alignItems: "center", gap: 32 }}
-            >
+            {/* Desktop Nav */}
+            <div className="hidden md:flex" style={{ alignItems: "center", gap: 28 }}>
               {NAV_ITEMS.map((item) => (
                 <NavLink
                   key={item.label}
                   item={item}
                   isActive={location.pathname === item.to}
-                  onClick={() => handleNavClick(item.to)}
                 />
               ))}
             </div>
 
-            {/* ── Desktop CTA Buttons ── */}
-            <div
-              className="hidden md:flex"
-              style={{ alignItems: "center", gap: 10 }}
-            >
+            {/* Desktop CTAs */}
+            <div className="hidden md:flex" style={{ alignItems: "center", gap: 10 }}>
               <SupportButton />
               <DownloadButton />
             </div>
 
-            {/* ── Mobile Hamburger – stays on the right, hidden on desktop via CSS ── */}
+            {/* Mobile Hamburger */}
             <button
               aria-label={isOpen ? "Close menu" : "Open menu"}
               aria-expanded={isOpen}
-              onClick={() => setIsOpen(!isOpen)}
+              onClick={() => setIsOpen((v) => !v)}
               className="navbar-hamburger md:hidden"
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                border: `1.5px solid ${isOpen ? TOKENS.orange + "60" : "rgba(229,231,235,0.8)"}`,
-                background: isOpen ? TOKENS.ivory : "transparent",
-                color: TOKENS.navy,
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                border: `1.5px solid ${isOpen ? T.orange + "70" : T.border}`,
+                background: isOpen
+                  ? `linear-gradient(135deg, ${T.ivory}, rgba(255,149,0,0.06))`
+                  : "transparent",
+                color: isOpen ? T.orange : T.navy,
                 cursor: "pointer",
-                transition: "all 0.2s ease",
+                transition: "all 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+                transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+                boxShadow: isOpen ? `0 0 0 3px ${T.orangeGlow}` : "none",
                 flexShrink: 0,
               }}
             >
               {isOpen
-                ? <X style={{ width: 20, height: 20 }} />
-                : <Menu style={{ width: 20, height: 20 }} />
+                ? <X style={{ width: 18, height: 18 }} />
+                : <Menu style={{ width: 18, height: 18 }} />
               }
             </button>
           </div>
         </div>
+
+        <ScrollProgress />
       </nav>
 
-      {/* ── Mobile Drawer Overlay ── */}
+      {/* ── Backdrop ── */}
       <div
         onClick={() => setIsOpen(false)}
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: 98,
-          background: "rgba(15,22,35,0.35)",
-          backdropFilter: "blur(2px)",
-          WebkitBackdropFilter: "blur(2px)",
+          zIndex: 998,
+          background: "rgba(10,15,28,0.45)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
-          transition: "opacity 0.3s ease",
+          transition: "opacity 0.35s ease",
         }}
       />
 
-      {/* ── Mobile Drawer Panel ── */}
+      {/* ── Mobile Drawer ── */}
       <div
         className="md:hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile navigation"
         style={{
           position: "fixed",
           top: 0,
           right: 0,
           bottom: 0,
-          zIndex: 99,
-          width: "min(320px, 90vw)",
-          background: TOKENS.white,
-          boxShadow: "-8px 0 48px rgba(15,22,35,0.18)",
-          transform: isOpen ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1)",
+          zIndex: 999,
+          width: "min(340px, 92vw)",
+          background: T.white,
+          boxShadow:
+            "-12px 0 60px rgba(10,15,28,0.22), -1px 0 0 rgba(255,149,0,0.1)",
+          transform: isOpen ? "translateX(0)" : "translateX(105%)",
+          transition: "transform 0.4s cubic-bezier(0.4,0,0.2,1)",
           display: "flex",
           flexDirection: "column",
           overflowY: "auto",
         }}
       >
+        {/* Corner glow */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: 200,
+            height: 200,
+            background: `radial-gradient(circle at top right, ${T.orange}12, transparent 70%)`,
+            pointerEvents: "none",
+          }}
+        />
+
         {/* Drawer Header */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "20px 24px",
-            borderBottom: `1px solid rgba(229,231,235,0.6)`,
+            padding: "20px 24px 18px",
+            borderBottom: "1px solid rgba(229,231,235,0.5)",
           }}
         >
-          <Link
-            to="/"
-            onClick={() => setIsOpen(false)}
-            style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}
-          >
-            <img
-              src={xpoolLogo}
-              alt=""
-              style={{ width: 28, height: 28, borderRadius: 8, objectFit: "cover" }}
-            />
-            <span
-              style={{
-                fontFamily: "'Syne', sans-serif",
-                fontWeight: 800,
-                fontSize: "1.2rem",
-                letterSpacing: "-0.03em",
-              }}
-            >
-              <span className="logo-x" style={{ color: TOKENS.navy }}>X</span>
-              <span className="logo-pool" style={{ color: TOKENS.orange }}>pool</span>
-            </span>
-          </Link>
-
+          <Logo small mobileStyle onClick={() => setIsOpen(false)} />
           <button
             onClick={() => setIsOpen(false)}
             aria-label="Close menu"
@@ -375,19 +566,35 @@ const Navbar = () => {
               justifyContent: "center",
               width: 36,
               height: 36,
-              borderRadius: 8,
-              border: "1.5px solid rgba(229,231,235,0.8)",
+              borderRadius: 10,
+              border: `1.5px solid ${T.border}`,
               background: "transparent",
-              color: TOKENS.navy,
+              color: T.navy,
               cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
           >
-            <X style={{ width: 18, height: 18 }} />
+            <X style={{ width: 16, height: 16 }} />
           </button>
         </div>
 
-        {/* Drawer Nav Links */}
-        <div style={{ padding: "12px 16px", flex: 1 }}>
+        {/* Section label */}
+        <div
+          style={{
+            padding: "16px 24px 4px",
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: "0.68rem",
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase" as const,
+            color: T.muted,
+          }}
+        >
+          Navigation
+        </div>
+
+        {/* Links */}
+        <nav style={{ padding: "4px 16px", flex: 1 }}>
           {NAV_ITEMS.map((item, i) => {
             const isActive = location.pathname === item.to;
             return (
@@ -399,47 +606,113 @@ const Navbar = () => {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "13px 12px",
-                  borderRadius: 10,
+                  justifyContent: "space-between",
+                  padding: "13px 14px",
+                  borderRadius: 12,
                   fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: isActive ? 600 : 500,
-                  fontSize: "0.95rem",
-                  color: isActive ? TOKENS.orange : TOKENS.navy,
-                  background: isActive ? TOKENS.ivory : "transparent",
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: "0.93rem",
+                  color: isActive ? T.orange : T.navy,
+                  background: isActive
+                    ? `linear-gradient(135deg, ${T.ivory}, rgba(255,149,0,0.05))`
+                    : "transparent",
+                  border: `1px solid ${isActive ? T.orange + "28" : "transparent"}`,
                   textDecoration: "none",
-                  marginBottom: 2,
-                  transition: "background 0.15s ease, color 0.15s ease",
-                  animation: isOpen ? `slideIn 0.3s ease ${i * 0.04 + 0.1}s both` : "none",
+                  marginBottom: 3,
+                  transition: "all 0.2s ease",
+                  animation: isOpen
+                    ? `mobileSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.055 + 0.12}s both`
+                    : "none",
+                  boxShadow: isActive ? `0 2px 12px ${T.orange}18` : "none",
                 }}
               >
-                {/* Active dot */}
-                <span
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 9,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: isActive
+                        ? `linear-gradient(135deg, ${T.orange}22, ${T.gold}22)`
+                        : "rgba(243,244,246,0.7)",
+                      border: `1px solid ${isActive ? T.orange + "33" : "rgba(229,231,235,0.6)"}`,
+                      fontSize: "0.65rem",
+                      color: isActive ? T.orange : T.muted,
+                      transition: "all 0.2s ease",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.icon}
+                  </span>
+                  <span>
+                    {item.label}
+                    {item.badge && <NewBadge />}
+                  </span>
+                </div>
+                <ChevronRight
                   style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: isActive ? TOKENS.orange : "transparent",
-                    border: `1.5px solid ${isActive ? TOKENS.orange : "rgba(156,163,175,0.5)"}`,
-                    flexShrink: 0,
-                    transition: "all 0.2s ease",
+                    width: 15,
+                    height: 15,
+                    color: isActive ? T.orange : "rgba(156,163,175,0.5)",
+                    transform: isActive ? "translateX(2px)" : "translateX(0)",
+                    transition: "transform 0.2s ease",
                   }}
                 />
-                {item.label}
-                {item.label === "Download" && <NewBadge />}
               </Link>
             );
           })}
-        </div>
+        </nav>
 
-        {/* Drawer Footer CTAs */}
+        {/* App info strip */}
         <div
           style={{
-            padding: "16px 24px 32px",
+            margin: "8px 16px",
+            padding: "14px 16px",
+            borderRadius: 14,
+            background: `linear-gradient(135deg, ${T.orange}0A, ${T.gold}14)`,
+            border: `1px solid ${T.orange}22`,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <Sparkles style={{ width: 16, height: 16, color: T.orange, flexShrink: 0 }} />
+          <div>
+            <div
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "0.78rem",
+                fontWeight: 700,
+                color: T.navy,
+                marginBottom: 1,
+              }}
+            >
+              Xpool app is launching soon!!
+            </div>
+            <div
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "0.72rem",
+                color: T.muted,
+              }}
+            >
+              New features &amp; performance boost
+            </div>
+          </div>
+        </div>
+
+        {/* Footer CTAs */}
+        <div
+          style={{
+            padding: "14px 20px 32px",
             display: "flex",
             flexDirection: "column",
             gap: 10,
-            borderTop: "1px solid rgba(229,231,235,0.6)",
+            borderTop: `1px solid ${T.border}`,
+            marginTop: 8,
           }}
         >
           <SupportButton fullWidth />
@@ -447,116 +720,25 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Keyframe animation and responsive overrides */}
+      {/* ── Global Keyframes ── */}
       <style>{`
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(16px); }
-          to   { opacity: 1; transform: translateX(0); }
+        @keyframes pipPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.65; transform: scale(0.72); }
         }
-
-        /* 🔧 Force hamburger to be hidden on desktop (screens ≥ 768px) */
+        @keyframes badgePop {
+          0%, 90%, 100% { transform: scale(1); }
+          95%            { transform: scale(1.12); }
+        }
+        @keyframes mobileSlideIn {
+          from { opacity: 0; transform: translateX(24px) scale(0.97); }
+          to   { opacity: 1; transform: translateX(0) scale(1); }
+        }
         @media (min-width: 768px) {
-          .navbar-hamburger {
-            display: none !important;
-          }
-        }
-
-        /* Mobile-only adjustments – logo colours */
-        @media (max-width: 768px) {
-          .logo-x {
-            color: ${TOKENS.yellow} !important;
-          }
-          .logo-pool {
-            color: ${TOKENS.navy} !important;
-          }
+          .navbar-hamburger { display: none !important; }
         }
       `}</style>
     </>
-  );
-};
-
-/* ─────────────────────────────────────────
-   Reusable CTA Buttons
-───────────────────────────────────────── */
-const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 7,
-        padding: "8px 18px",
-        borderRadius: 999,
-        fontFamily: "'DM Sans', sans-serif",
-        fontWeight: 600,
-        fontSize: "0.85rem",
-        color: hovered ? TOKENS.orange : TOKENS.navy,
-        background: hovered ? TOKENS.ivory : TOKENS.white,
-        border: `1.5px solid ${hovered ? TOKENS.orange + "80" : "rgba(209,213,219,0.8)"}`,
-        cursor: "pointer",
-        transition: "all 0.2s ease",
-        width: fullWidth ? "100%" : "auto",
-        whiteSpace: "nowrap",
-      }}
-    >
-      <Phone
-        style={{
-          width: 15,
-          height: 15,
-          color: TOKENS.orange,
-          flexShrink: 0,
-        }}
-      />
-      Support
-    </button>
-  );
-};
-
-const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 7,
-        padding: "8px 20px",
-        borderRadius: 999,
-        fontFamily: "'DM Sans', sans-serif",
-        fontWeight: 700,
-        fontSize: "0.85rem",
-        color: TOKENS.navy,
-        background: hovered
-          ? `linear-gradient(135deg, ${TOKENS.orangeDark} 0%, #F0A000 100%)`
-          : `linear-gradient(135deg, ${TOKENS.orange} 0%, ${TOKENS.gold} 100%)`,
-        border: "none",
-        boxShadow: hovered
-          ? "0 8px 28px rgba(255,149,0,0.40)"
-          : "0 3px 14px rgba(255,149,0,0.28)",
-        cursor: "pointer",
-        transform: hovered ? "translateY(-1px)" : "translateY(0)",
-        transition: "all 0.2s ease",
-        width: fullWidth ? "100%" : "auto",
-        whiteSpace: "nowrap",
-      }}
-    >
-      <Download
-        style={{
-          width: 15,
-          height: 15,
-          color: TOKENS.navy,
-          flexShrink: 0,
-        }}
-      />
-      Download App
-    </button>
   );
 };
 
