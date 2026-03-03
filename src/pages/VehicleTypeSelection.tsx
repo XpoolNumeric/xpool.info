@@ -83,7 +83,7 @@ const VehicleTypeSelection = () => {
   return (
     <div className="min-h-screen bg-background px-4 py-6 flex justify-center">
       <div className="w-full max-w-md space-y-6">
-        
+
         {/* HEADER */}
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold">Choose your ride</h1>
@@ -107,11 +107,10 @@ const VehicleTypeSelection = () => {
                 key={v.id}
                 onClick={() => setSelected(v.id)}
                 className={`p-4 rounded-2xl cursor-pointer transition-all border
-                ${
-                  active
+                ${active
                     ? "border-primary bg-primary/5 scale-[1.01]"
                     : "hover:border-primary/40"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-4">
                   {/* ICON */}

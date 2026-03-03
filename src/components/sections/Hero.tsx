@@ -13,6 +13,7 @@ import {
   useMotionValue,
   useSpring,
   useTransform,
+  animate,
 } from "framer-motion";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
 
@@ -35,7 +36,7 @@ interface TrustBadge {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Constants (fine‑tuned for light background)
+// Constants
 // ─────────────────────────────────────────────────────────────────────────────
 const PULSE_CONFIG: PulsePoint[] = [
   { x: 8, y: 12, size: 200, delay: 0, dur: 3.4, opacity: 0.30 },
@@ -57,7 +58,7 @@ const TRUST_BADGES: TrustBadge[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Animation Variants (respects reduced motion)
+// Animation Variants
 // ─────────────────────────────────────────────────────────────────────────────
 const containerVariants = {
   hidden: {},
@@ -66,76 +67,43 @@ const containerVariants = {
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
 };
 
 const badgeVariant = {
   hidden: { opacity: 0, y: 20, scale: 0.92 },
   visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.5,
-      delay: 0.6 + i * 0.1,
-      ease: [0.22, 1, 0.36, 1],
-    },
+    opacity: 1, y: 0, scale: 1,
+    transition: { duration: 0.5, delay: 0.6 + i * 0.1, ease: [0.22, 1, 0.36, 1] },
   }),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Global Styles (injected once, with CSS variables)
+// Global Styles
 // ─────────────────────────────────────────────────────────────────────────────
 const HeroStyles = () => (
   <style>{`
-    /* ----- Fonts with fallbacks and display swap ----- */
     @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
     :root {
-      --color-amber-50: #fffbeb;
-      --color-amber-100: #fef3c7;
-      --color-amber-200: #fde68a;
-      --color-amber-300: #fcd34d;
-      --color-amber-400: #fbbf24;
-      --color-amber-500: #f59e0b;
-      --color-amber-600: #d97706;
-      --color-amber-700: #b45309;
-      --color-amber-800: #92400e;
-      --color-amber-900: #78350f;
-      --color-gray-50: #f9fafb;
-      --color-gray-100: #f3f4f6;
-      --color-gray-200: #e5e7eb;
-      --color-gray-300: #d1d5db;
-      --color-gray-400: #9ca3af;
-      --color-gray-500: #6b7280;
-      --color-gray-600: #4b5563;
-      --color-gray-700: #374151;
-      --color-gray-800: #1f2937;
-      --color-gray-900: #111827;
-      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-      --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-      --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
-      --blur-md: blur(12px);
+      --color-amber-50: #fffbeb; --color-amber-100: #fef3c7; --color-amber-200: #fde68a;
+      --color-amber-300: #fcd34d; --color-amber-400: #fbbf24; --color-amber-500: #f59e0b;
+      --color-amber-600: #d97706; --color-amber-700: #b45309; --color-amber-800: #92400e;
+      --color-amber-900: #78350f; --color-gray-50: #f9fafb; --color-gray-100: #f3f4f6;
+      --color-gray-200: #e5e7eb; --color-gray-300: #d1d5db; --color-gray-400: #9ca3af;
+      --color-gray-500: #6b7280; --color-gray-600: #4b5563; --color-gray-700: #374151;
+      --color-gray-800: #1f2937; --color-gray-900: #111827;
       --transition-base: 0.2s ease-in-out;
     }
 
-    /* ----- Pulse animation ----- */
     @keyframes pulse-fade {
-      0%, 100% { opacity: 0; }
-      50%      { opacity: 1; }
+      0%, 100% { opacity: 0; } 50% { opacity: 1; }
     }
     .pulse-blob {
       animation: pulse-fade ease-in-out infinite;
       will-change: opacity;
     }
 
-    /* ----- CTA shimmer (subtle, not distracting) ----- */
     @keyframes shimmer {
       0%   { background-position: 200% center; }
       100% { background-position: -200% center; }
@@ -143,10 +111,8 @@ const HeroStyles = () => (
     .cta-shimmer {
       background: linear-gradient(
         110deg,
-        var(--color-amber-500) 0%,
-        var(--color-amber-400) 30%,
-        var(--color-amber-200) 50%,
-        var(--color-amber-400) 70%,
+        var(--color-amber-500) 0%, var(--color-amber-400) 30%,
+        var(--color-amber-200) 50%, var(--color-amber-400) 70%,
         var(--color-amber-500) 100%
       );
       background-size: 200% auto;
@@ -154,76 +120,88 @@ const HeroStyles = () => (
       color: #1a0800 !important;
       font-weight: 700 !important;
       border: none !important;
-      box-shadow: 0 4px 24px rgba(245, 158, 11, 0.4),
-                  0 1px 0 rgba(255, 255, 255, 0.35) inset;
+      box-shadow: 0 4px 24px rgba(245,158,11,0.4), 0 1px 0 rgba(255,255,255,0.35) inset;
       transition: filter var(--transition-base), box-shadow var(--transition-base);
     }
     .cta-shimmer:hover {
       filter: brightness(1.07);
-      box-shadow: 0 8px 36px rgba(245, 158, 11, 0.55),
-                  0 1px 0 rgba(255, 255, 255, 0.35) inset;
+      box-shadow: 0 8px 36px rgba(245,158,11,0.55), 0 1px 0 rgba(255,255,255,0.35) inset;
     }
 
-    /* ----- Ghost button (light background) ----- */
     .btn-ghost-light {
-      border: 1.5px solid rgba(180, 83, 9, 0.22) !important;
+      border: 1.5px solid rgba(180,83,9,0.22) !important;
       color: var(--color-amber-800) !important;
-      background: rgba(251, 191, 36, 0.07) !important;
+      background: rgba(251,191,36,0.07) !important;
       font-weight: 600 !important;
-      transition: background var(--transition-base),
-                  border-color var(--transition-base),
-                  color var(--transition-base) !important;
+      transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base) !important;
     }
     .btn-ghost-light:hover {
-      background: rgba(251, 191, 36, 0.16) !important;
-      border-color: rgba(180, 83, 9, 0.4) !important;
+      background: rgba(251,191,36,0.16) !important;
+      border-color: rgba(180,83,9,0.4) !important;
       color: var(--color-amber-900) !important;
     }
 
-    /* ----- Logo ring pulse (softer) ----- */
     @keyframes ring-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
-      50%      { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.5); }
+      50%       { box-shadow: 0 0 0 8px rgba(245,158,11,0); }
     }
-    .logo-ring {
-      animation: ring-pulse 2.8s ease-in-out infinite;
-    }
+    .logo-ring { animation: ring-pulse 2.8s ease-in-out infinite; }
 
-    /* ----- Badge border breathe (reduced intensity) ----- */
     @keyframes border-breathe {
-      0%, 100% { border-color: rgba(245, 158, 11, 0.18); }
-      50%      { border-color: rgba(245, 158, 11, 0.5); }
+      0%, 100% { border-color: rgba(245,158,11,0.18); }
+      50%       { border-color: rgba(245,158,11,0.5); }
     }
-    .badge-breathe {
-      animation: border-breathe 3s ease-in-out infinite;
-    }
+    .badge-breathe { animation: border-breathe 3s ease-in-out infinite; }
 
-    /* ----- Eyebrow dot blink ----- */
     @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%      { opacity: 0.3; }
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
     }
-    .blink-dot {
-      animation: blink 1.6s ease-in-out infinite;
-    }
+    .blink-dot { animation: blink 1.6s ease-in-out infinite; }
 
-    /* ----- Scroll bounce ----- */
     @keyframes bounce {
       0%, 100% { transform: translateX(-50%) translateY(0); }
-      50%      { transform: translateX(-50%) translateY(8px); }
+      50%       { transform: translateX(-50%) translateY(8px); }
     }
-    .scroll-bounce {
-      animation: bounce 2s ease-in-out infinite;
+    .scroll-bounce { animation: bounce 2s ease-in-out infinite; }
+
+    /* Badge Carousel */
+    .badge-carousel::-webkit-scrollbar { display: none; }
+    .badge-carousel { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Dot indicator transitions */
+    .dot-indicator {
+      transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  background-color 0.3s ease,
+                  opacity 0.3s ease;
     }
 
-    /* ----- Disable animations for reduced motion ----- */
+    /* Badge glow on active */
+    .badge-active {
+      box-shadow: 0 0 0 2px rgba(245,158,11,0.5), 0 8px 24px rgba(245,158,11,0.18) !important;
+      border-color: rgba(245,158,11,0.5) !important;
+    }
+
+    /* Fade edges mask on carousel */
+    .carousel-mask {
+      -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        black 10%,
+        black 90%,
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        black 10%,
+        black 90%,
+        transparent 100%
+      );
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .pulse-blob,
-      .cta-shimmer,
-      .logo-ring,
-      .badge-breathe,
-      .blink-dot,
-      .scroll-bounce {
+      .pulse-blob, .cta-shimmer, .logo-ring,
+      .badge-breathe, .blink-dot, .scroll-bounce {
         animation: none !important;
       }
     }
@@ -231,36 +209,24 @@ const HeroStyles = () => (
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub‑components
+// PulseBackground
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Soft amber glow blobs — performance‑optimized with will-change and reduced opacity */
 const PulseBackground = memo(() => {
   const prefersReducedMotion = useReducedMotion();
   if (prefersReducedMotion) return null;
-
   return (
-    <div
-      aria-hidden="true"
-      className="absolute inset-0 pointer-events-none overflow-hidden"
-      style={{ zIndex: 0 }}
-    >
+    <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
       {PULSE_CONFIG.map((p, i) => (
         <div
           key={i}
           className="pulse-blob"
           style={{
             position: "absolute",
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: p.size,
-            height: p.size,
+            left: `${p.x}%`, top: `${p.y}%`,
+            width: p.size, height: p.size,
             borderRadius: "50%",
             transform: "translate(-50%, -50%)",
-            background: `radial-gradient(circle,
-              rgba(251, 191, 36, ${p.opacity}) 0%,
-              rgba(245, 158, 11, ${p.opacity * 0.5}) 42%,
-              transparent 70%)`,
+            background: `radial-gradient(circle, rgba(251,191,36,${p.opacity}) 0%, rgba(245,158,11,${p.opacity * 0.5}) 42%, transparent 70%)`,
             filter: "blur(44px)",
             animationDuration: `${p.dur}s`,
             animationDelay: `${p.delay}s`,
@@ -273,7 +239,9 @@ const PulseBackground = memo(() => {
 });
 PulseBackground.displayName = "PulseBackground";
 
-/** Magnetic 3D logo with spring physics – disabled for reduced motion */
+// ─────────────────────────────────────────────────────────────────────────────
+// MagneticLogo
+// ─────────────────────────────────────────────────────────────────────────────
 const MagneticLogo: FC<{ src: string }> = ({ src }) => {
   const ref = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -284,44 +252,65 @@ const MagneticLogo: FC<{ src: string }> = ({ src }) => {
   const rotateX = useTransform(springY, [-30, 30], [10, -10]);
   const rotateY = useTransform(springX, [-30, 30], [-10, 10]);
 
-  const handleMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (prefersReducedMotion) return;
-      const r = ref.current?.getBoundingClientRect();
-      if (!r) return;
-      rawX.set(e.clientX - r.left - r.width / 2);
-      rawY.set(e.clientY - r.top - r.height / 2);
-    },
-    [rawX, rawY, prefersReducedMotion]
-  );
+  const handleMove = useCallback((e: React.MouseEvent) => {
+    if (prefersReducedMotion) return;
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    rawX.set(e.clientX - r.left - r.width / 2);
+    rawY.set(e.clientY - r.top - r.height / 2);
+  }, [rawX, rawY, prefersReducedMotion]);
 
   const handleLeave = useCallback(() => {
-    rawX.set(0);
-    rawY.set(0);
+    rawX.set(0); rawY.set(0);
   }, [rawX, rawY]);
 
   return (
-    <div
-      ref={ref}
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
-      style={{ perspective: prefersReducedMotion ? "none" : 500, flexShrink: 0 }}
-    >
+    <div ref={ref} onMouseMove={handleMove} onMouseLeave={handleLeave}
+      style={{ perspective: prefersReducedMotion ? "none" : 500, flexShrink: 0 }}>
       <motion.img
-        src={src}
-        alt="Xpool logo"
+        src={src} alt="Xpool logo"
         className="logo-ring h-14 w-14 sm:h-16 sm:w-16 rounded-2xl shadow-lg object-cover select-none block"
         style={prefersReducedMotion ? {} : { rotateX, rotateY }}
-        loading="eager"
-        draggable={false}
+        loading="eager" draggable={false}
       />
     </div>
   );
 };
 
-/** Individual trust badge – responsive, with consistent spacing */
-const TrustBadgeCard = memo(({ badge, index }: { badge: TrustBadge; index: number }) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// TrustBadgeCard
+// ─────────────────────────────────────────────────────────────────────────────
+const TrustBadgeCard = memo(({
+  badge,
+  index,
+  animate: shouldAnimate = true,
+  isActive = false,
+}: {
+  badge: TrustBadge;
+  index: number;
+  animate?: boolean;
+  isActive?: boolean;
+}) => {
   const Icon = badge.icon;
+  const content = (
+    <div
+      className={`badge-breathe flex flex-col items-center justify-center gap-1.5 px-5 py-4 rounded-2xl border border-amber-200/60 bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 ${isActive ? "badge-active" : ""}`}
+      style={{ minWidth: 130 }}
+      role="figure"
+      aria-label={`${badge.value} ${badge.label}`}
+    >
+      <div className="flex items-center gap-1.5">
+        <Icon size={15} strokeWidth={2.5} className="text-amber-500" aria-hidden="true" />
+        <span className="text-2xl font-black leading-none text-gray-900 font-syne">{badge.value}</span>
+      </div>
+      <span className="text-[10.5px] font-semibold text-gray-500 tracking-wider uppercase whitespace-nowrap font-dmsans">
+        {badge.label}
+      </span>
+    </div>
+  );
+
+  if (!shouldAnimate) return content;
+
   return (
     <motion.div
       custom={index}
@@ -329,208 +318,279 @@ const TrustBadgeCard = memo(({ badge, index }: { badge: TrustBadge; index: numbe
       initial="hidden"
       animate="visible"
       whileHover={{ y: -3, transition: { duration: 0.18 } }}
-      className="badge-breathe flex flex-col items-center justify-center gap-1.5 px-5 py-4 rounded-2xl border border-amber-200/60 bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-shadow"
-      style={{ minWidth: 130 }}
-      role="figure"
-      aria-label={`${badge.value} ${badge.label}`}
     >
-      <div className="flex items-center gap-1.5">
-        <Icon size={15} strokeWidth={2.5} className="text-amber-500" aria-hidden="true" />
-        <span className="text-2xl font-black leading-none text-gray-900 font-syne">
-          {badge.value}
-        </span>
-      </div>
-      <span className="text-[10.5px] font-semibold text-gray-500 tracking-wider uppercase whitespace-nowrap font-dmsans">
-        {badge.label}
-      </span>
+      {content}
     </motion.div>
   );
 });
 TrustBadgeCard.displayName = "TrustBadgeCard";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DotIndicators — animated progress dots
+// ─────────────────────────────────────────────────────────────────────────────
+const DotIndicators: FC<{ count: number; activeIndex: number; onDotClick: (i: number) => void }> = ({
+  count,
+  activeIndex,
+  onDotClick,
+}) => (
+  <div
+    className="flex items-center justify-center gap-1.5 mt-4"
+    role="tablist"
+    aria-label="Badge navigation"
+  >
+    {Array.from({ length: count }).map((_, i) => (
+      <button
+        key={i}
+        role="tab"
+        aria-selected={i === activeIndex}
+        aria-label={`Go to ${TRUST_BADGES[i]?.label}`}
+        onClick={() => onDotClick(i)}
+        className="dot-indicator rounded-full bg-amber-400 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+        style={{
+          width: i === activeIndex ? 20 : 6,
+          height: 6,
+          opacity: i === activeIndex ? 1 : 0.35,
+          cursor: "pointer",
+          padding: 0,
+          border: "none",
+          background: i === activeIndex ? "#f59e0b" : "#fbbf24",
+        }}
+      />
+    ))}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BadgeCarousel
+//
+// Strategy (Framer Motion–driven, pixel-perfect):
+//   • Infinite seamless loop using THREE copies: [pre-clone | real | post-clone]
+//   • useMotionValue for scroll position → no rerender on every frame
+//   • framer-motion `animate()` for physics-quality easing on each step
+//   • Instant silent jump at loop boundaries (pre → real end, post → real start)
+//   • Dot indicators with pill-expand effect on active
+//   • Tap-to-pause with visual "paused" indicator
+//   • Edge fade mask for depth effect
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ADVANCE_DURATION = 0.72;   // seconds for each scroll step
+const ADVANCE_EASE = [0.32, 0, 0.67, 1] as const; // smooth deceleration
+const DWELL_MS = 2800;           // pause between advances
+const RESUME_DELAY_MS = 3000;    // resume after user interaction
+
+const BadgeCarousel: FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollX = useMotionValue(0);
+  const isPaused = useRef(false);
+  const isAnimating = useRef(false);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const dwellTimer = useRef<ReturnType<typeof setTimeout>>();
+  const animationControls = useRef<{ stop: () => void } | null>(null);
+
+  // Track the "real" active badge index for dots
+  const [activeIndex, setActiveIndex] = useState(0);
+  const count = TRUST_BADGES.length;
+
+  // Build items: [pre-clone(last) | real[0..n] | post-clone(first)]
+  // Pre = last real badge; Post = all real badges again (for seamless loop)
+  const items = useMemo(
+    () => [
+      ...TRUST_BADGES.map((b, i) => ({ badge: b, key: `pre-${i}`, realIndex: i })),
+      ...TRUST_BADGES.map((b, i) => ({ badge: b, key: `real-${i}`, realIndex: i })),
+      ...TRUST_BADGES.map((b, i) => ({ badge: b, key: `post-${i}`, realIndex: i })),
+    ],
+    []
+  );
+
+  // The "current list index" we're showing: starts at `count` (first real badge)
+  const listIndexRef = useRef(count);
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  // Get left offset of item at listIndex
+  const getItemLeft = useCallback((listIndex: number): number => {
+    const el = containerRef.current;
+    if (!el) return 0;
+    const child = el.children[listIndex] as HTMLElement | undefined;
+    return child ? child.offsetLeft : 0;
+  }, []);
+
+  // Snap scrollX instantly (no animation)
+  const snapTo = useCallback((listIndex: number) => {
+    const left = getItemLeft(listIndex);
+    scrollX.set(left);
+    if (containerRef.current) containerRef.current.scrollLeft = left;
+  }, [getItemLeft, scrollX]);
+
+  // Animate scrollX smoothly to a list index
+  const smoothScrollTo = useCallback((listIndex: number): Promise<void> => {
+    return new Promise((resolve) => {
+      const targetLeft = getItemLeft(listIndex);
+      if (animationControls.current) animationControls.current.stop();
+      const controls = animate(scrollX, targetLeft, {
+        duration: ADVANCE_DURATION,
+        ease: ADVANCE_EASE,
+        onUpdate: (v) => {
+          if (containerRef.current) containerRef.current.scrollLeft = v;
+        },
+        onComplete: resolve,
+        onStop: resolve,
+      });
+      animationControls.current = controls;
+    });
+  }, [getItemLeft, scrollX]);
+
+  // ── Core advance logic ────────────────────────────────────────────────────
+
+  const advance = useCallback(async (targetListIndex?: number) => {
+    if (isAnimating.current || isPaused.current) return;
+    isAnimating.current = true;
+
+    const nextListIndex = targetListIndex ?? listIndexRef.current + 1;
+
+    // Animate to next item
+    await smoothScrollTo(nextListIndex);
+
+    if (isPaused.current) {
+      isAnimating.current = false;
+      return;
+    }
+
+    listIndexRef.current = nextListIndex;
+
+    // Update dot indicator
+    setActiveIndex(nextListIndex % count);
+
+    // Loop boundary: if we've reached end of post-clone set, silently jump back
+    if (nextListIndex >= count * 2) {
+      // Jump to the equivalent position in the real set
+      const equivalentReal = count + (nextListIndex % count);
+      snapTo(equivalentReal);
+      listIndexRef.current = equivalentReal;
+    }
+
+    isAnimating.current = false;
+  }, [count, smoothScrollTo, snapTo]);
+
+  // ── Dwell scheduler ───────────────────────────────────────────────────────
+
+  const scheduleDwell = useCallback(() => {
+    if (dwellTimer.current) clearTimeout(dwellTimer.current);
+    dwellTimer.current = setTimeout(() => {
+      if (!isPaused.current) advance();
+      scheduleDwell();
+    }, DWELL_MS);
+  }, [advance]);
+
+  const stopDwell = useCallback(() => {
+    if (dwellTimer.current) clearTimeout(dwellTimer.current);
+  }, []);
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    // Wait a frame so DOM is measured
+    const init = () => {
+      snapTo(count); // start at first real badge
+      setActiveIndex(0);
+      listIndexRef.current = count;
+      scheduleDwell();
+    };
+    const raf = requestAnimationFrame(init);
+    return () => {
+      cancelAnimationFrame(raf);
+      stopDwell();
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+      if (animationControls.current) animationControls.current.stop();
+    };
+  }, [count, snapTo, scheduleDwell, stopDwell]);
+
+  // ── User interaction ──────────────────────────────────────────────────────
+
+  const handleInteractionStart = useCallback(() => {
+    isPaused.current = true;
+    stopDwell();
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    if (animationControls.current) animationControls.current.stop();
+    isAnimating.current = false;
+  }, [stopDwell]);
+
+  const handleInteractionEnd = useCallback(() => {
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => {
+      isPaused.current = false;
+      scheduleDwell();
+    }, RESUME_DELAY_MS);
+  }, [scheduleDwell]);
+
+  // Dot click: jump to that badge in the real set
+  const handleDotClick = useCallback((realIdx: number) => {
+    handleInteractionStart();
+    const targetListIndex = count + realIdx;
+    listIndexRef.current = targetListIndex;
+    smoothScrollTo(targetListIndex).then(() => {
+      setActiveIndex(realIdx);
+      handleInteractionEnd();
+    });
+  }, [count, smoothScrollTo, handleInteractionStart, handleInteractionEnd]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="flex flex-col items-center w-full" style={{ maxWidth: "100vw" }}>
+      {/* Fade-edge wrapper */}
+      <div
+        className="carousel-mask w-full overflow-hidden"
+        style={{ paddingBottom: 4 }}
+      >
+        <div
+          ref={containerRef}
+          className="badge-carousel flex items-stretch gap-3 overflow-x-hidden"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          role="list"
+          aria-label="Platform statistics"
+          onMouseDown={handleInteractionStart}
+          onMouseUp={handleInteractionEnd}
+          onMouseLeave={handleInteractionEnd}
+          onTouchStart={handleInteractionStart}
+          onTouchEnd={handleInteractionEnd}
+        >
+          {items.map(({ badge, key, realIndex: ri }, idx) => (
+            <div key={key} role="listitem" className="shrink-0">
+              <TrustBadgeCard
+                badge={badge}
+                index={ri}
+                animate={idx >= count && idx < count * 2}
+                isActive={idx === listIndexRef.current}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dot indicators */}
+      <DotIndicators
+        count={count}
+        activeIndex={activeIndex}
+        onDotClick={handleDotClick}
+      />
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Hero Component
 // ─────────────────────────────────────────────────────────────────────────────
 const Hero: FC = () => {
   const prefersReducedMotion = useReducedMotion();
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
-  const autoScrollIndexRef = useRef(0); // persists across renders
-  const autoScrollTimer = useRef<NodeJS.Timeout>();
-  const resumeTimer = useRef<NodeJS.Timeout>();
 
-  // Real badge count and duplicated list for infinite loop
-  const totalReal = TRUST_BADGES.length;
-  const duplicatedBadges = useMemo(
-    () => [...TRUST_BADGES, ...TRUST_BADGES, ...TRUST_BADGES],
-    []
-  );
-
-  // Check if mobile on mount and resize
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 640); // Tailwind's sm breakpoint
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
-
-  // Initial scroll position to the second copy (infinite loop starting point)
-  useEffect(() => {
-    if (!isMobile || prefersReducedMotion) return;
-    const container = scrollRef.current;
-    if (!container) return;
-    const children = Array.from(container.children) as HTMLElement[];
-    if (children.length === 0) return;
-    // Scroll to the first badge of the second copy
-    const startIndex = totalReal;
-    if (children[startIndex]) {
-      container.scrollLeft = children[startIndex].offsetLeft;
-      autoScrollIndexRef.current = startIndex;
-    }
-  }, [isMobile, prefersReducedMotion, totalReal]);
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Infinite loop jump: when user scrolls into a cloned copy, instantly jump
-  // to the corresponding real badge in the middle copy.
-  // ───────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isMobile || prefersReducedMotion) return;
-    const container = scrollRef.current;
-    if (!container) return;
-
-    const handleScrollJump = () => {
-      const children = Array.from(container.children) as HTMLElement[];
-      if (children.length === 0) return;
-
-      // Find the most visible badge (same logic as before)
-      const scrollLeft = container.scrollLeft;
-      let closestIndex = 0;
-      let minDiff = Infinity;
-      children.forEach((child, idx) => {
-        const diff = Math.abs(child.offsetLeft - scrollLeft);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestIndex = idx;
-        }
-      });
-
-      // If we're in the first copy (index < totalReal)
-      if (closestIndex < totalReal) {
-        const targetIndex = closestIndex + totalReal; // move to second copy
-        container.scrollLeft = children[targetIndex].offsetLeft;
-        autoScrollIndexRef.current = targetIndex;
-      }
-      // If we're in the third copy (index >= totalReal * 2)
-      else if (closestIndex >= totalReal * 2) {
-        const targetIndex = closestIndex - totalReal; // move back to second copy
-        container.scrollLeft = children[targetIndex].offsetLeft;
-        autoScrollIndexRef.current = targetIndex;
-      } else {
-        // Update the ref to the current visible index (in second copy)
-        autoScrollIndexRef.current = closestIndex;
-      }
-    };
-
-    container.addEventListener("scroll", handleScrollJump);
-    return () => container.removeEventListener("scroll", handleScrollJump);
-  }, [isMobile, prefersReducedMotion, totalReal]);
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Auto‑scroll logic (continuous loop with pause on interaction)
-  // ───────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isMobile || prefersReducedMotion) return;
-
-    const container = scrollRef.current;
-    if (!container) return;
-
-    const children = Array.from(container.children) as HTMLElement[];
-    if (children.length === 0) return;
-
-    const totalItems = children.length; // now 3 * totalReal
-
-    // Scroll to a given index with smooth behavior
-    const scrollToIndex = (index: number) => {
-      if (!container) return;
-      const child = children[index];
-      if (!child) return;
-      container.scrollTo({
-        left: child.offsetLeft,
-        behavior: "smooth",
-      });
-    };
-
-    // Determine which badge is most visible based on scroll position
-    const getCurrentIndexFromScroll = () => {
-      if (!container) return autoScrollIndexRef.current;
-      const scrollLeft = container.scrollLeft;
-      let closestIndex = 0;
-      let minDiff = Infinity;
-      children.forEach((child, idx) => {
-        const diff = Math.abs(child.offsetLeft - scrollLeft);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestIndex = idx;
-        }
-      });
-      return closestIndex;
-    };
-
-    // Set up the interval for auto‑advance
-    let interval: NodeJS.Timeout | null = null;
-
-    const startAutoScroll = () => {
-      if (interval) clearInterval(interval);
-      interval = setInterval(() => {
-        if (!autoScrollEnabled) return; // pause if user interacting
-        // Always move forward (increment index), wrapping around within totalItems
-        autoScrollIndexRef.current = (autoScrollIndexRef.current + 1) % totalItems;
-        scrollToIndex(autoScrollIndexRef.current);
-      }, 4000);
-    };
-
-    if (autoScrollEnabled) {
-      startAutoScroll();
-    }
-
-    // Handle manual scroll: pause auto‑scroll and then resume after a delay
-    const onScroll = () => {
-      setAutoScrollEnabled(false); // pause
-      // Clear any pending resume timer
-      if (resumeTimer.current) clearTimeout(resumeTimer.current);
-      // Schedule resume after 3 seconds of inactivity
-      resumeTimer.current = setTimeout(() => {
-        // Update current index to the one now visible (should be in second copy due to jump handler)
-        autoScrollIndexRef.current = getCurrentIndexFromScroll();
-        setAutoScrollEnabled(true);
-      }, 3000);
-    };
-
-    // Pause on hover/touch (immediate)
-    const pause = () => setAutoScrollEnabled(false);
-    const resume = () => {
-      // Resume is handled by the scroll timer
-    };
-
-    container.addEventListener("scroll", onScroll);
-    container.addEventListener("mouseenter", pause);
-    container.addEventListener("mouseleave", resume);
-    container.addEventListener("touchstart", pause);
-    container.addEventListener("touchend", resume);
-
-    return () => {
-      if (interval) clearInterval(interval);
-      if (resumeTimer.current) clearTimeout(resumeTimer.current);
-      container.removeEventListener("scroll", onScroll);
-      container.removeEventListener("mouseenter", pause);
-      container.removeEventListener("mouseleave", resume);
-      container.removeEventListener("touchstart", pause);
-      container.removeEventListener("touchend", resume);
-    };
-  }, [isMobile, prefersReducedMotion, autoScrollEnabled, totalReal]);
 
   const scrollToBooking = useCallback(() => {
     document.getElementById("booking-section")?.scrollIntoView({ behavior: "smooth" });
@@ -544,7 +604,6 @@ const Hero: FC = () => {
     <>
       <HeroStyles />
 
-      {/* Skip link */}
       <a
         href="#booking-section"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-amber-400 focus:text-black focus:font-bold focus:shadow-lg"
@@ -561,10 +620,9 @@ const Hero: FC = () => {
           isolation: "isolate",
         }}
       >
-        {/* Layer 0: ambient blobs (disabled if reduced motion) */}
         <PulseBackground />
 
-        {/* Layer 1: subtle dot grid */}
+        {/* Dot grid */}
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none"
@@ -575,18 +633,17 @@ const Hero: FC = () => {
           }}
         />
 
-        {/* Layer 2: center radial highlight (softer) */}
+        {/* Radial highlight */}
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none"
           style={{
             zIndex: 2,
-            background:
-              "radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255, 251, 235, 0) 0%, rgba(255, 251, 235, 0.7) 100%)",
+            background: "radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255,251,235,0) 0%, rgba(255,251,235,0.7) 100%)",
           }}
         />
 
-        {/* Hero content */}
+        {/* Content */}
         <motion.div
           className="relative flex flex-col items-center text-center w-full max-w-3xl mx-auto py-16 md:py-20"
           style={{ zIndex: 10 }}
@@ -595,10 +652,7 @@ const Hero: FC = () => {
           animate="visible"
         >
           {/* Wordmark */}
-          <motion.div
-            variants={!prefersReducedMotion ? fadeUp : {}}
-            className="flex items-center justify-center gap-3 mb-7"
-          >
+          <motion.div variants={!prefersReducedMotion ? fadeUp : {}} className="flex items-center justify-center gap-3 mb-7">
             <MagneticLogo src={xpoolLogo} />
             <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none text-gray-900 font-syne">
               <span className="text-amber-500">X</span>pool
@@ -625,15 +679,13 @@ const Hero: FC = () => {
             <br />
             <span
               className="text-amber-500"
-              style={{
-                textShadow: "0 2px 0 rgba(160,80,0,0.15), 0 0 40px rgba(245,158,11,0.2)",
-              }}
+              style={{ textShadow: "0 2px 0 rgba(160,80,0,0.15), 0 0 40px rgba(245,158,11,0.2)" }}
             >
               Ride Safe.
             </span>
           </motion.h2>
 
-          {/* Sub‑copy */}
+          {/* Sub-copy */}
           <motion.p
             variants={!prefersReducedMotion ? fadeUp : {}}
             className="text-gray-500 text-base sm:text-lg max-w-lg mx-auto mb-10 leading-relaxed font-dmsans"
@@ -642,7 +694,7 @@ const Hero: FC = () => {
             transparent pricing — every single time.
           </motion.p>
 
-          {/* CTA buttons */}
+          {/* CTAs */}
           <motion.div
             variants={!prefersReducedMotion ? fadeUp : {}}
             className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-14 w-full"
@@ -679,38 +731,25 @@ const Hero: FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Trust badges – responsive grid with auto‑scroll on mobile */}
-          <div
-            ref={scrollRef}
-            className={`relative flex items-stretch gap-3 w-full ${isMobile
-                ? "overflow-x-auto scroll-smooth snap-x snap-mandatory flex-nowrap"
-                : "flex-wrap justify-center"
-              }`}
-            role="list"
-            aria-label="Platform statistics"
-          >
-            {isMobile
-              ? duplicatedBadges.map((badge, idx) => (
-                <div
-                  key={idx}
-                  role="listitem"
-                  className="snap-start shrink-0"
-                >
-                  <TrustBadgeCard
-                    badge={badge}
-                    index={idx % totalReal} // preserve staggered animation per real badge
-                  />
-                </div>
-              ))
-              : TRUST_BADGES.map((badge, i) => (
+          {/* Badges — carousel on mobile, static grid on desktop */}
+          {isMobile && !prefersReducedMotion ? (
+            <BadgeCarousel />
+          ) : (
+            <div
+              className="flex flex-wrap items-stretch justify-center gap-3 w-full"
+              role="list"
+              aria-label="Platform statistics"
+            >
+              {TRUST_BADGES.map((badge, i) => (
                 <div key={badge.label} role="listitem">
                   <TrustBadgeCard badge={badge} index={i} />
                 </div>
               ))}
-          </div>
+            </div>
+          )}
         </motion.div>
 
-        {/* Scroll indicator (hidden if reduced motion) */}
+        {/* Scroll indicator */}
         {!prefersReducedMotion && (
           <div
             className="scroll-bounce absolute bottom-8 left-1/2 flex flex-col items-center gap-1 text-amber-400/60 pointer-events-none"

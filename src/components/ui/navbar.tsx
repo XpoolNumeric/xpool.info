@@ -91,12 +91,12 @@ const NewBadge = () => (
       alignItems: "center",
       padding: "2px 8px",
       borderRadius: 999,
-      background: `linear-gradient(135deg, ${T.orange}60, ${T.gold}70)`, // increased opacity
+      background: `linear-gradient(135deg, ${T.orange}60, ${T.gold}70)`,
       border: `1px solid ${T.orange}`,
       fontSize: "0.6rem",
       fontWeight: 800,
       letterSpacing: "0.1em",
-      color: T.navy, // darker text for contrast
+      color: T.navy,
       textTransform: "uppercase" as const,
       fontFamily: "'DM Sans', sans-serif",
       marginLeft: 6,
@@ -244,12 +244,13 @@ const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => (
 );
 
 /* ─────────────────────────────────────────────────────────
-   Support Button
+   Support Button – now a clickable tel link
 ───────────────────────────────────────────────────────── */
 const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
   const [hovered, setHovered] = useState(false);
   return (
-    <button
+    <a
+      href="tel:+917904790007"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -271,6 +272,7 @@ const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         width: fullWidth ? "100%" : "auto",
         whiteSpace: "nowrap" as const,
         boxShadow: hovered ? `0 0 0 3px ${T.orangeGlow}` : "none",
+        textDecoration: "none",
       }}
     >
       <Phone
@@ -284,18 +286,19 @@ const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         }}
       />
       Support
-    </button>
+    </a>
   );
 };
 
 /* ─────────────────────────────────────────────────────────
-   Download Button
+   Download Button – now a Link to /download
 ───────────────────────────────────────────────────────── */
 const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <button
+    <Link
+      to="/download"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -324,6 +327,7 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         whiteSpace: "nowrap" as const,
         position: "relative",
         overflow: "hidden",
+        textDecoration: "none",
       }}
     >
       <span
@@ -348,7 +352,7 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         }}
       />
       <span style={{ position: "relative" }}>Download App</span>
-    </button>
+    </Link>
   );
 };
 

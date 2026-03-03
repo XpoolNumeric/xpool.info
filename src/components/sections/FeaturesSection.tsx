@@ -1,4 +1,4 @@
-import { FC, useCallback, useRef, useState, useEffect, useMemo } from "react";
+import { FC, useCallback, useRef, useState, useEffect } from "react";
 import { MapPin, Clock, Shield, Star, ArrowRight, Zap } from "lucide-react";
 import {
   motion,
@@ -89,7 +89,22 @@ const miniStats = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Animation Variants (match Hero)
+// Hooks
+// ─────────────────────────────────────────────────────────────────────────────
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) setMatches(media.matches);
+    const listener = (e: MediaQueryListEvent) => setMatches(e.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, [matches, query]);
+  return matches;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Animation Variants
 // ─────────────────────────────────────────────────────────────────────────────
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -115,7 +130,7 @@ const cardVariant = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared Styles (can be extracted to a separate file)
+// Global Styles
 // ─────────────────────────────────────────────────────────────────────────────
 const GlobalStyles = () => (
   <style>{`
@@ -144,7 +159,6 @@ const GlobalStyles = () => (
       --color-gray-900: #111827;
     }
 
-    /* Custom keyframes (already in Hero, but included for completeness) */
     @keyframes pulse-fade {
       0%, 100% { opacity: 0; }
       50%      { opacity: 1; }
@@ -165,6 +179,21 @@ const GlobalStyles = () => (
       0%   { transform: translateX(0); }
       100% { transform: translateX(-50%); }
     }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .animate-shimmer {
+      animation: shimmer 2s infinite linear;
+    }
+
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
 
     @media (prefers-reduced-motion: reduce) {
       * {
@@ -181,14 +210,12 @@ const GlobalStyles = () => (
 // Sub‑components
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Ambient glowing blobs (like Hero's PulseBackground) */
 const AmbientBlobs = () => {
   const prefersReducedMotion = useReducedMotion();
   if (prefersReducedMotion) return null;
 
   return (
     <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
-      {/* Large central glow */}
       <div
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full"
         style={{
@@ -196,7 +223,6 @@ const AmbientBlobs = () => {
           filter: "blur(60px)",
         }}
       />
-      {/* Smaller blobs */}
       <div
         className="absolute left-[10%] top-[30%] w-[300px] h-[300px] rounded-full"
         style={{
@@ -217,7 +243,6 @@ const AmbientBlobs = () => {
   );
 };
 
-/** Dot grid overlay (same as Hero) */
 const DotGrid = () => (
   <div
     aria-hidden="true"
@@ -229,7 +254,6 @@ const DotGrid = () => (
   />
 );
 
-/** Image with skeleton and fallback (simplified) */
 const CardImage: FC<{ src: string; alt: string; fallbackGradient: string }> = ({
   src,
   alt,
@@ -239,15 +263,12 @@ const CardImage: FC<{ src: string; alt: string; fallbackGradient: string }> = ({
 
   return (
     <>
-      {/* Skeleton */}
       {status === "loading" && (
         <div className="absolute inset-0 bg-gradient-to-r from-amber-100/20 via-amber-300/20 to-amber-100/20 animate-shimmer bg-[length:200%_100%]" />
       )}
-      {/* Fallback gradient */}
       {status === "error" && (
         <div className={`absolute inset-0 bg-gradient-to-br ${fallbackGradient}`} />
       )}
-      {/* Actual image */}
       <img
         src={src}
         alt={alt}
@@ -261,13 +282,11 @@ const CardImage: FC<{ src: string; alt: string; fallbackGradient: string }> = ({
   );
 };
 
-/** Individual feature card with hover tilt and amber glow */
 const FeatureCard: FC<{ feature: Feature; index: number }> = ({ feature, index }) => {
   const prefersReducedMotion = useReducedMotion();
   const cardRef = useRef<HTMLDivElement>(null);
   const [touchActive, setTouchActive] = useState(false);
 
-  // Magnetic tilt (like Hero's MagneticLogo)
   const rawX = useMotionValue(0);
   const rawY = useMotionValue(0);
   const springX = useSpring(rawX, { stiffness: 180, damping: 22 });
@@ -306,7 +325,7 @@ const FeatureCard: FC<{ feature: Feature; index: number }> = ({ feature, index }
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-50px" }}
-      className="w-full aspect-[4/3]"
+      className="w-full aspect-[4/3] flex-shrink-0 snap-start"
     >
       <div
         ref={cardRef}
@@ -323,7 +342,6 @@ const FeatureCard: FC<{ feature: Feature; index: number }> = ({ feature, index }
             : {}
         }
       >
-        {/* 3D tilt wrapper */}
         <motion.div
           className="absolute inset-0"
           style={
@@ -332,33 +350,26 @@ const FeatureCard: FC<{ feature: Feature; index: number }> = ({ feature, index }
               : {}
           }
         >
-          {/* Image and overlays */}
           <CardImage
             src={feature.img}
             alt={feature.title}
             fallbackGradient={feature.fallbackGradient}
           />
 
-          {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent transition-all group-hover:from-black/95 group-hover:via-amber-900/30 group-hover:to-transparent" />
 
-          {/* Shimmer sweep */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           </div>
 
-          {/* Amber glow ring */}
           <div className="absolute inset-0 rounded-2xl border border-amber-200/20 group-hover:border-amber-400/60 group-hover:shadow-[0_0_0_3px_rgba(245,158,11,0.1)] transition-all" />
 
-          {/* Progress bar */}
           <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-amber-400 to-amber-600 w-0 group-hover:w-full transition-all duration-700 ease-out" />
 
-          {/* Background number */}
           <span className="absolute bottom-0 right-2 text-8xl font-black text-white/5 select-none group-hover:text-amber-500/10 transition-colors">
             {feature.number}
           </span>
 
-          {/* Content */}
           <div className="absolute inset-0 p-4 flex flex-col justify-between z-10">
             <div className="flex justify-between items-start">
               <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-amber-500 group-hover:to-amber-600 group-hover:border-transparent transition-all">
@@ -405,12 +416,140 @@ const FeatureCard: FC<{ feature: Feature; index: number }> = ({ feature, index }
 // ─────────────────────────────────────────────────────────────────────────────
 const FeaturesSection: FC = () => {
   const prefersReducedMotion = useReducedMotion();
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const headerRef = useRef(null);
   const statsRef = useRef(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [autoScrollActive, setAutoScrollActive] = useState(false);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const longPressTimerRef = useRef<NodeJS.Timeout>();
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout>();
+  const isProgrammaticScrollRef = useRef(false);
 
   const handleBookClick = useCallback(() => {
     document.getElementById("booking-section")?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  // Long press detection (3 seconds)
+  const handleTouchStart = useCallback(() => {
+    if (!isMobile) return;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      setAutoScrollActive(true);
+    }, 3000);
+  }, [isMobile]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isMobile) return;
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = undefined;
+    }
+  }, [isMobile]);
+
+  const handleTouchMove = useCallback(() => {
+    if (!isMobile) return;
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = undefined;
+    }
+  }, [isMobile]);
+
+  // Update current index based on scroll position
+  const updateCurrentIndexFromScroll = useCallback(() => {
+    if (!carouselRef.current) return;
+    const container = carouselRef.current;
+    const cards = Array.from(container.children) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const positions = cards.map(card => {
+      const cardRect = card.getBoundingClientRect();
+      return cardRect.left - containerRect.left + container.scrollLeft;
+    });
+
+    const scrollLeft = container.scrollLeft;
+    let closest = 0;
+    let minDiff = Math.abs(positions[0] - scrollLeft);
+    for (let i = 1; i < positions.length; i++) {
+      const diff = Math.abs(positions[i] - scrollLeft);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = i;
+      }
+    }
+    setCurrentCardIndex(closest);
+  }, []);
+
+  // Stop auto‑scroll on user interaction (ignore programmatic scrolls)
+  const handleScroll = useCallback(() => {
+    if (isProgrammaticScrollRef.current) {
+      isProgrammaticScrollRef.current = false;
+      updateCurrentIndexFromScroll();
+      return;
+    }
+    setAutoScrollActive(false);
+    updateCurrentIndexFromScroll();
+  }, [updateCurrentIndexFromScroll]);
+
+  const handleClick = useCallback(() => {
+    setAutoScrollActive(false);
+  }, []);
+
+  // Auto‑scroll logic
+  useEffect(() => {
+    if (!isMobile || !autoScrollActive || !carouselRef.current) return;
+
+    const container = carouselRef.current;
+    const cards = Array.from(container.children) as HTMLElement[];
+
+    const getCardPositions = () => {
+      const containerRect = container.getBoundingClientRect();
+      return cards.map(card => {
+        const cardRect = card.getBoundingClientRect();
+        return cardRect.left - containerRect.left + container.scrollLeft;
+      });
+    };
+
+    let currentIndex = 0; // local for interval closure
+
+    const scrollToIndex = (index: number) => {
+      const positions = getCardPositions();
+      if (positions.length === 0) return;
+      const targetIndex = ((index % positions.length) + positions.length) % positions.length;
+      const targetScroll = positions[targetIndex];
+      isProgrammaticScrollRef.current = true;
+      container.scrollTo({ left: targetScroll, behavior: "smooth" });
+      setCurrentCardIndex(targetIndex); // update indicator immediately
+      currentIndex = targetIndex;
+    };
+
+    // Start from current visible index
+    const updateCurrentIndex = () => {
+      const positions = getCardPositions();
+      if (positions.length === 0) return;
+      const scrollLeft = container.scrollLeft;
+      let closest = 0;
+      let minDiff = Math.abs(positions[0] - scrollLeft);
+      for (let i = 1; i < positions.length; i++) {
+        const diff = Math.abs(positions[i] - scrollLeft);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closest = i;
+        }
+      }
+      currentIndex = closest;
+    };
+    updateCurrentIndex();
+
+    autoScrollIntervalRef.current = setInterval(() => {
+      scrollToIndex(currentIndex + 1);
+    }, 3000);
+
+    return () => {
+      if (autoScrollIntervalRef.current) clearInterval(autoScrollIntervalRef.current);
+    };
+  }, [isMobile, autoScrollActive]);
 
   return (
     <>
@@ -419,11 +558,9 @@ const FeaturesSection: FC = () => {
         className="relative py-24 md:py-32 overflow-hidden bg-gradient-to-b from-amber-50 to-white"
         aria-label="Platform Features"
       >
-        {/* Ambient layers */}
         <AmbientBlobs />
         <DotGrid />
 
-        {/* Content container */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <motion.div
@@ -475,7 +612,7 @@ const FeaturesSection: FC = () => {
               <Zap size={14} className="text-amber-400" />
               <div className="overflow-hidden max-w-[300px] sm:max-w-md">
                 <div
-                  className="flex gap-2 animate-ticker whitespace-nowrap"
+                  className="flex gap-2 whitespace-nowrap"
                   style={{ animation: "tickerScroll 22s linear infinite" }}
                 >
                   {cityListDoubled.map((city, i) => (
@@ -492,12 +629,56 @@ const FeaturesSection: FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Cards grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {features.map((feature, i) => (
-              <FeatureCard key={feature.number} feature={feature} index={i} />
-            ))}
-          </div>
+          {/* Cards grid / carousel */}
+          {isMobile ? (
+            <>
+              <div
+                ref={carouselRef}
+                className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 hide-scrollbar"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                onTouchMove={handleTouchMove}
+                onScroll={handleScroll}
+                onClick={handleClick}
+              >
+                {features.map((feature, i) => (
+                  <FeatureCard key={feature.number} feature={feature} index={i} />
+                ))}
+              </div>
+              {/* Scroll indicator dots (mobile only) */}
+              <div className="flex justify-center gap-2 mt-4">
+                {features.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-all ${i === currentCardIndex
+                        ? "w-6 bg-amber-500"
+                        : "bg-gray-300 hover:bg-amber-300"
+                      }`}
+                    onClick={() => {
+                      if (carouselRef.current) {
+                        const container = carouselRef.current;
+                        const cards = Array.from(container.children) as HTMLElement[];
+                        if (cards.length === 0) return;
+                        const containerRect = container.getBoundingClientRect();
+                        const targetScroll = cards[i].getBoundingClientRect().left - containerRect.left + container.scrollLeft;
+                        isProgrammaticScrollRef.current = true;
+                        container.scrollTo({ left: targetScroll, behavior: "smooth" });
+                        setCurrentCardIndex(i);
+                      }
+                    }}
+                    aria-label={`Go to slide ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            // Desktop: grid layout
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              {features.map((feature, i) => (
+                <FeatureCard key={feature.number} feature={feature} index={i} />
+              ))}
+            </div>
+          )}
 
           {/* Mini stats row */}
           <motion.div
