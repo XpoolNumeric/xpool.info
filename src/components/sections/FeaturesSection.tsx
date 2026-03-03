@@ -1,255 +1,29 @@
-"use client";
+import { FC, useCallback, useRef, useState, useEffect, useMemo } from "react";
+import { MapPin, Clock, Shield, Star, ArrowRight, Zap } from "lucide-react";
+import {
+  motion,
+  useReducedMotion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 
-import { useEffect, useRef, useState } from "react";
-import { MapPin, Clock, Shield, Star, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
-
-/* ===================== Injected Styles (professional font stack) ===================== */
-const featureStyles = `
-  .features-section {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  }
-
-  .feature-card {
-    background: #FFFFFF;
-    border: 2px solid rgba(245, 158, 11, 0.08);
-    border-radius: 24px;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.02);
-  }
-  .feature-card:hover {
-    background: #FFFBEB;
-    border-color: #f59e0b;
-    box-shadow: 0 12px 40px rgba(245,158,11,0.15), 0 2px 8px rgba(245,158,11,0.1);
-    transform: translateY(-4px);
-  }
-
-  .feature-icon-box {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #FFF3CD;
-    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-icon-box {
-    background: #FFE0A0;
-  }
-  .feature-icon {
-    color: #f59e0b;
-    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-icon {
-    color: #FF9500;
-  }
-
-  .feature-tag {
-    font-family: 'SF Mono', Menlo, Monaco, 'Cascadia Code', 'Consolas', 'Courier New', monospace;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    padding: 5px 12px;
-    border-radius: 999px;
-    background: #FFF3CD;
-    color: #B07D00;
-    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-tag {
-    background: rgba(255,149,0,0.14);
-    color: #FF8C00;
-  }
-
-  .feature-title {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-weight: 700;
-    font-size: 22px;
-    line-height: 1.2;
-    color: #1a1a2e;
-    margin-bottom: 12px;
-  }
-
-  .feature-desc {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-size: 13.5px;
-    line-height: 1.65;
-    color: #5a5a72;
-    margin-bottom: 20px;
-    flex: 1;
-    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-desc {
-    color: #6b5a3a;
-  }
-
-  .feature-divider {
-    height: 1px;
-    background: rgba(26,26,46,0.08);
-    margin-bottom: 18px;
-    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-divider {
-    background: rgba(255,149,0,0.22);
-  }
-
-  .feature-stat {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-weight: 700;
-    font-size: 26px;
-    line-height: 1;
-    margin-bottom: 4px;
-    color: #1a1a2e;
-    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-stat {
-    color: #E67E00;
-  }
-
-  .feature-stat-label {
-    font-family: 'SF Mono', Menlo, Monaco, 'Cascadia Code', 'Consolas', 'Courier New', monospace;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: #aaa;
-    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-stat-label {
-    color: #b07d30;
-  }
-
-  .feature-arrow {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #FFF3CD;
-    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s ease;
-  }
-  .feature-card:hover .feature-arrow {
-    background: #FFB300;
-    transform: scale(1.1);
-  }
-  .feature-arrow svg {
-    color: #f59e0b;
-    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .feature-card:hover .feature-arrow svg {
-    color: #FFFFFF;
-  }
-
-  .feature-watermark {
-    position: absolute;
-    bottom: -14px;
-    right: 6px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-weight: 800;
-    font-size: 100px;
-    line-height: 1;
-    user-select: none;
-    pointer-events: none;
-    color: rgba(26,26,46,0.045);
-    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    z-index: 0;
-  }
-  .feature-card:hover .feature-watermark {
-    color: rgba(255,149,0,0.11);
-  }
-
-  .live-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 16px;
-    border-radius: 999px;
-    border: 2px solid rgba(245,158,11,0.45);
-    background: #FFF3CD;
-    margin-bottom: 22px;
-  }
-  .live-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #f59e0b;
-    animation: pulse 1.8s ease-in-out infinite;
-    display: inline-block;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
-  }
-
-  .cta-strip {
-    margin-top: 48px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    padding: 22px 30px;
-    border-radius: 22px;
-    border: 2px solid rgba(245,158,11,0.3);
-    background: linear-gradient(135deg, #FFF3CD 0%, #FEF9EE 100%);
-  }
-
-  .cta-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 13px 26px;
-    border-radius: 999px;
-    border: none;
-    cursor: pointer;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-weight: 600;
-    font-size: 14px;
-    background: linear-gradient(135deg, #FFB300 0%, #FF9500 100%);
-    color: #1a1a2e;
-    box-shadow: 0 4px 18px rgba(255,149,0,0.22);
-    transition: transform 0.2s, box-shadow 0.2s, background 0.25s;
-  }
-  .cta-button:hover {
-    background: linear-gradient(135deg, #FF9500 0%, #FFB300 100%);
-    box-shadow: 0 10px 32px rgba(255,149,0,0.38);
-    transform: scale(1.05);
-  }
-
-  .heading-professional {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-  }
-
-  .body-professional {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  }
-`;
-
-/* ─── useInView ───────────────────────────────────────────────── */
-function useInView(threshold = 0.12) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) { setVisible(true); observer.disconnect(); }
-      },
-      { threshold }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return { ref, visible };
+// ─────────────────────────────────────────────────────────────────────────────
+// Types & Data
+// ─────────────────────────────────────────────────────────────────────────────
+interface Feature {
+  icon: typeof MapPin;
+  tag: string;
+  number: string;
+  title: string;
+  description: string;
+  stat: string;
+  statLabel: string;
+  img: string;
+  fallbackGradient: string;
 }
 
-/* ─── Feature Data ────────────────────────────────────────────── */
-const features = [
+const features: Feature[] = [
   {
     icon: MapPin,
     tag: "Navigation",
@@ -259,6 +33,8 @@ const features = [
       "Live GPS updates every second. Watch your driver move on the map and know exactly when they'll arrive — no guessing.",
     stat: "< 1s",
     statLabel: "Update Interval",
+    img: "/hero1.png",
+    fallbackGradient: "from-amber-950 to-amber-900",
   },
   {
     icon: Clock,
@@ -266,9 +42,11 @@ const features = [
     number: "02",
     title: "Quick Booking",
     description:
-      "From open app to confirmed ride in under 3 taps. Our streamlined flow removes every unnecessary step from your journey.",
+      "From open app to confirmed ride in under 3 taps. Our streamlined flow removes every unnecessary step.",
     stat: "3 taps",
     statLabel: "To Book a Ride",
+    img: "/hero2.png",
+    fallbackGradient: "from-blue-950 to-blue-900",
   },
   {
     icon: Shield,
@@ -276,9 +54,11 @@ const features = [
     number: "03",
     title: "Secure & Safe",
     description:
-      "100% verified drivers, encrypted payments, and a live safety team watching around the clock — every single ride.",
+      "100% verified drivers, encrypted payments, and a live safety team watching around the clock.",
     stat: "100%",
     statLabel: "Verified Drivers",
+    img: "/hero3.png",
+    fallbackGradient: "from-emerald-950 to-emerald-900",
   },
   {
     icon: Star,
@@ -289,194 +69,487 @@ const features = [
       "4.8★ average across 2 million+ rides. Our riders don't settle — and neither do we.",
     stat: "4.8★",
     statLabel: "Avg. Rating",
+    img: "/hero4.png",
+    fallbackGradient: "from-yellow-950 to-yellow-900",
   },
 ];
 
-/* ─── FeatureCard Component ──────────────────────────────────── */
-const FeatureCard = ({ feature, index }: { feature: typeof features[0]; index: number }) => {
-  const { ref, visible } = useInView();
+const cities = [
+  "Mumbai", "Delhi", "Bangalore", "Chennai", "Hyderabad",
+  "Pune", "Kolkata", "Ahmedabad", "Jaipur", "Surat",
+  "Lucknow", "Kochi", "Chandigarh", "Indore", "Nagpur",
+];
+const cityListDoubled = [...cities, ...cities];
+
+const miniStats = [
+  { value: "2M+", label: "Happy Riders" },
+  { value: "30+", label: "Cities" },
+  { value: "99.7%", label: "Uptime" },
+  { value: "24/7", label: "Support" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Animation Variants (match Hero)
+// ─────────────────────────────────────────────────────────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const cardVariant = {
+  hidden: { opacity: 0, y: 36, scale: 0.96 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.6,
+      delay: i * 0.08,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  }),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared Styles (can be extracted to a separate file)
+// ─────────────────────────────────────────────────────────────────────────────
+const GlobalStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --color-amber-50: #fffbeb;
+      --color-amber-100: #fef3c7;
+      --color-amber-200: #fde68a;
+      --color-amber-300: #fcd34d;
+      --color-amber-400: #fbbf24;
+      --color-amber-500: #f59e0b;
+      --color-amber-600: #d97706;
+      --color-amber-700: #b45309;
+      --color-amber-800: #92400e;
+      --color-amber-900: #78350f;
+      --color-gray-50: #f9fafb;
+      --color-gray-100: #f3f4f6;
+      --color-gray-200: #e5e7eb;
+      --color-gray-300: #d1d5db;
+      --color-gray-400: #9ca3af;
+      --color-gray-500: #6b7280;
+      --color-gray-600: #4b5563;
+      --color-gray-700: #374151;
+      --color-gray-800: #1f2937;
+      --color-gray-900: #111827;
+    }
+
+    /* Custom keyframes (already in Hero, but included for completeness) */
+    @keyframes pulse-fade {
+      0%, 100% { opacity: 0; }
+      50%      { opacity: 1; }
+    }
+    @keyframes ring-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+      50%      { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    }
+    @keyframes border-breathe {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.18); }
+      50%      { border-color: rgba(245, 158, 11, 0.5); }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+    @keyframes tickerScroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  `}</style>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub‑components
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Ambient glowing blobs (like Hero's PulseBackground) */
+const AmbientBlobs = () => {
+  const prefersReducedMotion = useReducedMotion();
+  if (prefersReducedMotion) return null;
+
+  return (
+    <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
+      {/* Large central glow */}
+      <div
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full"
+        style={{
+          background: "radial-gradient(circle, rgba(251,191,36,0.15) 0%, transparent 70%)",
+          filter: "blur(60px)",
+        }}
+      />
+      {/* Smaller blobs */}
+      <div
+        className="absolute left-[10%] top-[30%] w-[300px] h-[300px] rounded-full"
+        style={{
+          background: "radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%)",
+          filter: "blur(50px)",
+          animation: "pulse-fade 8s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="absolute right-[5%] bottom-[20%] w-[400px] h-[400px] rounded-full"
+        style={{
+          background: "radial-gradient(circle, rgba(245,158,11,0.1) 0%, transparent 70%)",
+          filter: "blur(70px)",
+          animation: "pulse-fade 10s ease-in-out infinite reverse",
+        }}
+      />
+    </div>
+  );
+};
+
+/** Dot grid overlay (same as Hero) */
+const DotGrid = () => (
+  <div
+    aria-hidden="true"
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      backgroundImage: "radial-gradient(rgba(245,158,11,0.06) 1px, transparent 1px)",
+      backgroundSize: "32px 32px",
+    }}
+  />
+);
+
+/** Image with skeleton and fallback (simplified) */
+const CardImage: FC<{ src: string; alt: string; fallbackGradient: string }> = ({
+  src,
+  alt,
+  fallbackGradient,
+}) => {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+
+  return (
+    <>
+      {/* Skeleton */}
+      {status === "loading" && (
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-100/20 via-amber-300/20 to-amber-100/20 animate-shimmer bg-[length:200%_100%]" />
+      )}
+      {/* Fallback gradient */}
+      {status === "error" && (
+        <div className={`absolute inset-0 bg-gradient-to-br ${fallbackGradient}`} />
+      )}
+      {/* Actual image */}
+      <img
+        src={src}
+        alt={alt}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-400 ${status === "loaded" ? "opacity-100" : "opacity-0"
+          }`}
+        loading="lazy"
+        onLoad={() => setStatus("loaded")}
+        onError={() => setStatus("error")}
+      />
+    </>
+  );
+};
+
+/** Individual feature card with hover tilt and amber glow */
+const FeatureCard: FC<{ feature: Feature; index: number }> = ({ feature, index }) => {
+  const prefersReducedMotion = useReducedMotion();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [touchActive, setTouchActive] = useState(false);
+
+  // Magnetic tilt (like Hero's MagneticLogo)
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+  const springX = useSpring(rawX, { stiffness: 180, damping: 22 });
+  const springY = useSpring(rawY, { stiffness: 180, damping: 22 });
+  const rotateX = useTransform(springY, [-30, 30], [5, -5]);
+  const rotateY = useTransform(springX, [-30, 30], [-5, 5]);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (prefersReducedMotion) return;
+      const rect = cardRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      rawX.set(e.clientX - rect.left - rect.width / 2);
+      rawY.set(e.clientY - rect.top - rect.height / 2);
+    },
+    [rawX, rawY, prefersReducedMotion]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    rawX.set(0);
+    rawY.set(0);
+    setTouchActive(false);
+  }, [rawX, rawY]);
+
+  const handleTouchStart = useCallback(() => setTouchActive(true), []);
+  const handleTouchEnd = useCallback(() => {
+    setTimeout(() => setTouchActive(false), 400);
+  }, []);
+
   const Icon = feature.icon;
 
   return (
     <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 30 }}
-      animate={visible ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, delay: index * 0.085, ease: [0.16, 1, 0.3, 1] }}
-      className="feature-card"
-      style={{ position: "relative", padding: 28, overflow: "hidden" }}
+      custom={index}
+      variants={cardVariant}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-50px" }}
+      className="w-full aspect-[4/3]"
     >
-      {/* Watermark */}
-      <span className="feature-watermark" aria-hidden>
-        {feature.number}
-      </span>
+      <div
+        ref={cardRef}
+        className={`relative w-full h-full rounded-2xl overflow-hidden cursor-pointer isolate group ${touchActive ? "touch-active" : ""
+          }`}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={
+          !prefersReducedMotion
+            ? { perspective: "1000px", transformStyle: "preserve-3d" }
+            : {}
+        }
+      >
+        {/* 3D tilt wrapper */}
+        <motion.div
+          className="absolute inset-0"
+          style={
+            !prefersReducedMotion
+              ? { rotateX, rotateY, transformStyle: "preserve-3d" }
+              : {}
+          }
+        >
+          {/* Image and overlays */}
+          <CardImage
+            src={feature.img}
+            alt={feature.title}
+            fallbackGradient={feature.fallbackGradient}
+          />
 
-      {/* Content */}
-      <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
-        {/* Icon + Tag row */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
-          <div className="feature-icon-box">
-            <Icon size={22} strokeWidth={2} className="feature-icon" />
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent transition-all group-hover:from-black/95 group-hover:via-amber-900/30 group-hover:to-transparent" />
+
+          {/* Shimmer sweep */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           </div>
-          <span className="feature-tag">{feature.tag}</span>
-        </div>
 
-        <h3 className="feature-title">{feature.title}</h3>
-        <p className="feature-desc">{feature.description}</p>
+          {/* Amber glow ring */}
+          <div className="absolute inset-0 rounded-2xl border border-amber-200/20 group-hover:border-amber-400/60 group-hover:shadow-[0_0_0_3px_rgba(245,158,11,0.1)] transition-all" />
 
-        <div className="feature-divider" />
+          {/* Progress bar */}
+          <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-amber-400 to-amber-600 w-0 group-hover:w-full transition-all duration-700 ease-out" />
 
-        {/* Stat + Arrow */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <div className="feature-stat">{feature.stat}</div>
-            <div className="feature-stat-label">{feature.statLabel}</div>
+          {/* Background number */}
+          <span className="absolute bottom-0 right-2 text-8xl font-black text-white/5 select-none group-hover:text-amber-500/10 transition-colors">
+            {feature.number}
+          </span>
+
+          {/* Content */}
+          <div className="absolute inset-0 p-4 flex flex-col justify-between z-10">
+            <div className="flex justify-between items-start">
+              <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-amber-500 group-hover:to-amber-600 group-hover:border-transparent transition-all">
+                <Icon size={18} className="text-amber-300 group-hover:text-white transition-colors" />
+              </div>
+              <span className="px-2 py-1 text-[10px] font-mono font-semibold uppercase tracking-wider bg-black/20 backdrop-blur-sm border border-white/10 rounded-full text-amber-300/80 group-hover:bg-amber-500/20 group-hover:text-amber-200 transition-colors">
+                {feature.tag}
+              </span>
+            </div>
+
+            <div>
+              <div className="overflow-hidden">
+                <p className="text-xs text-white/70 line-clamp-2 group-hover:line-clamp-3 transition-all duration-300">
+                  {feature.description}
+                </p>
+              </div>
+              <h3 className="text-base font-bold text-white mt-1 group-hover:text-amber-200 transition-colors font-syne">
+                {feature.title}
+              </h3>
+              <div className="h-px bg-white/10 my-2 group-hover:bg-amber-500/30 transition-colors" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xl font-black text-amber-300 group-hover:text-amber-200 transition-colors font-syne">
+                    {feature.stat}
+                  </div>
+                  <div className="text-[8px] font-mono uppercase tracking-wider text-white/40 group-hover:text-amber-300/60 transition-colors">
+                    {feature.statLabel}
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-amber-500 group-hover:to-amber-600 group-hover:border-transparent group-hover:scale-110 transition-all">
+                  <ArrowRight size={12} className="text-white/70 group-hover:text-white" />
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="feature-arrow">
-            <ArrowRight size={16} />
-          </div>
-        </div>
+        </motion.div>
       </div>
     </motion.div>
   );
 };
 
-/* ─── FeaturesSection ─────────────────────────────────────────── */
-const FeaturesSection = () => {
-  const { ref: headerRef, visible: headerVisible } = useInView(0.15);
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────────────────────
+const FeaturesSection: FC = () => {
+  const prefersReducedMotion = useReducedMotion();
+  const headerRef = useRef(null);
+  const statsRef = useRef(null);
 
-  const handleBookClick = () => {
-    const bookingSection = document.getElementById('booking-section');
-    if (bookingSection) {
-      bookingSection.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+  const handleBookClick = useCallback(() => {
+    document.getElementById("booking-section")?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   return (
     <>
-      <style>{featureStyles}</style>
+      <GlobalStyles />
+      <section
+        className="relative py-24 md:py-32 overflow-hidden bg-gradient-to-b from-amber-50 to-white"
+        aria-label="Platform Features"
+      >
+        {/* Ambient layers */}
+        <AmbientBlobs />
+        <DotGrid />
 
-      <section className="features-section" style={{
-        position: "relative",
-        padding: "96px 0 80px",
-        background: "#FEF9EE",
-        overflow: "hidden",
-      }}>
-        {/* Dot grid background */}
-        <div aria-hidden style={{
-          position: "absolute", inset: 0, pointerEvents: "none",
-          backgroundImage: "radial-gradient(circle, rgba(26,26,46,0.06) 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-        }} />
-
-        {/* Warm orange-gold glow */}
-        <div aria-hidden style={{
-          position: "absolute",
-          top: -100,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 700,
-          height: 420,
-          pointerEvents: "none",
-          background: "radial-gradient(ellipse, rgba(255,179,0,0.20) 0%, transparent 70%)",
-          filter: "blur(52px)",
-        }} />
-
-        <div style={{
-          position: "relative",
-          maxWidth: 1160,
-          margin: "0 auto",
-          padding: "0 20px",
-        }}>
-          {/* Section Header */}
+        {/* Content container */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
           <motion.div
             ref={headerRef}
-            initial={{ opacity: 0, y: 28 }}
-            animate={headerVisible ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            style={{ textAlign: "center", marginBottom: 56 }}
+            variants={!prefersReducedMotion ? { ...fadeUp, hidden: { opacity: 0, y: 28 } } : {}}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="text-center mb-16"
           >
-            {/* Live badge */}
-            <div className="live-badge">
-              <span className="live-dot" />
-              <span style={{
-                fontFamily: "'SF Mono', Menlo, Monaco, 'Cascadia Code', 'Consolas', 'Courier New', monospace",
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                color: "#B07D00",
-              }}>
+            <motion.div
+              variants={!prefersReducedMotion ? fadeUp : {}}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-amber-300/60 bg-amber-50/80 backdrop-blur-sm text-amber-700 shadow-sm mb-6"
+            >
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-xs font-semibold tracking-widest uppercase font-dmsans">
                 Everything You Need
               </span>
-            </div>
+            </motion.div>
 
-            <h2 style={{
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-              fontWeight: 700,
-              fontSize: "clamp(34px, 5vw, 56px)",
-              lineHeight: 1.06,
-              letterSpacing: "-0.02em",
-              color: "#1a1a2e",
-              marginBottom: 14,
-            }}>
-              Ride Smarter. <span style={{ color: "#f59e0b" }}>Every Time.</span>
-            </h2>
+            <motion.h2
+              variants={!prefersReducedMotion ? fadeUp : {}}
+              className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-gray-900 font-syne"
+            >
+              Ride Smarter.{" "}
+              <span className="relative inline-block text-amber-500">
+                Every Time.
+                <motion.span
+                  initial={{ scaleX: 0 }}
+                  whileInView={{ scaleX: 1 }}
+                  transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full origin-left"
+                />
+              </span>
+            </motion.h2>
 
-            <p style={{
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-              fontSize: 17,
-              color: "#5a5a72",
-              maxWidth: 460,
-              margin: "0 auto",
-              lineHeight: 1.6,
-            }}>
+            <motion.p
+              variants={!prefersReducedMotion ? fadeUp : {}}
+              className="text-gray-500 text-base sm:text-lg max-w-2xl mx-auto mt-4 font-dmsans"
+            >
               Four pillars that make Xpool the most trusted ride-sharing platform in 30+ cities.
-            </p>
+            </motion.p>
+
+            {/* City ticker */}
+            <motion.div
+              variants={!prefersReducedMotion ? fadeUp : {}}
+              className="flex items-center justify-center gap-3 mt-8"
+            >
+              <Zap size={14} className="text-amber-400" />
+              <div className="overflow-hidden max-w-[300px] sm:max-w-md">
+                <div
+                  className="flex gap-2 animate-ticker whitespace-nowrap"
+                  style={{ animation: "tickerScroll 22s linear infinite" }}
+                >
+                  {cityListDoubled.map((city, i) => (
+                    <span
+                      key={`${city}-${i}`}
+                      className="px-3 py-1 text-[10px] font-mono font-medium uppercase tracking-wider bg-amber-100/50 text-amber-700 rounded-full border border-amber-200/50"
+                    >
+                      {city}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <Zap size={14} className="text-amber-400" />
+            </motion.div>
           </motion.div>
 
-          {/* Cards Grid */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 16,
-            alignItems: "stretch",
-          }}>
-            {features.map((f, i) => (
-              <FeatureCard key={f.number} feature={f} index={i} />
+          {/* Cards grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {features.map((feature, i) => (
+              <FeatureCard key={feature.number} feature={feature} index={i} />
             ))}
           </div>
 
-          {/* CTA Strip */}
+          {/* Mini stats row */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={headerVisible ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.32, ease: [0.16, 1, 0.3, 1] }}
-            className="cta-strip"
+            ref={statsRef}
+            variants={!prefersReducedMotion ? fadeUp : {}}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="flex flex-wrap items-center justify-center gap-8 mt-16 p-6 rounded-2xl bg-white/60 backdrop-blur-sm border border-amber-200/30 shadow-sm"
           >
-            <div>
-              <p style={{
-                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                fontWeight: 700,
-                fontSize: 21,
-                color: "#1a1a2e",
-                marginBottom: 4,
-              }}>
-                Ready for your first ride?
-              </p>
-              <p style={{
-                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                fontSize: 14,
-                color: "#5a5a72",
-              }}>
-                Join 2 million+ happy riders across 30+ cities.
-              </p>
-            </div>
+            {miniStats.map((stat, i) => (
+              <div key={stat.label} className="text-center">
+                <div className="text-2xl font-black text-gray-900 font-syne">{stat.value}</div>
+                <div className="text-[10px] font-mono uppercase tracking-wider text-gray-500">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </motion.div>
 
-            <button onClick={handleBookClick} className="cta-button">
-              Book Your Ride
-              <ArrowRight size={15} />
-            </button>
+          {/* CTA strip */}
+          <motion.div
+            variants={!prefersReducedMotion ? fadeUp : {}}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="relative mt-16 p-6 md:p-8 rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-50 to-amber-100/50 shadow-lg overflow-hidden"
+          >
+            <div
+              className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-amber-300/20 blur-3xl"
+              aria-hidden="true"
+            />
+            <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div>
+                <h3 className="text-xl md:text-2xl font-bold text-gray-900 font-syne">
+                  Ready for your first ride?
+                </h3>
+                <p className="text-sm text-gray-600 mt-1 font-dmsans">
+                  Join 2 million+ happy riders across 30+ cities.
+                </p>
+              </div>
+              <button
+                onClick={handleBookClick}
+                className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  Book Your Ride
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </span>
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 opacity-0 group-hover:opacity-100 transition-opacity blur-md" />
+              </button>
+            </div>
           </motion.div>
         </div>
       </section>
