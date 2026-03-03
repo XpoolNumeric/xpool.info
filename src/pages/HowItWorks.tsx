@@ -1,332 +1,101 @@
-import { useEffect, useRef, useState, memo } from "react";
-import {
-  MapPin, Users, Shield, CreditCard, Star, Clock,
-  DollarSign, CheckCircle, Phone, Bike, Sparkles,
-  Download, ArrowRight,
-} from "lucide-react";
+import { FC, useRef, useState, useEffect } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import Navbar from "@/components/ui/navbar";
-import { useReducedMotion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import {
+  MapPin,
+  Users,
+  Shield,
+  CreditCard,
+  Star,
+  Clock,
+  DollarSign,
+  CheckCircle,
+  Phone,
+  Bike,
+  Sparkles,
+  Download,
+  ArrowRight,
+} from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Design tokens — unified with Hero / Download / Contact
+// Types
 // ─────────────────────────────────────────────────────────────────────────────
-const T = {
-  amber: "#f59e0b",
-  orange: "#f97316",
-  red: "#ef4444",
-  navy: "#1c1917",
-  white: "#ffffff",
-  ivory: "#fffbeb",
-  g500: "#6b7280",
-  g900: "#111827",
-  syne: "'Syne', sans-serif",
-  dm: "'DM Sans', sans-serif",
-} as const;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Pulse config — same 8-point set as all other pages
-// ─────────────────────────────────────────────────────────────────────────────
-const BLOBS = [
-  { x: 8, y: 12, size: 200, delay: 0, dur: 3.4, o: 0.28 },
-  { x: 25, y: 65, size: 140, delay: 0.8, dur: 4.1, o: 0.20 },
-  { x: 50, y: 18, size: 260, delay: 1.5, dur: 3.8, o: 0.25 },
-  { x: 75, y: 80, size: 180, delay: 0.3, dur: 5.0, o: 0.18 },
-  { x: 90, y: 30, size: 220, delay: 2.1, dur: 3.5, o: 0.22 },
-  { x: 12, y: 88, size: 160, delay: 1.0, dur: 4.5, o: 0.16 },
-  { x: 60, y: 50, size: 300, delay: 2.7, dur: 3.2, o: 0.20 },
-  { x: 40, y: 35, size: 120, delay: 0.5, dur: 4.8, o: 0.25 },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Global styles
-// ─────────────────────────────────────────────────────────────────────────────
-const Styles = () => (
-  <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-
-    @keyframes hiw-blob   { 0%,100%{opacity:0}  50%{opacity:1} }
-    @keyframes hiw-up     { from{opacity:0;transform:translateY(28px)}  to{opacity:1;transform:translateY(0)} }
-    @keyframes hiw-left   { from{opacity:0;transform:translateX(-28px)} to{opacity:1;transform:translateX(0)} }
-    @keyframes hiw-right  { from{opacity:0;transform:translateX(28px)}  to{opacity:1;transform:translateX(0)} }
-    @keyframes hiw-float  { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-14px) rotate(1deg)} }
-    @keyframes hiw-spin   { to{transform:translate(-50%,-50%) rotate(360deg)} }
-    @keyframes hiw-blink  { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    @keyframes hiw-breath { 0%,100%{border-color:rgba(245,158,11,0.18)} 50%{border-color:rgba(245,158,11,0.50)} }
-    @keyframes hiw-ring   { 0%{box-shadow:0 0 0 0 rgba(245,158,11,0.45)} 70%{box-shadow:0 0 0 16px rgba(245,158,11,0)} 100%{box-shadow:0 0 0 0 rgba(245,158,11,0)} }
-
-    .hiw-b  { animation:hiw-blob ease-in-out infinite; will-change:opacity; }
-    .hiw-bl { animation:hiw-blink 1.6s ease-in-out infinite; }
-    .hiw-br { animation:hiw-breath 3s ease-in-out infinite; }
-    .hiw-fl { animation:hiw-float 4.5s ease-in-out infinite; }
-    .hiw-sp { animation:hiw-spin 14s linear infinite; }
-    .hiw-ri { animation:hiw-ring 2.2s infinite; }
-
-    .step-card {
-      background:rgba(255,255,255,0.86);
-      backdrop-filter:blur(10px);
-      border:1px solid rgba(245,158,11,0.20);
-      border-radius:24px; padding:38px 34px;
-      position:relative; overflow:hidden;
-      transition:box-shadow .3s, transform .3s;
-      animation:hiw-breath 3s ease-in-out infinite;
-    }
-    .step-card::before {
-      content:''; position:absolute; top:0; left:0; right:0; height:3px;
-      background:linear-gradient(90deg,${T.amber},${T.orange});
-      transform:scaleX(0); transform-origin:left;
-      transition:transform .4s cubic-bezier(.34,1.56,.64,1);
-    }
-    .step-card:hover::before { transform:scaleX(1); }
-    .step-card:hover { box-shadow:0 24px 56px rgba(245,158,11,0.16); transform:translateY(-4px); }
-
-    .step-ghost {
-      position:absolute; right:18px; top:10px;
-      font-family:${T.syne}; font-weight:900; font-size:5.5rem; line-height:1;
-      background:linear-gradient(135deg,rgba(245,158,11,0.10),rgba(249,115,22,0.05));
-      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-      user-select:none; pointer-events:none;
-    }
-
-    .benefit-card {
-      background:rgba(255,255,255,0.86);
-      backdrop-filter:blur(8px);
-      border:1px solid rgba(245,158,11,0.18);
-      border-radius:20px; padding:28px 22px;
-      position:relative; overflow:hidden;
-      transition:all .3s;
-      animation:hiw-breath 3s ease-in-out infinite;
-    }
-    .benefit-card::after {
-      content:''; position:absolute; bottom:0; left:0; right:0; height:3px;
-      background:linear-gradient(90deg,${T.amber},${T.orange});
-      transform:scaleX(0); transform-origin:center; transition:transform .35s ease;
-    }
-    .benefit-card:hover::after { transform:scaleX(1); }
-    .benefit-card:hover { box-shadow:0 16px 40px rgba(245,158,11,0.15); transform:translateY(-6px); border-color:rgba(245,158,11,0.38); }
-
-    .hiw-connector { width:2px; margin:0 auto; background:linear-gradient(to bottom,rgba(245,158,11,0.5),transparent); }
-
-    .btn-pri {
-      display:inline-flex; align-items:center; gap:9px;
-      background:${T.white}; color:#92400e;
-      font-family:${T.dm}; font-weight:700;
-      border:none; border-radius:16px; padding:16px 32px; font-size:1rem;
-      cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,0.10);
-      transition:transform .2s, box-shadow .2s;
-    }
-    .btn-pri:hover { transform:translateY(-3px) scale(1.02); box-shadow:0 16px 40px rgba(0,0,0,0.16); }
-
-    .btn-sec {
-      display:inline-flex; align-items:center; gap:9px;
-      background:rgba(255,255,255,0.12); color:${T.white};
-      font-family:${T.dm}; font-weight:600;
-      border:1.5px solid rgba(255,255,255,0.28); border-radius:16px;
-      padding:16px 32px; font-size:1rem;
-      cursor:pointer; backdrop-filter:blur(8px);
-      transition:background .2s, transform .2s, border-color .2s;
-    }
-    .btn-sec:hover { background:rgba(255,255,255,0.22); border-color:rgba(255,255,255,0.55); transform:translateY(-3px); }
-
-    @media (max-width:768px) {
-      .step-grid   { grid-template-columns:1fr !important; }
-      .step-visual { display:none !important; }
-      .step-text   { order:0 !important; }
-      .step-card   { padding:26px 20px; }
-    }
-    @media (prefers-reduced-motion:reduce) {
-      .hiw-b,.hiw-bl,.hiw-br,.hiw-fl,.hiw-sp,.hiw-ri { animation:none !important; }
-    }
-  `}</style>
-);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PulseBackground
-// ─────────────────────────────────────────────────────────────────────────────
-const PulseBackground = memo(() => {
-  const rm = useReducedMotion();
-  if (rm) return null;
-  return (
-    <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
-      {BLOBS.map((p, i) => (
-        <div key={i} className="hiw-b" style={{
-          position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
-          width: p.size, height: p.size, borderRadius: "50%",
-          transform: "translate(-50%,-50%)",
-          background: `radial-gradient(circle,rgba(251,191,36,${p.o}) 0%,rgba(245,158,11,${p.o * 0.5}) 42%,transparent 70%)`,
-          filter: "blur(44px)",
-          animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s`, willChange: "opacity",
-        }} />
-      ))}
-    </div>
-  );
-});
-PulseBackground.displayName = "PulseBackground";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// useReveal
-// ─────────────────────────────────────────────────────────────────────────────
-function useReveal(threshold = 0.12) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
-      { threshold }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-  return { ref, visible };
+interface Step {
+  number: string;
+  title: string;
+  description: string;
+  icon: React.ElementType;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// StepCard
-// ─────────────────────────────────────────────────────────────────────────────
-function StepCard({ step, index, total }: {
-  step: { number: string; title: string; description: string; icon: any };
-  index: number; total: number;
-}) {
-  const Icon = step.icon;
-  const { ref, visible } = useReveal(0.1);
-  const isEven = index % 2 === 0;
-
-  return (
-    <div ref={ref} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-      <div style={{
-        width: "100%", maxWidth: 920,
-        opacity: visible ? 1 : 0,
-        animation: visible ? `${isEven ? "hiw-left" : "hiw-right"} 0.65s cubic-bezier(0.16,1,0.3,1) both` : "none",
-      }}>
-        <div className="step-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
-
-          {/* Text card */}
-          <div className="step-text" style={{ order: isEven ? 0 : 1 }}>
-            <div className="step-card">
-              <span className="step-ghost">{step.number}</span>
-
-              {/* Icon orb */}
-              <div className={index === 0 ? "hiw-ri" : ""} style={{
-                width: 76, height: 76, borderRadius: "50%",
-                background: `linear-gradient(135deg,${T.amber},${T.orange})`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                marginBottom: 20, boxShadow: "0 8px 24px rgba(245,158,11,0.30)",
-              }}>
-                <Icon style={{ width: 34, height: 34, color: T.white }} />
-              </div>
-
-              {/* Step pill */}
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                background: "rgba(245,158,11,0.09)", border: "1px solid rgba(245,158,11,0.22)",
-                borderRadius: 999, padding: "3px 12px", marginBottom: 14,
-              }}>
-                <span style={{ fontFamily: T.dm, fontWeight: 700, fontSize: "0.76rem", color: T.amber, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  Step {step.number}
-                </span>
-              </div>
-
-              <h3 style={{ fontFamily: T.syne, fontWeight: 900, fontSize: "1.45rem", color: T.g900, marginBottom: 12, lineHeight: 1.2 }}>
-                {step.title}
-              </h3>
-              <p style={{ fontFamily: T.dm, fontSize: "0.95rem", color: T.g500, lineHeight: 1.78 }}>
-                {step.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Visual orb */}
-          <div className="step-visual" style={{ order: isEven ? 1 : 0, display: "flex", justifyContent: "center", alignItems: "center" }}>
-            <div className="hiw-fl" style={{ animationDelay: `${index * 0.5}s`, position: "relative", width: 160, height: 160 }}>
-              {/* spinning dashed ring */}
-              <div className="hiw-sp" style={{
-                position: "absolute", top: "50%", left: "50%",
-                width: 210, height: 210,
-                border: "2px dashed rgba(245,158,11,0.22)", borderRadius: "50%",
-              }} />
-              {/* mid ring */}
-              <div style={{
-                position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                width: 160, height: 160, borderRadius: "50%",
-                border: "1px solid rgba(245,158,11,0.15)",
-                background: "rgba(255,251,235,0.50)", backdropFilter: "blur(6px)",
-              }} />
-              {/* core */}
-              <div style={{
-                position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                width: 88, height: 88, borderRadius: "50%",
-                background: `linear-gradient(135deg,${T.amber},${T.orange})`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 8px 32px rgba(245,158,11,0.42)", zIndex: 1,
-              }}>
-                <Icon style={{ width: 36, height: 36, color: T.white }} />
-              </div>
-              {/* badge */}
-              <div style={{
-                position: "absolute", top: -4, right: -4, zIndex: 2,
-                width: 34, height: 34, borderRadius: "50%",
-                background: T.navy, color: T.white,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: T.syne, fontWeight: 900, fontSize: "0.88rem",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.24)",
-              }}>
-                {step.number}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {index < total - 1 && (
-        <div className="hiw-connector" style={{ height: 52, marginTop: 8 }} />
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BenefitCard
-// ─────────────────────────────────────────────────────────────────────────────
-function BenefitCard({ icon: Icon, title, text, index }: { icon: any; title: string; text: string; index: number }) {
-  const { ref, visible } = useReveal(0.1);
-  return (
-    <div ref={ref} className="benefit-card" style={{
-      animation: visible ? `hiw-up 0.6s cubic-bezier(0.16,1,0.3,1) ${index * 0.1}s both` : "none",
-      opacity: visible ? undefined : 0,
-    }}>
-      <div style={{
-        width: 52, height: 52, borderRadius: 14,
-        background: `linear-gradient(135deg,${T.amber},${T.orange})`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 16, boxShadow: "0 6px 18px rgba(245,158,11,0.28)",
-      }}>
-        <Icon style={{ width: 24, height: 24, color: T.white }} />
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <CheckCircle style={{ width: 17, height: 17, color: "#22c55e", flexShrink: 0 }} />
-        <p style={{ fontFamily: T.syne, fontWeight: 900, color: T.g900, fontSize: "0.95rem", margin: 0 }}>{title}</p>
-      </div>
-      <p style={{ fontFamily: T.dm, fontSize: "0.875rem", color: T.g500, lineHeight: 1.65, margin: 0 }}>{text}</p>
-    </div>
-  );
+interface Benefit {
+  icon: React.ElementType;
+  title: string;
+  description: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────────────────────
-const steps = [
-  { number: "1", title: "Book Your Ride", description: "Open the Xpool app or website. Enter your pickup and drop location. Instantly view fare estimate and available vehicle options.", icon: MapPin },
-  { number: "2", title: "Get Matched with a Captain", description: "Our system finds the nearest available driver. View their name, photo, bike number, and rating. Track their real-time location until pickup.", icon: Users },
-  { number: "3", title: "Enjoy a Safe & Affordable Ride", description: "All Captains are KYC-verified with background checks. Helmets provided. Enjoy fast and affordable rides through city traffic.", icon: Shield },
-  { number: "4", title: "Seamless Payments", description: "Pay via UPI, card, wallet, or cash. Receive instant invoices and earn cashback through Xpool offers.", icon: CreditCard },
-  { number: "5", title: "Rate & Review", description: "Rate your Captain after every ride. Your feedback helps us improve safety and service quality.", icon: Star },
+const steps: Step[] = [
+  {
+    number: "1",
+    title: "Book Your Ride",
+    description:
+      "Open the Xpool app or website. Enter your pickup and drop location. Instantly view fare estimate and available vehicle options.",
+    icon: MapPin,
+  },
+  {
+    number: "2",
+    title: "Get Matched with a Captain",
+    description:
+      "Our system finds the nearest available driver. View their name, photo, bike number, and rating. Track their real-time location until pickup.",
+    icon: Users,
+  },
+  {
+    number: "3",
+    title: "Enjoy a Safe & Affordable Ride",
+    description:
+      "All Captains are KYC-verified with background checks. Helmets provided. Enjoy fast and affordable rides through city traffic.",
+    icon: Shield,
+  },
+  {
+    number: "4",
+    title: "Seamless Payments",
+    description:
+      "Pay via UPI, card, wallet, or cash. Receive instant invoices and earn cashback through Xpool offers.",
+    icon: CreditCard,
+  },
+  {
+    number: "5",
+    title: "Rate & Review",
+    description:
+      "Rate your Captain after every ride. Your feedback helps us improve safety and service quality.",
+    icon: Star,
+  },
 ];
 
-const benefits = [
-  { icon: Clock, title: "Fast Pickups", text: "Pickup in under 5 minutes — no waiting around." },
-  { icon: DollarSign, title: "Affordable Fares", text: "Cheaper than cabs & autos for every commute." },
-  { icon: Shield, title: "Verified Captains", text: "Every captain is KYC-checked and background-verified." },
-  { icon: Phone, title: "24/7 Support", text: "Our team is always available to help you." },
+const benefits: Benefit[] = [
+  {
+    icon: Clock,
+    title: "Fast Pickups",
+    description: "Pickup in under 5 minutes — no waiting around.",
+  },
+  {
+    icon: DollarSign,
+    title: "Affordable Fares",
+    description: "Cheaper than cabs & autos for every commute.",
+  },
+  {
+    icon: Shield,
+    title: "Verified Captains",
+    description: "Every captain is KYC-checked and background-verified.",
+  },
+  {
+    icon: Phone,
+    title: "24/7 Support",
+    description: "Our team is always available to help you.",
+  },
 ];
 
 const stats = [
@@ -337,223 +106,599 @@ const stats = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Page
+// Animation Variants
 // ─────────────────────────────────────────────────────────────────────────────
-const HowItWorks = () => {
-  const hero = useReveal(0.1);
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const badgeVariant = {
+  hidden: { opacity: 0, y: 20, scale: 0.92 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.5,
+      delay: 0.6 + i * 0.1,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  }),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Global Styles (extending HeroStyles)
+// ─────────────────────────────────────────────────────────────────────────────
+const HowItWorksStyles = () => (
+  <style>{`
+    /* ----- Reuse Hero's variables and animations ----- */
+    :root {
+      --color-amber-50: #fffbeb;
+      --color-amber-100: #fef3c7;
+      --color-amber-200: #fde68a;
+      --color-amber-300: #fcd34d;
+      --color-amber-400: #fbbf24;
+      --color-amber-500: #f59e0b;
+      --color-amber-600: #d97706;
+      --color-amber-700: #b45309;
+      --color-amber-800: #92400e;
+      --color-amber-900: #78350f;
+      --color-gray-50: #f9fafb;
+      --color-gray-100: #f3f4f6;
+      --color-gray-200: #e5e7eb;
+      --color-gray-300: #d1d5db;
+      --color-gray-400: #9ca3af;
+      --color-gray-500: #6b7280;
+      --color-gray-600: #4b5563;
+      --color-gray-700: #374151;
+      --color-gray-800: #1f2937;
+      --color-gray-900: #111827;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+      --blur-md: blur(12px);
+      --transition-base: 0.2s ease-in-out;
+    }
+
+    /* ----- Pulse animation (same as Hero) ----- */
+    @keyframes pulse-fade {
+      0%, 100% { opacity: 0; }
+      50%      { opacity: 1; }
+    }
+    .pulse-blob {
+      animation: pulse-fade ease-in-out infinite;
+      will-change: opacity;
+    }
+
+    /* ----- CTA shimmer (identical) ----- */
+    @keyframes shimmer {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    .cta-shimmer {
+      background: linear-gradient(
+        110deg,
+        var(--color-amber-500) 0%,
+        var(--color-amber-400) 30%,
+        var(--color-amber-200) 50%,
+        var(--color-amber-400) 70%,
+        var(--color-amber-500) 100%
+      );
+      background-size: 200% auto;
+      animation: shimmer 3s linear infinite;
+      color: #1a0800 !important;
+      font-weight: 700 !important;
+      border: none !important;
+      box-shadow: 0 4px 24px rgba(245, 158, 11, 0.4),
+                  0 1px 0 rgba(255, 255, 255, 0.35) inset;
+      transition: filter var(--transition-base), box-shadow var(--transition-base);
+    }
+    .cta-shimmer:hover {
+      filter: brightness(1.07);
+      box-shadow: 0 8px 36px rgba(245, 158, 11, 0.55),
+                  0 1px 0 rgba(255, 255, 255, 0.35) inset;
+    }
+
+    /* ----- Ghost button (light background) ----- */
+    .btn-ghost-light {
+      border: 1.5px solid rgba(180, 83, 9, 0.22) !important;
+      color: var(--color-amber-800) !important;
+      background: rgba(251, 191, 36, 0.07) !important;
+      font-weight: 600 !important;
+      transition: background var(--transition-base),
+                  border-color var(--transition-base),
+                  color var(--transition-base) !important;
+    }
+    .btn-ghost-light:hover {
+      background: rgba(251, 191, 36, 0.16) !important;
+      border-color: rgba(180, 83, 9, 0.4) !important;
+      color: var(--color-amber-900) !important;
+    }
+
+    /* ----- Step connector line ----- */
+    .step-connector {
+      width: 2px;
+      height: 48px;
+      margin: 8px auto;
+      background: linear-gradient(to bottom, rgba(245,158,11,0.4), transparent);
+    }
+
+    /* ----- Disable animations for reduced motion ----- */
+    @media (prefers-reduced-motion: reduce) {
+      .pulse-blob,
+      .cta-shimmer,
+      .step-connector {
+        animation: none !important;
+      }
+    }
+  `}</style>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub‑components
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Soft amber glow blobs (copied from Hero) */
+const PulseBackground: FC = () => {
+  const prefersReducedMotion = useReducedMotion();
+  if (prefersReducedMotion) return null;
+
+  const BLOBS = [
+    { x: 8, y: 12, size: 200, delay: 0, dur: 3.4, o: 0.30 },
+    { x: 25, y: 65, size: 140, delay: 0.8, dur: 4.1, o: 0.22 },
+    { x: 50, y: 18, size: 260, delay: 1.5, dur: 3.8, o: 0.28 },
+    { x: 75, y: 80, size: 180, delay: 0.3, dur: 5.0, o: 0.20 },
+    { x: 90, y: 30, size: 220, delay: 2.1, dur: 3.5, o: 0.25 },
+    { x: 12, y: 88, size: 160, delay: 1.0, dur: 4.5, o: 0.18 },
+    { x: 60, y: 50, size: 300, delay: 2.7, dur: 3.2, o: 0.22 },
+    { x: 40, y: 35, size: 120, delay: 0.5, dur: 4.8, o: 0.28 },
+  ];
+
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 pointer-events-none overflow-hidden"
+      style={{ zIndex: 0 }}
+    >
+      {BLOBS.map((p, i) => (
+        <div
+          key={i}
+          className="pulse-blob"
+          style={{
+            position: "absolute",
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            borderRadius: "50%",
+            transform: "translate(-50%, -50%)",
+            background: `radial-gradient(circle,
+              rgba(251, 191, 36, ${p.o}) 0%,
+              rgba(245, 158, 11, ${p.o * 0.5}) 42%,
+              transparent 70%)`,
+            filter: "blur(44px)",
+            animationDuration: `${p.dur}s`,
+            animationDelay: `${p.delay}s`,
+            willChange: "opacity",
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+/** Statistics badge – identical to Features' StatsBadgeCard */
+const StatsBadgeCard: FC<{ value: string; label: string; index: number }> = ({
+  value,
+  label,
+  index,
+}) => {
+  // Use a generic icon based on label for visual variety, but we can keep it simple
+  const Icon = label.includes("Riders")
+    ? Users
+    : label.includes("Pickup")
+      ? Clock
+      : label.includes("Cities")
+        ? MapPin
+        : Star;
+
+  return (
+    <motion.div
+      custom={index}
+      variants={badgeVariant}
+      initial="hidden"
+      animate="visible"
+      whileHover={{ y: -3, transition: { duration: 0.18 } }}
+      className="flex flex-col items-center justify-center gap-1.5 px-6 py-5 rounded-2xl border border-amber-200/60 bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-shadow"
+      style={{ minWidth: 120 }}
+      role="figure"
+      aria-label={`${value} ${label}`}
+    >
+      <div className="flex items-center gap-1.5">
+        <Icon size={16} strokeWidth={2.5} className="text-amber-500" aria-hidden="true" />
+        <span className="text-2xl font-black leading-none text-gray-900 font-syne">{value}</span>
+      </div>
+      <span className="text-[10.5px] font-semibold text-gray-500 tracking-wider uppercase whitespace-nowrap font-dmsans">
+        {label}
+      </span>
+    </motion.div>
+  );
+};
+
+/** Step card with alternating layout and animated visual orb */
+const StepCard: FC<{ step: Step; index: number; total: number }> = ({
+  step,
+  index,
+  total,
+}) => {
+  const prefersReducedMotion = useReducedMotion();
+  const isEven = index % 2 === 0;
+
+  return (
+    <motion.div
+      variants={{
+        hidden: { opacity: 0, x: isEven ? -30 : 30 },
+        visible: {
+          opacity: 1,
+          x: 0,
+          transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: index * 0.15 },
+        },
+      }}
+      className="w-full max-w-4xl mx-auto"
+    >
+      <div
+        className={`flex flex-col ${isEven ? "md:flex-row" : "md:flex-row-reverse"
+          } items-center gap-8 md:gap-12`}
+      >
+        {/* Text card */}
+        <div className="flex-1">
+          <motion.div
+            whileHover={{ y: -5, transition: { duration: 0.2 } }}
+            className="relative bg-white/80 backdrop-blur-sm border border-amber-200/60 rounded-2xl p-8 shadow-md hover:shadow-lg transition-all"
+          >
+            {/* Large ghost number */}
+            <span
+              className="absolute bottom-3 right-4 text-7xl font-black text-amber-100 select-none"
+              aria-hidden="true"
+            >
+              {step.number.padStart(2, "0")}
+            </span>
+
+            {/* Icon */}
+            <div
+              className={`w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mb-5 shadow-lg ${index === 0 ? "animate-pulse" : ""
+                }`}
+            >
+              <step.icon size={32} className="text-white" strokeWidth={1.8} />
+            </div>
+
+            {/* Step label */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100/70 border border-amber-200/60 text-amber-700 text-xs font-semibold uppercase tracking-wider mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Step {step.number}
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-900 mb-3 font-syne">{step.title}</h3>
+            <p className="text-gray-500 text-sm leading-relaxed font-dmsans">{step.description}</p>
+          </motion.div>
+        </div>
+
+        {/* Visual orb */}
+        <div className="flex-1 flex justify-center items-center">
+          <div
+            className={`relative w-48 h-48 ${!prefersReducedMotion ? "animate-float" : ""
+              }`}
+            style={{ animation: "float 4s ease-in-out infinite" }}
+          >
+            {/* Dashed ring */}
+            <div
+              className="absolute inset-0 rounded-full border-2 border-dashed border-amber-300/40"
+              style={
+                !prefersReducedMotion
+                  ? { animation: "spin 20s linear infinite" }
+                  : {}
+              }
+            />
+            {/* Solid ring */}
+            <div className="absolute inset-4 rounded-full border border-amber-200/60 bg-amber-50/50 backdrop-blur-sm" />
+            {/* Core icon */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-xl">
+                <step.icon size={36} className="text-white" />
+              </div>
+            </div>
+            {/* Floating badge */}
+            <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold font-syne shadow-lg">
+              {step.number}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Connector (except after last step) */}
+      {index < total - 1 && <div className="step-connector" />}
+    </motion.div>
+  );
+};
+
+/** Benefit card (smaller, used in Why Xpool section) */
+const BenefitCard: FC<{ benefit: Benefit; index: number }> = ({ benefit, index }) => {
+  const Icon = benefit.icon;
+  return (
+    <motion.div
+      variants={{
+        hidden: { opacity: 0, y: 20 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.5, delay: 0.3 + index * 0.1, ease: [0.22, 1, 0.36, 1] },
+        },
+      }}
+      whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      className="bg-white/80 backdrop-blur-sm border border-amber-200/60 rounded-xl p-6 shadow-md hover:shadow-lg transition-all"
+    >
+      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mb-4">
+        <Icon size={22} className="text-white" />
+      </div>
+      <div className="flex items-center gap-2 mb-2">
+        <CheckCircle size={16} className="text-green-500" />
+        <h4 className="font-bold text-gray-900 font-syne">{benefit.title}</h4>
+      </div>
+      <p className="text-sm text-gray-500 font-dmsans">{benefit.description}</p>
+    </motion.div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────────────────────
+const HowItWorks: FC = () => {
+  const prefersReducedMotion = useReducedMotion();
+
+  // Custom keyframes for float and spin (inlined in style)
+  useEffect(() => {
+    if (!prefersReducedMotion) {
+      const style = document.createElement("style");
+      style.innerHTML = `
+        @keyframes float {
+          0%, 100% { transform: translateY(0) rotate(-1deg); }
+          50% { transform: translateY(-12px) rotate(1deg); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+      return () => {
+        document.head.removeChild(style);
+      };
+    }
+  }, [prefersReducedMotion]);
 
   return (
     <>
-      <Styles />
-      <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,${T.ivory} 0%,#fef9e7 45%,#fffdf5 100%)`, overflowX: "hidden" }}>
+      <HowItWorksStyles />
+
+      {/* Skip link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-amber-400 focus:text-black focus:font-bold focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
+
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 via-amber-50/90 to-white relative isolate">
         <Navbar />
 
-        <main style={{ paddingTop: 64 }}>
+        {/* Ambient blobs */}
+        <PulseBackground />
 
-          {/* ══════════════════════════════ HERO ══════════════════════════════ */}
-          <section style={{ position: "relative", overflow: "hidden", padding: "96px 24px 128px", isolation: "isolate" }}>
-            <PulseBackground />
+        {/* Subtle dot grid */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            zIndex: 1,
+            backgroundImage: "radial-gradient(rgba(245,158,11,0.08) 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+          }}
+        />
 
-            {/* dot grid */}
-            <div aria-hidden="true" style={{
-              position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1,
-              backgroundImage: "radial-gradient(rgba(245,158,11,0.08) 1px,transparent 1px)",
-              backgroundSize: "32px 32px",
-            }} />
-            {/* center vignette */}
-            <div aria-hidden="true" style={{
-              position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2,
-              background: "radial-gradient(ellipse 70% 60% at 50% 45%,rgba(255,251,235,0) 0%,rgba(255,251,235,0.65) 100%)",
-            }} />
+        {/* Center vignette */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            zIndex: 2,
+            background:
+              "radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255, 251, 235, 0) 0%, rgba(255, 251, 235, 0.7) 100%)",
+          }}
+        />
 
-            <div ref={hero.ref} style={{ position: "relative", zIndex: 10, maxWidth: 720, margin: "0 auto", textAlign: "center" }}>
-
-              {/* Badge */}
-              <div style={{ animation: hero.visible ? "hiw-up 0.5s ease both" : "none", opacity: hero.visible ? undefined : 0, marginBottom: 24 }}>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 8,
-                  background: "rgba(245,158,11,0.09)", border: "1px solid rgba(245,158,11,0.28)",
-                  borderRadius: 999, padding: "6px 18px",
-                  fontFamily: T.dm, fontWeight: 600, color: "#92400e", fontSize: "0.85rem",
-                  backdropFilter: "blur(6px)",
-                }}>
-                  <span className="hiw-bl" style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
-                  <Bike style={{ width: 15, height: 15, color: T.amber }} />
-                  Simple · Safe · Affordable
-                </span>
-              </div>
-
-              {/* Heading */}
-              <h1 style={{
-                fontFamily: T.syne, fontWeight: 900,
-                fontSize: "clamp(2.4rem,6vw,4.2rem)",
-                color: T.g900, marginBottom: 20, lineHeight: 1.08, letterSpacing: "-0.025em",
-                animation: hero.visible ? "hiw-up 0.6s 0.1s ease both" : "none",
-                opacity: hero.visible ? undefined : 0,
-              }}>
-                How{" "}
-                <span style={{ background: `linear-gradient(90deg,${T.amber},${T.orange})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                  Xpool
-                </span>{" "}
-                Works
-              </h1>
-
-              <p style={{
-                fontFamily: T.dm, fontSize: "1.08rem", color: T.g500,
-                lineHeight: 1.78, maxWidth: 500, margin: "0 auto 44px",
-                animation: hero.visible ? "hiw-up 0.6s 0.2s ease both" : "none",
-                opacity: hero.visible ? undefined : 0,
-              }}>
-                Booking a ride with Xpool is quick, simple, and reliable —
-                perfect for daily commutes, college, and city travel.
-              </p>
-
-              {/* Stats */}
-              <div style={{
-                display: "grid", gridTemplateColumns: "repeat(2,1fr)",
-                gap: 12, maxWidth: 420, margin: "0 auto",
-                animation: hero.visible ? "hiw-up 0.6s 0.3s ease both" : "none",
-                opacity: hero.visible ? undefined : 0,
-              }}>
-                {stats.map((s, i) => (
-                  <div key={i} className="hiw-br" style={{
-                    background: "rgba(255,255,255,0.72)", backdropFilter: "blur(8px)",
-                    border: "1px solid rgba(245,158,11,0.20)", borderRadius: 16,
-                    padding: "14px 18px", boxShadow: "0 2px 12px rgba(245,158,11,0.07)",
-                  }}>
-                    <p style={{ fontFamily: T.syne, fontWeight: 900, fontSize: "1.5rem", color: T.g900, margin: 0 }}>{s.value}</p>
-                    <p style={{ fontFamily: T.dm, fontSize: "0.72rem", color: "#9ca3af", marginTop: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</p>
-                  </div>
-                ))}
-              </div>
+        {/* Main content */}
+        <motion.main
+          id="main-content"
+          className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28"
+          variants={!prefersReducedMotion ? containerVariants : {}}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* ── Hero section ── */}
+          <motion.div variants={!prefersReducedMotion ? fadeUp : {}} className="text-center mb-16">
+            {/* Eyebrow */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-amber-300/60 bg-amber-50/80 backdrop-blur-sm text-amber-700 shadow-sm mb-6">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-xs font-semibold tracking-widest uppercase font-dmsans">
+                Simple · Safe · Affordable
+              </span>
             </div>
 
-            {/* Wave into steps */}
-            <div style={{ position: "absolute", bottom: -1, left: 0, right: 0, zIndex: 10 }}>
-              <svg viewBox="0 0 1440 48" fill="none" style={{ display: "block", width: "100%" }}>
-                <path d="M0,0 C360,48 1080,48 1440,0 L1440,48 L0,48 Z" fill="rgba(255,253,245,0.6)" />
-              </svg>
-            </div>
-          </section>
+            {/* Heading */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-gray-900 mb-5 font-syne">
+              How{" "}
+              <span
+                className="text-amber-500"
+                style={{ textShadow: "0 2px 0 rgba(160,80,0,0.15)" }}
+              >
+                Xpool
+              </span>{" "}
+              Works
+            </h1>
 
-          {/* ══════════════════════════════ STEPS ══════════════════════════════ */}
-          <section style={{ padding: "80px 24px 100px", maxWidth: 1100, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 64 }}>
-              <h2 style={{ fontFamily: T.syne, fontWeight: 900, fontSize: "clamp(1.6rem,4vw,2.4rem)", color: T.g900, letterSpacing: "-0.02em", marginBottom: 8 }}>
+            <p className="text-gray-500 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed font-dmsans">
+              Booking a ride with Xpool is quick, simple, and reliable — perfect for daily
+              commutes, college, and city travel.
+            </p>
+          </motion.div>
+
+          {/* Stats badges */}
+          <motion.div
+            variants={!prefersReducedMotion ? containerVariants : {}}
+            className="flex flex-wrap justify-center gap-4 mb-20"
+          >
+            {stats.map((stat, idx) => (
+              <StatsBadgeCard key={stat.label} value={stat.value} label={stat.label} index={idx} />
+            ))}
+          </motion.div>
+
+          {/* Steps section */}
+          <motion.div variants={!prefersReducedMotion ? fadeUp : {}} className="mb-24">
+            <div className="text-center mb-12">
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-3 font-syne">
                 Your Ride in{" "}
-                <span style={{ background: `linear-gradient(90deg,${T.amber},${T.orange})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                  5 Simple Steps
-                </span>
+                <span className="text-amber-500">5 Simple Steps</span>
               </h2>
-              <p style={{ fontFamily: T.dm, color: T.g500, fontSize: "1rem", maxWidth: 420, margin: "0 auto" }}>
+              <p className="text-gray-500 text-sm max-w-md mx-auto font-dmsans">
                 From booking to rating — the complete Xpool experience
               </p>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-              {steps.map((s, i) => <StepCard key={s.number} step={s} index={i} total={steps.length} />)}
+            <div className="space-y-6">
+              {steps.map((step, idx) => (
+                <StepCard key={step.number} step={step} index={idx} total={steps.length} />
+              ))}
             </div>
-          </section>
+          </motion.div>
 
-          {/* ══════════════════════════════ WHY XPOOL ══════════════════════════════ */}
-          <section style={{
-            padding: "80px 24px 100px",
-            background: "rgba(255,253,245,0.65)",
-            borderTop: "1px solid rgba(245,158,11,0.14)",
-            borderBottom: "1px solid rgba(245,158,11,0.14)",
-          }}>
-            <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-              <div style={{ textAlign: "center", marginBottom: 56 }}>
-                <div style={{
-                  display: "inline-flex", alignItems: "center", gap: 7,
-                  background: "rgba(245,158,11,0.09)", border: "1px solid rgba(245,158,11,0.22)",
-                  borderRadius: 999, padding: "5px 16px", marginBottom: 16,
-                }}>
-                  <Sparkles style={{ width: 15, height: 15, color: T.amber }} />
-                  <span style={{ fontFamily: T.dm, fontWeight: 700, color: "#92400e", fontSize: "0.82rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    Why Xpool?
+          {/* Why Xpool section */}
+          <motion.div variants={!prefersReducedMotion ? fadeUp : {}} className="mb-24">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-amber-300/60 bg-amber-50/80 backdrop-blur-sm text-amber-700 shadow-sm mb-4">
+                <Sparkles size={14} className="text-amber-500" />
+                <span className="text-xs font-semibold tracking-widest uppercase font-dmsans">
+                  Why Xpool?
+                </span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-3 font-syne">
+                Built for your everyday commute
+              </h2>
+              <p className="text-gray-500 text-sm max-w-md mx-auto font-dmsans">
+                Everything you need for a stress-free daily ride
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {benefits.map((benefit, idx) => (
+                <BenefitCard key={idx} benefit={benefit} index={idx} />
+              ))}
+            </div>
+          </motion.div>
+
+          {/* CTA section (styled after Hero's buttons) */}
+          <motion.div variants={!prefersReducedMotion ? fadeUp : {}}>
+            <div className="relative bg-gradient-to-br from-amber-500 to-amber-600 rounded-3xl p-12 text-center overflow-hidden">
+              {/* Background rings */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-white/30" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full border border-white/30" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border border-white/30" />
+              </div>
+
+              {/* Dot grid overlay */}
+              <div
+                className="absolute inset-0 opacity-10"
+                style={{
+                  backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                }}
+              />
+
+              <div className="relative z-10">
+                {/* Online badge */}
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white mb-6">
+                  <span className="h-2 w-2 rounded-full bg-green-300 animate-pulse" />
+                  <span className="text-xs font-semibold uppercase tracking-wider">
+                    App available now
                   </span>
                 </div>
-                <h2 style={{ fontFamily: T.syne, fontWeight: 900, fontSize: "clamp(1.6rem,4vw,2.4rem)", color: T.g900, letterSpacing: "-0.02em", marginBottom: 8 }}>
-                  Built for your everyday commute
+
+                <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 font-syne">
+                  Ready to Experience{" "}
+                  <span className="bg-white/20 px-3 py-1 rounded-lg">Xpool?</span>
                 </h2>
-                <p style={{ fontFamily: T.dm, color: T.g500, fontSize: "0.97rem", maxWidth: 380, margin: "0 auto" }}>
-                  Everything you need for a stress-free daily ride
+
+                <p className="text-white/80 text-base max-w-lg mx-auto mb-8 font-dmsans">
+                  Download the app today and enjoy fast, affordable, and safe rides across the
+                  city.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="bg-white text-amber-700 hover:bg-amber-50 px-8 py-6 rounded-xl gap-2 font-bold shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <a href="#">
+                      <Download size={18} />
+                      Download for Android
+                      <ArrowRight size={16} />
+                    </a>
+                  </Button>
+
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="border-white/40 text-white bg-white/10 backdrop-blur-sm hover:bg-white/20 px-8 py-6 rounded-xl gap-2 font-semibold"
+                  >
+                    <a href="#">
+                      <Download size={18} />
+                      Download for iOS
+                    </a>
+                  </Button>
+                </div>
+
+                <p className="text-white/40 text-xs mt-6 font-dmsans">
+                  Available on Play Store & App Store · Free to download
                 </p>
               </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 22 }}>
-                {benefits.map((b, i) => <BenefitCard key={i} icon={b.icon} title={b.title} text={b.text} index={i} />)}
-              </div>
             </div>
-          </section>
+          </motion.div>
+        </motion.main>
 
-          {/* ══════════════════════════════ CTA ══════════════════════════════ */}
-          <section style={{
-            padding: "100px 24px",
-            background: `linear-gradient(135deg,${T.amber} 0%,${T.orange} 55%,${T.red} 100%)`,
-            position: "relative", overflow: "hidden", textAlign: "center",
-          }}>
-            {/* blobs */}
-            <div style={{ position: "absolute", top: -60, right: -60, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%)", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", bottom: -80, left: -80, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle,rgba(255,255,255,0.06),transparent 70%)", pointerEvents: "none" }} />
-
-            {/* dot grid */}
-            <div aria-hidden="true" style={{
-              position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.08,
-              backgroundImage: "radial-gradient(circle,white 1px,transparent 1px)",
-              backgroundSize: "28px 28px",
-            }} />
-
-            {/* rings */}
-            {[200, 340, 480].map((sz, i) => (
-              <div key={i} style={{
-                position: "absolute", top: "50%", left: "50%",
-                width: sz, height: sz,
-                border: `1px solid rgba(255,255,255,${0.07 - i * 0.015})`,
-                borderRadius: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none",
-              }} />
-            ))}
-
-            <div style={{ position: "relative", zIndex: 1, maxWidth: 640, margin: "0 auto" }}>
-              {/* online badge */}
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)",
-                borderRadius: 999, padding: "6px 18px", marginBottom: 24, backdropFilter: "blur(8px)",
-              }}>
-                <span className="hiw-bl" style={{ width: 8, height: 8, borderRadius: "50%", background: "#86efac", display: "inline-block" }} />
-                <span style={{ fontFamily: T.dm, fontWeight: 600, color: "rgba(255,255,255,0.9)", fontSize: "0.84rem" }}>App available now</span>
-              </div>
-
-              <h2 style={{ fontFamily: T.syne, fontWeight: 900, fontSize: "clamp(2rem,5vw,3.2rem)", color: T.white, letterSpacing: "-0.025em", marginBottom: 16, lineHeight: 1.1 }}>
-                Ready to Experience{" "}
-                <span style={{ background: "rgba(255,255,255,0.18)", borderRadius: 8, padding: "2px 10px" }}>Xpool?</span>
-              </h2>
-
-              <p style={{ fontFamily: T.dm, fontSize: "1.05rem", color: "rgba(255,255,255,0.78)", lineHeight: 1.72, maxWidth: 480, margin: "0 auto 44px" }}>
-                Download the app today and enjoy fast, affordable, and safe rides across the city.
-              </p>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
-                <button className="btn-pri">
-                  <Download style={{ width: 18, height: 18, color: T.amber }} />
-                  Download for Android
-                  <ArrowRight style={{ width: 16, height: 16, color: T.amber }} />
-                </button>
-                <button className="btn-sec">
-                  <Download style={{ width: 18, height: 18 }} />
-                  Download for iOS
-                </button>
-              </div>
-
-              <p style={{ marginTop: 20, fontFamily: T.dm, fontSize: "0.78rem", color: "rgba(255,255,255,0.38)" }}>
-                Available on Play Store & App Store · Free to download
-              </p>
-            </div>
-          </section>
-
-        </main>
+        {/* Scroll indicator (optional) */}
+        {!prefersReducedMotion && (
+          <div
+            className="scroll-bounce absolute bottom-8 left-1/2 flex flex-col items-center gap-1 text-amber-400/60 pointer-events-none"
+            aria-hidden="true"
+            style={{ zIndex: 10 }}
+          >
+            <div className="w-px h-8 bg-gradient-to-b from-transparent to-amber-400/50" />
+            <ArrowRight size={16} className="rotate-90" strokeWidth={1.5} />
+          </div>
+        )}
       </div>
     </>
   );

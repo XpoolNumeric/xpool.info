@@ -72,7 +72,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
       {/* ================= AUTH DIALOG (STEP 1) ================= */}
       <Dialog open={open} onOpenChange={resetDialog}>
         <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-3xl bg-card/95 backdrop-blur-xl shadow-2xl">
-          
+
           {/* 🔒 TRUST BAR */}
           <div className="flex items-center justify-center gap-2 bg-primary/10 py-3 text-sm text-primary">
             <ShieldCheck className="h-4 w-4" />

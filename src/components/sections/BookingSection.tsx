@@ -24,6 +24,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import MapView from "./MapView";
+
 
 /* ===================== Injected Styles (full fallback stacks) ===================== */
 const bookingStyles = `
