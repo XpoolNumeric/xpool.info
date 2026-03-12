@@ -84,7 +84,9 @@ const badgeVariant = {
 // ─────────────────────────────────────────────────────────────────────────────
 const HeroStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
     :root {
       --color-amber-50: #fffbeb; --color-amber-100: #fef3c7; --color-amber-200: #fde68a;
@@ -302,9 +304,9 @@ const TrustBadgeCard = memo(({
     >
       <div className="flex items-center gap-1.5">
         <Icon size={15} strokeWidth={2.5} className="text-amber-500" aria-hidden="true" />
-        <span className="text-2xl font-black leading-none text-gray-900 font-syne">{badge.value}</span>
+        <span className="text-2xl font-extrabold leading-none text-gray-900" style={{ fontFamily: "'Inter', sans-serif" }}>{badge.value}</span>
       </div>
-      <span className="text-[10.5px] font-semibold text-gray-500 tracking-wider uppercase whitespace-nowrap font-dmsans">
+      <span className="text-[10.5px] font-semibold text-gray-500 tracking-wider uppercase whitespace-nowrap" style={{ fontFamily: "'Inter', sans-serif" }}>
         {badge.label}
       </span>
     </div>
@@ -655,7 +657,7 @@ const Hero: FC = () => {
           {/* Wordmark */}
           <motion.div variants={!prefersReducedMotion ? fadeUp : {}} className="flex items-center justify-center gap-3 mb-7">
             <MagneticLogo src={xpoolLogo} />
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none text-gray-900 font-syne">
+            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-none text-gray-900" style={{ fontFamily: "'Inter', sans-serif" }}>
               <span className="text-amber-500">X</span>pool
             </h1>
           </motion.div>
@@ -666,30 +668,31 @@ const Hero: FC = () => {
             className="inline-flex items-center gap-2 mb-7 px-4 py-1.5 rounded-full border border-amber-300/60 bg-amber-50/80 backdrop-blur-sm text-amber-700 shadow-sm"
           >
             <span className="blink-dot h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
-            <span className="text-xs font-semibold tracking-widest uppercase font-dmsans">
+            <span className="text-xs font-semibold tracking-widest uppercase" style={{ fontFamily: "'Inter', sans-serif" }}>
               Now live in 30+ cities
             </span>
           </motion.div>
 
-          {/* Headline */}
+          {/* Headline — single line, professional font (Inter) */}
           <motion.h2
             variants={!prefersReducedMotion ? fadeUp : {}}
-            className="text-3xl sm:text-4xl lg:text-5xl font-black leading-[1.04] tracking-tight text-gray-900 mb-5 font-syne"
+            className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-[1.08] tracking-tight text-gray-900 mb-5 whitespace-nowrap"
+            style={{ fontFamily: "'Inter', sans-serif" }}
           >
-            Ride Smart.
-            <br />
+            Ride Smart,{" "}
             <span
               className="text-amber-500"
               style={{ textShadow: "0 2px 0 rgba(160,80,0,0.15), 0 0 40px rgba(245,158,11,0.2)" }}
             >
-              Ride Safe.
+              Ride Safe
             </span>
           </motion.h2>
 
           {/* Sub-copy */}
           <motion.p
             variants={!prefersReducedMotion ? fadeUp : {}}
-            className="text-gray-500 text-base sm:text-lg max-w-lg mx-auto mb-10 leading-relaxed font-dmsans"
+            className="text-gray-500 text-base sm:text-lg max-w-lg mx-auto mb-10 leading-relaxed"
+            style={{ fontFamily: "'Inter', sans-serif" }}
           >
             Seamless rides with real‑time tracking, verified drivers, and
             transparent pricing — every single time.
@@ -707,7 +710,8 @@ const Hero: FC = () => {
               <Button
                 onClick={scrollToBooking}
                 size="lg"
-                className="cta-shimmer px-9 py-6 text-base rounded-2xl gap-2 font-bold font-dmsans"
+                className="cta-shimmer px-9 py-6 text-base rounded-2xl gap-2 font-bold"
+                style={{ fontFamily: "'Inter', sans-serif" }}
                 aria-label="Book your ride now"
               >
                 Book Your Ride
@@ -723,7 +727,8 @@ const Hero: FC = () => {
                 variant="ghost"
                 size="lg"
                 onClick={scrollToHow}
-                className="btn-ghost-light px-9 py-6 text-base rounded-2xl gap-2 font-dmsans"
+                className="btn-ghost-light px-9 py-6 text-base rounded-2xl gap-2"
+                style={{ fontFamily: "'Inter', sans-serif" }}
                 aria-label="Learn how Xpool works"
               >
                 How it works
