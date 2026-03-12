@@ -30,10 +30,6 @@ interface Message {
   status?: "sending" | "sent" | "error";
 }
 
-const SYSTEM_PROMPT = `You are Xpool's friendly ride assistant. Help users book rides, 
-answer questions about pricing, drivers, safety, and coverage areas. 
-Be concise, warm, and on-brand. Xpool operates in 30+ cities with 100% verified drivers and ~4 min avg pickup.`;
-
 const SUGGESTIONS = [
   "How do I book a ride?",
   "What cities are covered?",
@@ -42,37 +38,34 @@ const SUGGESTIONS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// API Call — direct to Anthropic (no proxy needed)
+// Mock API Call — simulates a response (no real API)
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function fetchReply(messages: Message[]): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY ?? "",
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
-      system: SYSTEM_PROMPT,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    }),
-  });
+async function mockFetchReply(messages: Message[]): Promise<string> {
+  // Simulate network delay
+  await new Promise((resolve) => setTimeout(resolve, 800));
 
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || `API error: ${res.status}`);
+  const lastUserMessage = messages.filter((m) => m.role === "user").pop();
+  const userContent = lastUserMessage?.content.toLowerCase() || "";
+
+  // Simple canned responses
+  if (userContent.includes("book")) {
+    return "You can book a ride by opening the Xpool app, entering your destination, and confirming your ride. It's that easy!";
   }
-
-  const data = await res.json();
-  return data.content?.[0]?.text ?? "I'm sorry, I couldn't process that.";
+  if (userContent.includes("city") || userContent.includes("cities")) {
+    return "Xpool is currently live in 30+ cities including New York, Los Angeles, Chicago, Houston, and more. We're expanding rapidly!";
+  }
+  if (userContent.includes("driver") || userContent.includes("verify")) {
+    return "All Xpool drivers go through a rigorous verification process including background checks, vehicle inspections, and in-person interviews. Your safety is our priority.";
+  }
+  if (userContent.includes("pickup") || userContent.includes("time")) {
+    return "Average pickup time is just 4 minutes. Of course, this can vary slightly based on time of day and location, but we pride ourselves on quick service.";
+  }
+  return "Thanks for your question! Our support team will get back to you shortly. In the meantime, feel free to ask about bookings, coverage, drivers, or safety.";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Custom Hook: useChat  (no localStorage — not supported in this env)
+// Custom Hook: useChat (no external API)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useChat() {
@@ -109,21 +102,13 @@ function useChat() {
       setError(null);
 
       try {
-        // Use ref so we always pass the latest history
-        const history = messagesRef.current;
-        // Build the conversation list to send (include the new user message)
-        const toSend: Message[] = retryId
-          ? [...history, userMsg]
-          : [...history]; // userMsg is already appended via setMessages above,
-        // but messagesRef hasn't updated yet, so add manually
-        // Actually messagesRef is stale here (set happens asynchronously),
-        // so build the list explicitly:
+        // Build the conversation list to send (exclude error messages)
         const previousMsgs = messagesRef.current.filter(
           (m) => m.id !== userMsg.id && m.status !== "error"
         );
         const apiMessages: Message[] = [...previousMsgs, userMsg];
 
-        const reply = await fetchReply(apiMessages);
+        const reply = await mockFetchReply(apiMessages);
 
         // Mark user message as sent
         setMessages((prev) =>
@@ -146,11 +131,7 @@ function useChat() {
             m.id === userMsg.id ? { ...m, status: "error" } : m
           )
         );
-        setError(
-          err?.message?.includes("API key")
-            ? "API key missing or invalid. Set VITE_ANTHROPIC_API_KEY."
-            : "Failed to send message. Please try again."
-        );
+        setError("Failed to send message. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -459,7 +440,7 @@ export default function Chatbot() {
           right: 28px;
           z-index: 9998;
           width: 380px;
-          max-height: min(500px, calc(100vh - 120px));
+          max-height: min(570px, calc(100vh - 120px));
           display: flex;
           flex-direction: column;
           border-radius: 32px;
