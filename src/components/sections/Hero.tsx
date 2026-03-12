@@ -718,23 +718,6 @@ const Hero: FC = () => {
                 <ArrowRight size={18} strokeWidth={2.5} />
               </Button>
             </motion.div>
-
-            <motion.div
-              whileHover={!prefersReducedMotion ? { scale: 1.04 } : {}}
-              whileTap={!prefersReducedMotion ? { scale: 0.97 } : {}}
-            >
-              <Button
-                variant="ghost"
-                size="lg"
-                onClick={scrollToHow}
-                className="btn-ghost-light px-9 py-6 text-base rounded-2xl gap-2"
-                style={{ fontFamily: "'Inter', sans-serif" }}
-                aria-label="Learn how Xpool works"
-              >
-                How it works
-                <ChevronDown size={16} strokeWidth={2.5} />
-              </Button>
-            </motion.div>
           </motion.div>
 
           {/* Badges — carousel on mobile, static grid on desktop */}
