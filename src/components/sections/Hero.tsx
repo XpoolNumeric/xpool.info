@@ -596,7 +596,41 @@ const Hero: FC = () => {
   }, []);
 
   const scrollToBooking = useCallback(() => {
-    document.getElementById("booking-section")?.scrollIntoView({ behavior: "smooth" });
+    const el = document.getElementById("booking-section");
+    if (!el) return;
+
+    const isMobileDevice = window.innerWidth < 640;
+
+    if (!isMobileDevice) {
+      // Desktop: scrollIntoView works fine
+      el.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    // Mobile: manually calculate and scroll to avoid early-stop issues
+    // caused by mobile browser address bar hiding/showing during scroll
+    const scrollToTarget = () => {
+      const rect = el.getBoundingClientRect();
+      const absoluteTop = rect.top + window.pageYOffset;
+      // Small offset so the section isn't flush with the very top
+      const offset = 16;
+      window.scrollTo({ top: absoluteTop - offset, behavior: "smooth" });
+    };
+
+    scrollToTarget();
+
+    // After smooth scroll finishes (~600ms), verify position and correct if needed
+    // This handles the mobile address bar resize that can cut the scroll short
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const rect = el.getBoundingClientRect();
+        // If the element top is still far from the viewport top, re-scroll
+        if (Math.abs(rect.top - 16) > 30) {
+          const absoluteTop = rect.top + window.pageYOffset;
+          window.scrollTo({ top: absoluteTop - 16, behavior: "smooth" });
+        }
+      });
+    }, 650);
   }, []);
 
   const scrollToHow = useCallback(() => {
