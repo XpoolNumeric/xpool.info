@@ -29,10 +29,10 @@ import MapView from "./MapView";
 
 /* ===================== Injected Styles (full fallback stacks) ===================== */
 const bookingStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
   .booking-section {
-    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   .bs-card {
@@ -81,7 +81,7 @@ const bookingStyles = `
   }
 
   .bs-tab {
-    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 600;
     border-radius: 12px;
     transition: all 0.2s ease;
@@ -111,7 +111,7 @@ const bookingStyles = `
     background-size: 200% auto;
     animation: bs-shimmer 3s linear infinite;
     color: #1a0800;
-    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 700;
     font-size: 1.1rem;
     border: none;
@@ -151,7 +151,7 @@ const bookingStyles = `
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
     color: #57534e;
@@ -203,7 +203,7 @@ const bookingStyles = `
 
   /* Professional typography refinements */
   h2, .heading-professional {
-    font-family: 'Syne', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     letter-spacing: -0.02em;
     line-height: 1.2;
   }
@@ -402,7 +402,7 @@ const BookingSection = () => {
                 Instant booking
               </p>
               <h2
-                className="heading-professional text-3xl sm:text-4xl font-black text-gray-900 mb-2 leading-tight"
+                className="heading-professional text-3xl sm:text-4xl font-extrabold text-gray-900 mb-2 leading-tight"
               >
                 <span className="tricolor-text">India</span> Moves On{" "}
                 <span>
@@ -412,7 +412,7 @@ const BookingSection = () => {
               </h2>
               <p
                 className="text-sm text-gray-500"
-                style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                style={{ fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
               >
                 Book your ride in under 30 seconds
               </p>
@@ -624,7 +624,7 @@ const LocationInput = memo(({
         onChange={onChange}
         placeholder={placeholder}
         className="border-0 p-0 h-auto text-sm font-medium text-gray-800 placeholder:text-gray-400 focus-visible:ring-0 bg-transparent"
-        style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+        style={{ fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
         autoComplete="off"
       />
     </div>
@@ -683,7 +683,7 @@ const SuggestionList = ({
               <div className="flex-1 min-w-0">
                 <p
                   className="text-sm font-semibold text-gray-800 truncate"
-                  style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                  style={{ fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
                 >
                   {item.split(",")[0]}
                 </p>
