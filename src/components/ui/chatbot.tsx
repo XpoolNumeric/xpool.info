@@ -38,30 +38,112 @@ const SUGGESTIONS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock API Call — simulates a response (no real API)
+// Gemini API Call
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function mockFetchReply(messages: Message[]): Promise<string> {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 800));
+const GEMINI_API_KEY = "AIzaSyB7_39jR-kqbchHlKHzBtmWbtAbY8jrtbw";
 
-  const lastUserMessage = messages.filter((m) => m.role === "user").pop();
-  const userContent = lastUserMessage?.content.toLowerCase() || "";
+async function fetchGeminiReply(messages: Message[]): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-  // Simple canned responses
-  if (userContent.includes("book")) {
-    return "You can book a ride by opening the Xpool app, entering your destination, and confirming your ride. It's that easy!";
+  const formattedMessages = messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+
+  const systemInstruction = `You are the incredibly upbeat, witty, catchy, and hilarious AI sidekick for Xpool – the absolute coolest premium ride-pooling and hailing app out there! Your mission is to help users book rides, answer questions about Xpool, and dish out facts with a splash of humor.
+Keep your responses surprisingly short, incredibly sweet, and delightfully funny. If someone goes completely off-topic, creatively and politely steer them back to our stellar rides!
+
+Here is your cheat sheet (the serious stuff, but you make it sound fun):
+
+1. THE FLEX:
+- Zooming around 30+ major Pan-India cities from our Chennai HQ!
+- 50K+ Thrilled Riders & 12K+ Verified Captains (our drivers are actual superheroes).
+- 99% Safety Score & an epic 4.8★ App Rating.
+- Support replies in under 2 minutes. Pickups in under 5 minutes. Whoosh!
+
+2. HOW WE ROLL (5 Easy Steps):
+- Step 1: Book It! Enter your pickup and drop, and see the fare before you ride.
+- Step 2: Match Maker. Get matched with a nearby Captain. See their photo, ride details, and track them live!
+- Step 3: Ride safely. Share the OTP, grab your helmet (for bikes), and relax.
+- Step 4: Pay Your Way. UPI, Wallet, Card, or Cash. Plus, snag some sweet cashback!
+- Step 5: Star Power. Rate your Captain to keep our safety score sparkling at 99%.
+
+3. THE GOOD STUFF (Features):
+- Real-time tracking so you never guess where your ride is.
+- Secure in-app calls (your number stays a secret!).
+- Foolproof safety with OTP verification.
+- Transparent fares: ZERO hidden charges. Way cheaper than regular cabs and autos!
+- Safety first: SOS button and strictly verified Captains.
+
+4. HOLLER AT US (Contact):
+- 24/7 Phone Support: +91 7904790007 (We never sleep!)
+- Email: support@xpool.app
+- HQ: Chennai, India. Drivers or partners can hit us up here too!
+
+CRITICAL RULES:
+- Keep it funny, catchy, and incredibly concise! Short and sweet is the name of the game.
+- You MUST reply in plain text ONLY. DO NOT use Markdown formatting (no asterisks, hashes, or dashes).
+- Speak like a friendly, witty human. No robotic lists!`;
+
+  const payload = {
+    system_instruction: {
+      parts: { text: systemInstruction }
+    },
+    contents: formattedMessages,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 800,
+    },
+    safetySettings: [
+      {
+        category: "HARM_CATEGORY_HARASSMENT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE",
+      },
+      {
+        category: "HARM_CATEGORY_HATE_SPEECH",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE",
+      },
+      {
+        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE",
+      },
+      {
+        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE",
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API Error Response:", errorText);
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    let replyText = data.candidates[0].content.parts[0].text;
+
+    // Fallback to strip any residual markdown formatting
+    replyText = replyText.replace(/\*\*(.*?)\*\*/g, "$1"); // remove bold **
+    replyText = replyText.replace(/\*(.*?)\*/g, "$1"); // remove italic *
+    replyText = replyText.replace(/__(.*?)__/g, "$1"); // remove bold __
+    replyText = replyText.replace(/^\s*[\*\-]\s+/gm, "• "); // convert list dashes/asterisks to bullet points
+
+    return replyText;
+  } catch (error) {
+    console.error("Gemini API error:", error);
+    throw new Error("Failed to communicate with AI.");
   }
-  if (userContent.includes("city") || userContent.includes("cities")) {
-    return "Xpool is currently live in 30+ cities including New York, Los Angeles, Chicago, Houston, and more. We're expanding rapidly!";
-  }
-  if (userContent.includes("driver") || userContent.includes("verify")) {
-    return "All Xpool drivers go through a rigorous verification process including background checks, vehicle inspections, and in-person interviews. Your safety is our priority.";
-  }
-  if (userContent.includes("pickup") || userContent.includes("time")) {
-    return "Average pickup time is just 4 minutes. Of course, this can vary slightly based on time of day and location, but we pride ourselves on quick service.";
-  }
-  return "Thanks for your question! Our support team will get back to you shortly. In the meantime, feel free to ask about bookings, coverage, drivers, or safety.";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,7 +190,7 @@ function useChat() {
         );
         const apiMessages: Message[] = [...previousMsgs, userMsg];
 
-        const reply = await mockFetchReply(apiMessages);
+        const reply = await fetchGeminiReply(apiMessages);
 
         // Mark user message as sent
         setMessages((prev) =>
@@ -267,13 +349,24 @@ export default function Chatbot() {
   const [input, setInput] = useState("");
   const [hasUnread, setHasUnread] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [showGreeting, setShowGreeting] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+
+  // ── Greeting Slide-out Timeout ───────────────────────────────────────────
+  useEffect(() => {
+    // Quick glance: slide out quickly (800ms) and disappear after a short interval (4000ms)
+    const timer1 = setTimeout(() => setShowGreeting(true), 800);
+    const timer2 = setTimeout(() => setShowGreeting(false), 4000);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
 
   // ── Scroll tracking ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -339,7 +432,7 @@ export default function Chatbot() {
   };
 
   // ── Animation variants ───────────────────────────────────────────────────
-  const panelVariants = prefersReducedMotion
+  const panelVariants: any = prefersReducedMotion
     ? { hidden: {}, visible: {}, exit: {} }
     : {
       hidden: { opacity: 0, y: 20, scale: 0.95 },
@@ -399,38 +492,75 @@ export default function Chatbot() {
           bottom: 28px;
           right: 28px;
           z-index: 9999;
-          width: 60px;
-          height: 60px;
-          border-radius: 20px;
-          border: none;
+          height: 64px;
+          width: 64px;
+          border-radius: 32px;
+          padding: 0 12px;
+          border: 0 !important;
+          outline: none !important;
           cursor: pointer;
           display: flex;
           align-items: center;
-          justify-content: center;
-          background: linear-gradient(145deg, #f59e0b, #fbbf24);
-          box-shadow: var(--shadow-lg), 0 0 0 2px rgba(255, 255, 255, 0.5) inset;
-          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+          justify-content: flex-start;
+          background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%);
+          box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.4) inset !important;
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          -webkit-tap-highlight-color: transparent;
+          overflow: hidden;
         }
-        .chat-trigger:hover {
-          transform: scale(1.1);
-          box-shadow: var(--shadow-xl), 0 0 0 3px rgba(255, 255, 255, 0.6) inset;
+        .chat-trigger:not(.chat-open):hover,
+        .chat-trigger.expanded {
+          width: 250px;
+          padding: 0 20px 0 12px;
+          transform: scale(1.04) translateY(-4px);
+          box-shadow: 0 15px 35px -5px rgba(245, 158, 11, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.6) inset !important;
+        }
+        .chat-trigger.chat-open {
+          width: 64px !important;
+          padding: 0 !important;
+          justify-content: center;
+        }
+        .chat-trigger.chat-open:hover {
+          transform: scale(1.08) translateY(-4px);
+          box-shadow: 0 15px 35px -5px rgba(245, 158, 11, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.6) inset !important;
+        }
+        .chat-trigger:active {
+          transform: scale(0.96) translateY(0) !important;
         }
         .chat-trigger img {
-          width: 36px;
-          height: 36px;
-          border-radius: 14px;
+          width: 40px;
+          height: 40px;
+          border-radius: 16px;
           object-fit: cover;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+          flex-shrink: 0;
+        }
+        .chat-greeting-text {
+          white-space: nowrap;
+          font-family: var(--font-sans);
+          font-weight: 700;
+          font-size: 0.95rem;
+          color: #1a0800;
+          margin-left: 14px;
+          opacity: 0;
+          transform: translateX(10px);
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .chat-trigger:not(.chat-open):hover .chat-greeting-text,
+        .chat-trigger.expanded .chat-greeting-text {
+          opacity: 1;
+          transform: translateX(0);
         }
         .unread-badge {
           position: absolute;
           top: -4px;
           right: -4px;
-          width: 14px;
-          height: 14px;
+          width: 16px;
+          height: 16px;
           background: #ef4444;
           border-radius: 50%;
           border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }
 
         /* ── Panel ── */
@@ -440,7 +570,7 @@ export default function Chatbot() {
           right: 28px;
           z-index: 9998;
           width: 380px;
-          max-height: min(570px, calc(100vh - 120px));
+          max-height: min(500px, calc(100vh - 120px));
           display: flex;
           flex-direction: column;
           border-radius: 32px;
@@ -904,7 +1034,7 @@ export default function Chatbot() {
       {/* ── Trigger Button ── */}
       <button
         ref={triggerRef}
-        className="chat-trigger"
+        className={`chat-trigger border-0 outline-none ring-0 appearance-none ${isOpen ? "chat-open" : ""} ${!isOpen && showGreeting ? "expanded" : ""}`}
         onClick={() => setIsOpen((v) => !v)}
         aria-label={isOpen ? "Close chat" : "Open chat"}
         aria-expanded={isOpen}
@@ -913,7 +1043,10 @@ export default function Chatbot() {
         {isOpen ? (
           <X size={24} strokeWidth={2.5} color="#1a0800" />
         ) : (
-          <img src="/chatbotlogo.png" alt="Xpool" />
+          <>
+            <img src="/chatbotlogo.png" alt="Xpool" />
+            <span className="chat-greeting-text">Hi, ask me anything!</span>
+          </>
         )}
         {hasUnread && !isOpen && <span className="unread-badge" aria-label="New message" />}
       </button>
@@ -922,7 +1055,6 @@ export default function Chatbot() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            ref={panelRef}
             className="chat-panel"
             variants={panelVariants}
             initial="hidden"

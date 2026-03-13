@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import Chatbot from "@/components/ui/chatbot";
 
 // Pages
 import Index from "./pages/Index";
@@ -44,6 +45,12 @@ const App = (): JSX.Element => {
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <div
+          className="fixed top-4 right-4 z-[9999]"
+          style={{ maxWidth: 'calc(100vw - 2rem)' }}
+        >
+          <Chatbot />
+        </div>
       </TooltipProvider>
     </QueryClientProvider>
   );
