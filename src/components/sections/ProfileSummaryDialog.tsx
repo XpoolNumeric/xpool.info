@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -129,8 +130,30 @@ const ProfileSummaryDialog = ({
     setStep((s) => (s + 1) as Step);
   }, [step, isStep2Valid]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     setLoading(true);
+    
+    try {
+      // 1. Try to save to Supabase
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({ 
+          phone: profile.phone,
+          full_name: profile.fullName,
+          email: profile.email,
+          city: profile.city,
+          dob: profile.dob,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'phone' });
+
+      if (error) {
+        console.error("Failed to save to Supabase:", error);
+      }
+    } catch (err) {
+      console.error("Error connecting to Supabase:", err);
+    }
+
+    // 2. Always fallback/sync with local storage
     localStorage.setItem("profile", JSON.stringify(profile));
 
     setTimeout(() => {
