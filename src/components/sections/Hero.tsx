@@ -16,7 +16,6 @@ import {
   animate,
 } from "framer-motion";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
-import Chatbot from "@/components/ui/chatbot";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -599,7 +598,7 @@ const Hero: FC = () => {
     const el = document.getElementById("booking-section");
     if (!el) return;
 
-    const isMobileDevice = window.innerWidth < 640;
+    const isMobileDevice = window.innerWidth < 620;
 
     if (!isMobileDevice) {
       // Desktop: scrollIntoView works fine
@@ -784,14 +783,6 @@ const Hero: FC = () => {
           </div>
         )}
       </section>
-
-      {/* Floating Chatbot - now at top right corner */}
-      <div
-        className="fixed top-4 right-4 z-50"
-        style={{ maxWidth: 'calc(100vw - 2rem)' }}
-      >
-        <Chatbot />
-      </div>
     </>
   );
 };

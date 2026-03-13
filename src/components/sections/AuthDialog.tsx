@@ -444,15 +444,15 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
       const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
       }).then(res => res.json());
-      
+
       const storedProfile = localStorage.getItem("profile");
       let profile = storedProfile ? JSON.parse(storedProfile) : {
         fullName: "", email: "", city: "", dob: "", phone: ""
       };
-      
+
       profile.fullName = userInfo.name || profile.fullName;
       profile.email = userInfo.email || profile.email;
-      
+
       localStorage.setItem("profile", JSON.stringify(profile));
       onClose(); // close auth dialog
       setShowProfileDialog(true); // open profile dialog
