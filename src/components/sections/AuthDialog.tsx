@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
@@ -189,24 +190,6 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const AppleIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M17.05 20.28c-.98.95-2.05.88-3.08.38-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.38C2.79 15.25 3.51 8.3 8.05 7.97c1.27.09 2.17.86 2.92.86.75 0 2.16-1.06 3.64-.91 1.52.15 2.67.81 3.3 2.02-2.94 1.74-2.42 5.68.52 6.74-.6 1.58-1.44 3.15-2.34 4.6h-.04zM14.06 4.24c.54-1.14 1.51-2.02 2.68-2.24.3 1.34-.31 2.56-1.15 3.44-.8.86-1.96 1.43-3.12 1.35-.24-1.24.59-2.45 1.59-2.55z"
-      fill="currentColor"
-    />
-  </svg>
-);
-
-const FacebookIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047v-2.66c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.264h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"
-      fill="#1877F2"
-    />
-  </svg>
-);
-
 // ---------- Subcomponents ----------
 const TrustBar = () => (
   <div className="flex items-center justify-center gap-2 bg-primary/10 py-3 text-sm text-primary">
@@ -392,11 +375,11 @@ const OtpStep = ({
   );
 };
 
-const GoogleLoginButton = ({ onSuccess, icon, label }: { onSuccess: () => void, icon: React.ReactNode, label: string }) => {
+const GoogleLoginButton = ({ onSuccess, icon, label }: { onSuccess: (tokenResponse: any) => void, icon: React.ReactNode, label: string }) => {
   const login = useGoogleLogin({
     onSuccess: tokenResponse => {
       console.log('Google login successful', tokenResponse);
-      onSuccess();
+      onSuccess(tokenResponse);
     },
     onError: error => console.error("Google Login Failed", error)
   });
@@ -415,32 +398,12 @@ const GoogleLoginButton = ({ onSuccess, icon, label }: { onSuccess: () => void, 
   );
 };
 
-const SocialLogin = ({ onSuccess }: { onSuccess: () => void }) => {
+const SocialLogin = ({ onGoogleSuccess }: { onGoogleSuccess: (tokenResponse: any) => void }) => {
   return (
     <GoogleOAuthProvider clientId="206250659332-uhhro34nbj9jqr15k578ujut5qvlu1sj.apps.googleusercontent.com">
       <Separator className="my-6" />
       <div className="space-y-3">
-        <GoogleLoginButton onSuccess={onSuccess} icon={<GoogleIcon />} label="Continue with Google" />
-        <Button
-          variant="outline"
-          onClick={onSuccess}
-          className="w-full h-12 rounded-2xl flex items-center justify-center gap-3 text-sm font-medium"
-        >
-          <span className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted shrink-0">
-            <AppleIcon />
-          </span>
-          <span className="truncate">Continue with Apple</span>
-        </Button>
-        <Button
-          variant="outline"
-          onClick={onSuccess}
-          className="w-full h-12 rounded-2xl flex items-center justify-center gap-3 text-sm font-medium"
-        >
-          <span className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted shrink-0">
-            <FacebookIcon />
-          </span>
-          <span className="truncate">Continue with Facebook</span>
-        </Button>
+        <GoogleLoginButton onSuccess={onGoogleSuccess} icon={<GoogleIcon />} label="Continue with Google" />
       </div>
     </GoogleOAuthProvider>
   );
@@ -448,6 +411,8 @@ const SocialLogin = ({ onSuccess }: { onSuccess: () => void }) => {
 
 // ---------- Main Component ----------
 const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
+  const navigate = useNavigate();
+
   const {
     step,
     setStep,
@@ -473,6 +438,28 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
       setShowProfileDialog(true); // open profile dialog
     }
   }, [verifyOtp, onClose]);
+
+  const handleGoogleSuccess = useCallback(async (tokenResponse: any) => {
+    try {
+      const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      }).then(res => res.json());
+      
+      const storedProfile = localStorage.getItem("profile");
+      let profile = storedProfile ? JSON.parse(storedProfile) : {
+        fullName: "", email: "", city: "", dob: "", phone: ""
+      };
+      
+      profile.fullName = userInfo.name || profile.fullName;
+      profile.email = userInfo.email || profile.email;
+      
+      localStorage.setItem("profile", JSON.stringify(profile));
+      onClose(); // close auth dialog
+      setShowProfileDialog(true); // open profile dialog
+    } catch (err) {
+      console.error("Failed to fetch Google user info", err);
+    }
+  }, [onClose]);
 
   const handleResend = useCallback(() => {
     sendOtp(); // re-use sendOtp which resets timer and moves to OTP step
@@ -534,7 +521,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
 
             <div id="recaptcha-container" className="my-2 flex justify-center"></div>
 
-            <SocialLogin onSuccess={handleVerify} />
+            <SocialLogin onGoogleSuccess={handleGoogleSuccess} />
 
             <p className="mt-4 text-[11px] text-center text-muted-foreground px-2">
               By continuing, you agree to our Terms & Privacy Policy

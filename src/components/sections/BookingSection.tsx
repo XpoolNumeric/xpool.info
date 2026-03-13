@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AuthDialog from "@/components/sections/AuthDialog";
+import { useNavigate } from "react-router-dom";
 import {
   MapPin,
   Navigation,
@@ -260,6 +261,7 @@ interface DateTimeInputProps extends React.InputHTMLAttributes<HTMLInputElement>
 /* ===================== Main Component ===================== */
 
 const BookingSection = () => {
+  const navigate = useNavigate();
   const [pickupLocation, setPickupLocation] = useState("");
   const [dropLocation, setDropLocation] = useState("");
   const [activeBox, setActiveBox] = useState<"pickup" | "drop" | null>(null);
@@ -346,9 +348,27 @@ const BookingSection = () => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      setShowAuthDialog(true);
+      
+      let isLoggedAndComplete = false;
+      try {
+        const profileStr = localStorage.getItem("profile");
+        if (profileStr) {
+          const profile = JSON.parse(profileStr);
+          if (profile.fullName && profile.email && profile.city && profile.dob) {
+            isLoggedAndComplete = true; 
+          }
+        }
+      } catch (e) {
+        console.error("Error reading profile from local storage", e);
+      }
+
+      if (isLoggedAndComplete) {
+        navigate("/vehicles");
+      } else {
+        setShowAuthDialog(true);
+      }
     }, 700);
-  }, []);
+  }, [navigate]);
 
   const styleElement = useMemo(() => <style>{bookingStyles}</style>, []);
 
