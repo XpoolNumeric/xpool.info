@@ -1,4 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +27,20 @@ const PHONE_REGEX = /^[6-9]\d{9}$/;
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 30; // seconds
 
+// ---------- Firebase Setup ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyDk4g-4ooXJ4UO2n1zBl1Rskf2S0uaioV8",
+  authDomain: "xpool-89403.firebaseapp.com",
+  projectId: "xpool-89403",
+  storageBucket: "xpool-89403.firebasestorage.app",
+  messagingSenderId: "1086162216296",
+  appId: "1:1086162216296:web:8eda7e98cf853c85de22dd",
+  measurementId: "G-GQZS3LDQVX"
+};
+
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
 // ---------- Types ----------
 interface AuthDialogProps {
   open: boolean;
@@ -40,6 +57,7 @@ function useAuth(initialStep: Step = "phone") {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   // Timer effect for resend cooldown
   useEffect(() => {
@@ -52,6 +70,24 @@ function useAuth(initialStep: Step = "phone") {
 
   const isValidPhone = PHONE_REGEX.test(phone);
 
+  const setupRecaptcha = () => {
+    if (!(window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': () => {
+          // reCAPTCHA solved
+        },
+        'expired-callback': () => {
+          setError("reCAPTCHA expired. Please try again.");
+          if ((window as any).recaptchaVerifier) {
+            (window as any).recaptchaVerifier.clear();
+            (window as any).recaptchaVerifier = null;
+          }
+        }
+      });
+    }
+  };
+
   const sendOtp = useCallback(async () => {
     if (!isValidPhone) {
       setError("Please enter a valid 10-digit Indian mobile number.");
@@ -60,35 +96,49 @@ function useAuth(initialStep: Step = "phone") {
     setLoading(true);
     setError(null);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setupRecaptcha();
+      await new Promise((resolve) => setTimeout(resolve, 100)); // allow recaptcha render cycle
+      const appVerifier = (window as any).recaptchaVerifier;
+      const phoneNumber = `+91${phone}`;
+
+      const result = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+      setConfirmationResult(result);
       setStep("otp");
       setResendTimer(RESEND_COOLDOWN);
-    } catch {
-      setError("Failed to send OTP. Please try again.");
+    } catch (err: any) {
+      console.error("Error sending OTP:", err);
+      setError(err.message || "Failed to send OTP. Please try again.");
+      if ((window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier.clear();
+        (window as any).recaptchaVerifier = null;
+      }
     } finally {
       setLoading(false);
     }
-  }, [isValidPhone]);
+  }, [isValidPhone, phone]);
 
   const verifyOtp = useCallback(async () => {
     if (otp.length !== OTP_LENGTH) {
       setError(`OTP must be ${OTP_LENGTH} digits.`);
       return false;
     }
+    if (!confirmationResult) {
+      setError("Session expired. Please request OTP again.");
+      return false;
+    }
     setLoading(true);
     setError(null);
     try {
-      // Simulate verification
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await confirmationResult.confirm(otp);
       return true; // success
-    } catch {
+    } catch (err: any) {
+      console.error("Error verifying OTP:", err);
       setError("Invalid OTP. Please try again.");
       return false;
     } finally {
       setLoading(false);
     }
-  }, [otp]);
+  }, [otp, confirmationResult]);
 
   const reset = useCallback(() => {
     setStep("phone");
@@ -97,6 +147,7 @@ function useAuth(initialStep: Step = "phone") {
     setLoading(false);
     setError(null);
     setResendTimer(0);
+    setConfirmationResult(null);
   }, []);
 
   return {
@@ -341,32 +392,57 @@ const OtpStep = ({
   );
 };
 
-const SocialLogin = ({ onSuccess }: { onSuccess: () => void }) => {
-  const socialButtons = [
-    { icon: <GoogleIcon />, label: "Continue with Google" },
-    { icon: <AppleIcon />, label: "Continue with Apple" },
-    { icon: <FacebookIcon />, label: "Continue with Facebook" },
-  ];
+const GoogleLoginButton = ({ onSuccess, icon, label }: { onSuccess: () => void, icon: React.ReactNode, label: string }) => {
+  const login = useGoogleLogin({
+    onSuccess: tokenResponse => {
+      console.log('Google login successful', tokenResponse);
+      onSuccess();
+    },
+    onError: error => console.error("Google Login Failed", error)
+  });
 
   return (
-    <>
+    <Button
+      variant="outline"
+      onClick={() => login()}
+      className="w-full h-12 rounded-2xl flex items-center justify-center gap-3 text-sm font-medium"
+    >
+      <span className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted shrink-0">
+        {icon}
+      </span>
+      <span className="truncate">{label}</span>
+    </Button>
+  );
+};
+
+const SocialLogin = ({ onSuccess }: { onSuccess: () => void }) => {
+  return (
+    <GoogleOAuthProvider clientId="206250659332-uhhro34nbj9jqr15k578ujut5qvlu1sj.apps.googleusercontent.com">
       <Separator className="my-6" />
       <div className="space-y-3">
-        {socialButtons.map(({ icon, label }) => (
-          <Button
-            key={label}
-            variant="outline"
-            onClick={onSuccess}
-            className="w-full h-12 rounded-2xl flex items-center justify-center gap-3 text-sm font-medium"
-          >
-            <span className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted shrink-0">
-              {icon}
-            </span>
-            <span className="truncate">{label}</span>
-          </Button>
-        ))}
+        <GoogleLoginButton onSuccess={onSuccess} icon={<GoogleIcon />} label="Continue with Google" />
+        <Button
+          variant="outline"
+          onClick={onSuccess}
+          className="w-full h-12 rounded-2xl flex items-center justify-center gap-3 text-sm font-medium"
+        >
+          <span className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted shrink-0">
+            <AppleIcon />
+          </span>
+          <span className="truncate">Continue with Apple</span>
+        </Button>
+        <Button
+          variant="outline"
+          onClick={onSuccess}
+          className="w-full h-12 rounded-2xl flex items-center justify-center gap-3 text-sm font-medium"
+        >
+          <span className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted shrink-0">
+            <FacebookIcon />
+          </span>
+          <span className="truncate">Continue with Facebook</span>
+        </Button>
       </div>
-    </>
+    </GoogleOAuthProvider>
   );
 };
 
@@ -426,7 +502,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
               <DialogTitle className="text-center text-2xl font-bold">
                 {step === "phone" ? "Verify your number" : "Enter OTP"}
               </DialogTitle>
-              <p className="text-center text-sm text-muted-foreground">
+              <p id={step === "phone" ? "phone-desc" : "otp-desc"} className="text-center text-sm text-muted-foreground">
                 {step === "phone"
                   ? "We’ll send a 6-digit code to your mobile"
                   : `OTP sent to +91 ${phone}`}
@@ -455,6 +531,8 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
                 error={error}
               />
             )}
+
+            <div id="recaptcha-container" className="my-2 flex justify-center"></div>
 
             <SocialLogin onSuccess={handleVerify} />
 
