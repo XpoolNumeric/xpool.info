@@ -6,9 +6,13 @@ import React, {
   memo,
   useCallback,
 } from "react";
+import { useLoadScript } from "@react-google-maps/api";
+
+const LIBRARIES: ("places")[] = ["places"];
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input";
 import AuthDialog from "@/components/sections/AuthDialog";
 import { useNavigate } from "react-router-dom";
 import {
@@ -243,7 +247,7 @@ function useDebounce<T>(value: T, delay = 300): T {
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } },
 };
 
 const sectionVariant = {
@@ -274,35 +278,67 @@ const BookingSection = () => {
   const pickupRef = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  /* ── Locations list (could be moved to a constant file) ── */
-  const locations = useMemo(() => [
-    "Chennai, Tamil Nadu",
-    "Coimbatore, Tamil Nadu",
-    "Madurai, Tamil Nadu",
-    "T. Nagar, Chennai",
-    "Anna Nagar, Chennai",
-    "Velachery, Chennai",
-    "Tambaram, Chennai",
-    "Adyar, Chennai",
-    "Airport, Chennai",
-  ], []);
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
+    libraries: LIBRARIES,
+  });
+
+  const [pickupPredictions, setPickupPredictions] = useState<string[]>([]);
+  const [dropPredictions, setDropPredictions] = useState<string[]>([]);
+  const autocompleteService = useRef<any>(null);
 
   const debouncedPickup = useDebounce(pickupLocation);
   const debouncedDrop = useDebounce(dropLocation);
 
+  useEffect(() => {
+    if (isLoaded && !autocompleteService.current) {
+      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+    }
+  }, [isLoaded]);
+
+  useEffect(() => {
+    if (!autocompleteService.current || activeBox !== "pickup" || !debouncedPickup) {
+      setPickupPredictions([]);
+      return;
+    }
+    autocompleteService.current.getPlacePredictions(
+      { input: debouncedPickup, componentRestrictions: { country: "IN" } },
+      (predictions: any, status: any) => {
+        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setPickupPredictions(predictions.map((p: any) => p.description));
+        } else {
+          setPickupPredictions([]);
+        }
+      }
+    );
+  }, [debouncedPickup, activeBox]);
+
+  useEffect(() => {
+    if (!autocompleteService.current || activeBox !== "drop" || !debouncedDrop) {
+      setDropPredictions([]);
+      return;
+    }
+    autocompleteService.current.getPlacePredictions(
+      { input: debouncedDrop, componentRestrictions: { country: "IN" } },
+      (predictions: any, status: any) => {
+        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setDropPredictions(predictions.map((p: any) => p.description));
+        } else {
+          setDropPredictions([]);
+        }
+      }
+    );
+  }, [debouncedDrop, activeBox]);
+
   const pickupSuggestions = useMemo(() => {
-    if (activeBox !== "pickup" || !debouncedPickup) return locations.slice(0, 5);
-    return locations.filter((l) =>
-      l.toLowerCase().includes(debouncedPickup.toLowerCase())
-    ).slice(0, 5);
-  }, [debouncedPickup, activeBox, locations]);
+    if (activeBox !== "pickup" || !debouncedPickup) return [];
+    return pickupPredictions.slice(0, 5);
+  }, [debouncedPickup, activeBox, pickupPredictions]);
 
   const dropSuggestions = useMemo(() => {
-    if (activeBox !== "drop" || !debouncedDrop) return locations.slice(0, 5);
-    return locations.filter((l) =>
-      l.toLowerCase().includes(debouncedDrop.toLowerCase())
-    ).slice(0, 5);
-  }, [debouncedDrop, activeBox, locations]);
+    if (activeBox !== "drop" || !debouncedDrop) return [];
+    return dropPredictions.slice(0, 5);
+  }, [debouncedDrop, activeBox, dropPredictions]);
 
   /* ── Default date/time ── */
   useEffect(() => {
@@ -478,6 +514,7 @@ const BookingSection = () => {
                         setActiveBox("drop");
                       }}
                       icon={<MapPin className="h-4 w-4 text-amber-400" />}
+                      query={debouncedPickup}
                     />
                   </div>
 
@@ -515,6 +552,7 @@ const BookingSection = () => {
                         setActiveBox(null);
                       }}
                       icon={<Navigation className="h-4 w-4 text-blue-400" />}
+                      query={debouncedDrop}
                     />
                   </div>
                 </div>
@@ -540,7 +578,7 @@ const BookingSection = () => {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
                       className="overflow-hidden mt-4"
                     >
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -638,12 +676,12 @@ const LocationInput = memo(({
           {label}
         </p>
       )}
-      <Input
+      <input
         value={value}
         onFocus={onFocus}
         onChange={onChange}
         placeholder={placeholder}
-        className="border-0 p-0 h-auto text-sm font-medium text-gray-800 placeholder:text-gray-400 focus-visible:ring-0 bg-transparent"
+        className="w-full border-0 p-0 h-auto text-sm font-medium text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-0 bg-transparent outline-none"
         style={{ fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
         autoComplete="off"
       />
@@ -659,9 +697,9 @@ const DateTimeInput: React.FC<DateTimeInputProps> = ({ icon, label, ...props }) 
       <p className="input-label-professional mb-0.5">
         {label}
       </p>
-      <Input
+      <input
         {...props}
-        className="border-0 p-0 h-auto text-sm font-medium text-gray-800 focus-visible:ring-0 bg-transparent"
+        className="w-full border-0 p-0 h-auto text-sm font-medium text-gray-800 focus:outline-none focus:ring-0 bg-transparent outline-none"
         style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
       />
     </div>
@@ -669,54 +707,64 @@ const DateTimeInput: React.FC<DateTimeInputProps> = ({ icon, label, ...props }) 
 );
 
 const SuggestionList = ({
-  visible, suggestions, onSelect, icon,
+  visible, suggestions, onSelect, icon, query,
 }: {
   visible: boolean;
   suggestions: string[];
   onSelect: (v: string) => void;
   icon: React.ReactNode;
+  query: string;
 }) => (
   <AnimatePresence>
-    {visible && suggestions.length > 0 && (
+    {visible && query && query.length > 0 && (
       <motion.div
         initial={{ opacity: 0, y: -6, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -6, scale: 0.98 }}
-        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] as const }}
         className="absolute z-50 mt-2 w-full rounded-2xl border border-gray-100 bg-white shadow-xl overflow-hidden"
       >
-        <div className="px-4 py-2 border-b border-gray-50">
+        <div className="px-4 py-2 border-b border-gray-50 flex items-center justify-between">
           <p className="caption-professional">
-            Suggested locations
+            {suggestions.length > 0 ? "Suggested locations" : "Searching..."}
           </p>
+          <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+            Google Maps
+          </div>
         </div>
         <div className="suggestion-list">
-          {suggestions.map((item) => (
-            <div
-              key={item}
-              onClick={() => onSelect(item)}
-              className="bs-suggestion-item flex items-center gap-3 border-b border-gray-50 last:border-0"
-            >
-              <span className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-xl bg-amber-50">
-                {icon}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p
-                  className="text-sm font-semibold text-gray-800 truncate"
-                  style={{ fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
-                >
-                  {item.split(",")[0]}
-                </p>
-                <p
-                  className="text-xs text-gray-400 truncate"
-                  style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
-                >
-                  {item.includes(",") ? item.split(",").slice(1).join(",").trim() : ""}
-                </p>
+          {suggestions.length > 0 ? (
+            suggestions.map((item) => (
+              <div
+                key={item}
+                onClick={() => onSelect(item)}
+                className="bs-suggestion-item flex items-center gap-3 border-b border-gray-50 last:border-0"
+              >
+                <span className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-xl bg-amber-50">
+                  {icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-semibold text-gray-800 truncate"
+                    style={{ fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                  >
+                    {item.split(",")[0]}
+                  </p>
+                  <p
+                    className="text-xs text-gray-400 truncate"
+                    style={{ fontFamily: "'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                  >
+                    {item.includes(",") ? item.split(",").slice(1).join(",").trim() : ""}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
               </div>
-              <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
+            ))
+          ) : (
+            <div className="px-4 py-6 text-center text-sm text-gray-400">
+              No exact match found. Please try modifying your search, or select from the map later.
             </div>
-          ))}
+          )}
         </div>
       </motion.div>
     )}

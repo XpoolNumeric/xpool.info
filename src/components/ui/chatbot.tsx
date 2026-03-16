@@ -14,6 +14,11 @@ import {
   ChevronDown,
   RotateCw,
   Check,
+  Mic,
+  MicOff,
+  Copy,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,6 +33,8 @@ interface Message {
   content: string;
   timestamp: Date;
   status?: "sending" | "sent" | "error";
+  feedback?: "up" | "down" | null;
+  copied?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -37,58 +44,52 @@ const SUGGESTIONS = [
   "Average pickup time?",
 ];
 
+const QUICK_REPLIES = [
+  "Track my ride",
+  "Cancel booking",
+  "Contact support",
+  "Pricing info",
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Gemini API Call
+// Gemini API Call  ← UPDATED API KEY
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GEMINI_API_KEY = "AIzaSyB7_39jR-kqbchHlKHzBtmWbtAbY8jrtbw";
+const GEMINI_API_KEY = "AIzaSyCd2aFf6zOwI_vfDWF8lqfcQ59oSKI3eQA";
 
 async function fetchGeminiReply(messages: Message[]): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-  const formattedMessages = messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
+  const formattedMessages = messages.reduce((acc, m) => {
+    const role = m.role === "assistant" ? "model" : "user";
+    if (acc.length > 0 && acc[acc.length - 1].role === role) {
+      acc[acc.length - 1].parts[0].text += `\n${m.content}`;
+    } else {
+      acc.push({ role, parts: [{ text: m.content }] });
+    }
+    return acc;
+  }, [] as { role: string; parts: { text: string }[] }[]);
 
-  const systemInstruction = `You are the incredibly upbeat, witty, catchy, and hilarious AI sidekick for Xpool – the absolute coolest premium ride-pooling and hailing app out there! Your mission is to help users book rides, answer questions about Xpool, and dish out facts with a splash of humor.
-Keep your responses surprisingly short, incredibly sweet, and delightfully funny. If someone goes completely off-topic, creatively and politely steer them back to our stellar rides!
+  const systemInstruction = `You are the incredibly upbeat, witty, and slightly cheeky AI sidekick for Xpool – India's absolute coolest premium ride-pooling and hailing app! Your mission is to help users book rides, answer questions with pizzazz, and keep the vibes high.
 
-Here is your cheat sheet (the serious stuff, but you make it sound fun):
+Keep your responses lightning-fast, surprisingly short, and delightfully funny. If someone goes completely off-topic, creatively and politely steer them back to our stellar rides!
 
-1. THE FLEX:
-- Zooming around 30+ major Pan-India cities from our Chennai HQ!
-- 50K+ Thrilled Riders & 12K+ Verified Captains (our drivers are actual superheroes).
-- 99% Safety Score & an epic 4.8★ App Rating.
-- Support replies in under 2 minutes. Pickups in under 5 minutes. Whoosh!
-
-2. HOW WE ROLL (5 Easy Steps):
-- Step 1: Book It! Enter your pickup and drop, and see the fare before you ride.
-- Step 2: Match Maker. Get matched with a nearby Captain. See their photo, ride details, and track them live!
-- Step 3: Ride safely. Share the OTP, grab your helmet (for bikes), and relax.
-- Step 4: Pay Your Way. UPI, Wallet, Card, or Cash. Plus, snag some sweet cashback!
-- Step 5: Star Power. Rate your Captain to keep our safety score sparkling at 99%.
-
-3. THE GOOD STUFF (Features):
-- Real-time tracking so you never guess where your ride is.
-- Secure in-app calls (your number stays a secret!).
-- Foolproof safety with OTP verification.
-- Transparent fares: ZERO hidden charges. Way cheaper than regular cabs and autos!
-- Safety first: SOS button and strictly verified Captains.
-
-4. HOLLER AT US (Contact):
-- 24/7 Phone Support: +91 7904790007 (We never sleep!)
-- Email: support@xpool.app
-- HQ: Chennai, India. Drivers or partners can hit us up here too!
+Xpool Cheat Sheet (The Real Scoop):
+1. THE FLEX: 30+ Pan-India cities (Chennai HQ!), 50K+ Happy riders, 12K+ "Super-Captain" drivers (all verified superheroes). 4.8★ App rating. 
+2. HOW WE ROLL: Book in seconds -> Get matched with a Captain -> Live tracking -> Easy Pay (UPI/Cash/Wallet) -> 5-star Rating.
+3. WHY US: Zero hidden costs, secure in-app calls, SOS button for safety, and prices that make regular cabs look expensive.
+4. HOLLER: Call us 24/7 at +91 7904790007 or email support@xpool.app.
 
 CRITICAL RULES:
-- Keep it funny, catchy, and incredibly concise! Short and sweet is the name of the game.
-- You MUST reply in plain text ONLY. DO NOT use Markdown formatting (no asterisks, hashes, or dashes).
-- Speak like a friendly, witty human. No robotic lists!`;
+- Keep it insanely short (1-2 sentences max!). 
+- Use plain text ONLY. ABSOLUTELY NO BOLDING, MARKS, OR HASHES. 
+- No lists! Speak like a witty human having a quick chat. 
+- If you're unsure, just be funny and point them to support.`;
 
   const payload = {
-    system_instruction: {
-      parts: { text: systemInstruction }
+    systemInstruction: {
+      role: "model",
+      parts: [{ text: systemInstruction }],
     },
     contents: formattedMessages,
     generationConfig: {
@@ -96,31 +97,17 @@ CRITICAL RULES:
       maxOutputTokens: 800,
     },
     safetySettings: [
-      {
-        category: "HARM_CATEGORY_HARASSMENT",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE",
-      },
-      {
-        category: "HARM_CATEGORY_HATE_SPEECH",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE",
-      },
-      {
-        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE",
-      },
-      {
-        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-        threshold: "BLOCK_MEDIUM_AND_ABOVE",
-      },
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
     ],
   };
 
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
@@ -133,11 +120,11 @@ CRITICAL RULES:
     const data = await response.json();
     let replyText = data.candidates[0].content.parts[0].text;
 
-    // Fallback to strip any residual markdown formatting
-    replyText = replyText.replace(/\*\*(.*?)\*\*/g, "$1"); // remove bold **
-    replyText = replyText.replace(/\*(.*?)\*/g, "$1"); // remove italic *
-    replyText = replyText.replace(/__(.*?)__/g, "$1"); // remove bold __
-    replyText = replyText.replace(/^\s*[\*\-]\s+/gm, "• "); // convert list dashes/asterisks to bullet points
+    // Strip any residual markdown formatting
+    replyText = replyText.replace(/\*\*(.*?)\*\*/g, "$1");
+    replyText = replyText.replace(/\*(.*?)\*/g, "$1");
+    replyText = replyText.replace(/__(.*?)__/g, "$1");
+    replyText = replyText.replace(/^\s*[\*\-]\s+/gm, "• ");
 
     return replyText;
   } catch (error) {
@@ -147,7 +134,7 @@ CRITICAL RULES:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Custom Hook: useChat (no external API)
+// Custom Hook: useChat
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useChat() {
@@ -155,7 +142,6 @@ function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Always keep a ref in sync so async callbacks read fresh state
   const messagesRef = useRef<Message[]>([]);
   useEffect(() => {
     messagesRef.current = messages;
@@ -166,7 +152,6 @@ function useChat() {
       const trimmed = content.trim();
       if (!trimmed || isLoading) return;
 
-      // Remove failed message on retry
       if (retryId) {
         setMessages((prev) => prev.filter((m) => m.id !== retryId));
       }
@@ -184,19 +169,14 @@ function useChat() {
       setError(null);
 
       try {
-        // Build the conversation list to send (exclude error messages)
         const previousMsgs = messagesRef.current.filter(
           (m) => m.id !== userMsg.id && m.status !== "error"
         );
         const apiMessages: Message[] = [...previousMsgs, userMsg];
-
         const reply = await fetchGeminiReply(apiMessages);
 
-        // Mark user message as sent
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === userMsg.id ? { ...m, status: "sent" } : m
-          )
+          prev.map((m) => (m.id === userMsg.id ? { ...m, status: "sent" } : m))
         );
 
         const assistantMsg: Message = {
@@ -204,14 +184,13 @@ function useChat() {
           role: "assistant",
           content: reply,
           timestamp: new Date(),
+          feedback: null,
         };
         setMessages((prev) => [...prev, assistantMsg]);
       } catch (err: any) {
         console.error("Chat error:", err);
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === userMsg.id ? { ...m, status: "error" } : m
-          )
+          prev.map((m) => (m.id === userMsg.id ? { ...m, status: "error" } : m))
         );
         setError("Failed to send message. Please try again.");
       } finally {
@@ -231,14 +210,40 @@ function useChat() {
   const retryMessage = useCallback(
     (messageId: string) => {
       const failedMsg = messagesRef.current.find((m) => m.id === messageId);
-      if (failedMsg?.role === "user") {
-        sendMessage(failedMsg.content, messageId);
-      }
+      if (failedMsg?.role === "user") sendMessage(failedMsg.content, messageId);
     },
     [sendMessage]
   );
 
-  return { messages, isLoading, error, sendMessage, clearMessages, retryMessage };
+  const setFeedback = useCallback((messageId: string, feedback: "up" | "down") => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, feedback: m.feedback === feedback ? null : feedback } : m
+      )
+    );
+  }, []);
+
+  const setCopied = useCallback((messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, copied: true } : m))
+    );
+    setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, copied: false } : m))
+      );
+    }, 2000);
+  }, []);
+
+  return {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    clearMessages,
+    retryMessage,
+    setFeedback,
+    setCopied,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -282,14 +287,22 @@ const TypingIndicator = () => (
 const MessageBubble = ({
   message,
   onRetry,
+  onFeedback,
+  onCopy,
 }: {
   message: Message;
   onRetry: (id: string) => void;
+  onFeedback: (id: string, f: "up" | "down") => void;
+  onCopy: (id: string) => void;
 }) => {
   const timeStr = message.timestamp.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content).then(() => onCopy(message.id));
+  };
 
   return (
     <motion.div
@@ -300,19 +313,23 @@ const MessageBubble = ({
       transition={{ duration: 0.2 }}
       layout
     >
-      <div className={`bubble ${message.role} ${message.status === "error" ? "bubble-error" : ""}`}>
+      <div
+        className={`bubble ${message.role} ${message.status === "error" ? "bubble-error" : ""
+          }`}
+      >
         {message.content}
         {message.status === "error" && (
           <button
             className="retry-btn"
             onClick={() => onRetry(message.id)}
-            aria-label="Retry sending message"
+            aria-label="Retry"
             title="Retry"
           >
             <RotateCw size={12} />
           </button>
         )}
       </div>
+
       <div className="timestamp">
         {timeStr}
         {message.status === "sending" && (
@@ -325,6 +342,36 @@ const MessageBubble = ({
         )}
         {message.status === "error" && (
           <span className="msg-status error"> · Failed</span>
+        )}
+
+        {/* Action buttons for assistant messages */}
+        {message.role === "assistant" && (
+          <span className="msg-actions">
+            <button
+              className={`msg-action-btn ${message.copied ? "active-green" : ""}`}
+              onClick={handleCopy}
+              title="Copy"
+              aria-label="Copy message"
+            >
+              {message.copied ? <Check size={11} /> : <Copy size={11} />}
+            </button>
+            <button
+              className={`msg-action-btn ${message.feedback === "up" ? "active-green" : ""}`}
+              onClick={() => onFeedback(message.id, "up")}
+              title="Helpful"
+              aria-label="Mark helpful"
+            >
+              <ThumbsUp size={11} />
+            </button>
+            <button
+              className={`msg-action-btn ${message.feedback === "down" ? "active-red" : ""}`}
+              onClick={() => onFeedback(message.id, "down")}
+              title="Not helpful"
+              aria-label="Mark not helpful"
+            >
+              <ThumbsDown size={11} />
+            </button>
+          </span>
         )}
       </div>
     </motion.div>
@@ -343,6 +390,8 @@ export default function Chatbot() {
     sendMessage,
     clearMessages,
     retryMessage,
+    setFeedback,
+    setCopied,
   } = useChat();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -350,17 +399,16 @@ export default function Chatbot() {
   const [hasUnread, setHasUnread] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [showGreeting, setShowGreeting] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
-  // ── Greeting Slide-out Timeout ───────────────────────────────────────────
+  const recognitionRef = useRef<any>(null);
+
+  // ── Greeting timeout ─────────────────────────────────────────────────────
   useEffect(() => {
-    // Quick glance: slide out quickly (800ms) and disappear after a short interval (4000ms)
-    const timer1 = setTimeout(() => setShowGreeting(true), 800);
-    const timer2 = setTimeout(() => setShowGreeting(false), 4000);
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-    };
+    const t1 = setTimeout(() => setShowGreeting(true), 800);
+    const t2 = setTimeout(() => setShowGreeting(false), 4000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -372,28 +420,24 @@ export default function Chatbot() {
   useEffect(() => {
     const el = messagesContainerRef.current;
     if (!el || !isOpen) return;
-
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = el;
       setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 120);
     };
-
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
   }, [isOpen]);
 
-  // ── Auto-scroll on new messages ──────────────────────────────────────────
+  // ── Auto-scroll ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, isOpen]);
 
   // ── Unread badge ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.role === "assistant") setHasUnread(true);
+      const last = messages[messages.length - 1];
+      if (last.role === "assistant") setHasUnread(true);
     }
   }, [messages, isOpen]);
 
@@ -401,12 +445,44 @@ export default function Chatbot() {
   useEffect(() => {
     if (isOpen) {
       setHasUnread(false);
-      // Small delay so the panel animation completes first
       setTimeout(() => inputRef.current?.focus(), 100);
     } else {
       triggerRef.current?.focus();
     }
   }, [isOpen]);
+
+  // ── Voice input ──────────────────────────────────────────────────────────
+  const toggleVoice = useCallback(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput((prev) => prev + (prev ? " " : "") + transcript);
+      inputRef.current?.focus();
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [isListening]);
 
   // ── Keyboard handlers ────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -427,9 +503,8 @@ export default function Chatbot() {
     }
   }, [input, isLoading, sendMessage]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
 
   // ── Animation variants ───────────────────────────────────────────────────
   const panelVariants: any = prefersReducedMotion
@@ -437,54 +512,40 @@ export default function Chatbot() {
     : {
       hidden: { opacity: 0, y: 20, scale: 0.95 },
       visible: {
-        opacity: 1,
-        y: 0,
-        scale: 1,
+        opacity: 1, y: 0, scale: 1,
         transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
       },
       exit: {
-        opacity: 0,
-        y: 10,
-        scale: 0.95,
+        opacity: 0, y: 10, scale: 0.95,
         transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
       },
     };
+
+  const showQuickReplies = messages.length > 0 && !isLoading;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        /* ----------------------------------------------
-           Professional UI Refresh for Xpool Chatbot
-           - Refined color palette (amber with modern neutrals)
-           - Improved typography (Inter, system fonts)
-           - Softer shadows, consistent border radii
-           - Better micro-interactions
-        ---------------------------------------------- */
-
         :root {
           --color-primary: #f59e0b;
           --color-primary-light: #fbbf24;
           --color-primary-lighter: #fde68a;
           --color-primary-dark: #d97706;
-          --color-bg-panel: rgba(255, 255, 255, 0.85);
-          --color-bg-header: rgba(255, 247, 235, 0.8);
+          --color-bg-panel: rgba(255, 255, 255, 0.88);
+          --color-bg-header: rgba(255, 247, 235, 0.85);
           --color-text: #1f2937;
           --color-text-soft: #6b7280;
           --color-border: rgba(245, 158, 11, 0.2);
-          --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-          --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-          --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          --shadow-sm: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+          --shadow-md: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+          --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+          --shadow-xl: 0 25px 50px -12px rgba(0,0,0,0.25);
           --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
           --font-display: 'Syne', var(--font-sans);
         }
 
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         /* ── Trigger ── */
         .chat-trigger {
@@ -503,38 +564,24 @@ export default function Chatbot() {
           align-items: center;
           justify-content: flex-start;
           background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%);
-          box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.4) inset !important;
-          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          box-shadow: 0 10px 25px -5px rgba(245,158,11,0.5), 0 0 0 2px rgba(255,255,255,0.4) inset !important;
+          transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
           -webkit-tap-highlight-color: transparent;
           overflow: hidden;
         }
-        .chat-trigger:not(.chat-open):hover,
-        .chat-trigger.expanded {
+        .chat-trigger:not(.chat-open):hover, .chat-trigger.expanded {
           width: 250px;
           padding: 0 20px 0 12px;
           transform: scale(1.04) translateY(-4px);
-          box-shadow: 0 15px 35px -5px rgba(245, 158, 11, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.6) inset !important;
+          box-shadow: 0 15px 35px -5px rgba(245,158,11,0.6), 0 0 0 3px rgba(255,255,255,0.6) inset !important;
         }
-        .chat-trigger.chat-open {
-          width: 64px !important;
-          padding: 0 !important;
-          justify-content: center;
-        }
+        .chat-trigger.chat-open { width: 64px !important; padding: 0 !important; justify-content: center; }
         .chat-trigger.chat-open:hover {
           transform: scale(1.08) translateY(-4px);
-          box-shadow: 0 15px 35px -5px rgba(245, 158, 11, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.6) inset !important;
+          box-shadow: 0 15px 35px -5px rgba(245,158,11,0.6), 0 0 0 3px rgba(255,255,255,0.6) inset !important;
         }
-        .chat-trigger:active {
-          transform: scale(0.96) translateY(0) !important;
-        }
-        .chat-trigger img {
-          width: 40px;
-          height: 40px;
-          border-radius: 16px;
-          object-fit: cover;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-          flex-shrink: 0;
-        }
+        .chat-trigger:active { transform: scale(0.96) translateY(0) !important; }
+        .chat-trigger img { width: 40px; height: 40px; border-radius: 16px; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.1); flex-shrink: 0; }
         .chat-greeting-text {
           white-space: nowrap;
           font-family: var(--font-sans);
@@ -544,23 +591,18 @@ export default function Chatbot() {
           margin-left: 14px;
           opacity: 0;
           transform: translateX(10px);
-          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
         }
         .chat-trigger:not(.chat-open):hover .chat-greeting-text,
-        .chat-trigger.expanded .chat-greeting-text {
-          opacity: 1;
-          transform: translateX(0);
-        }
+        .chat-trigger.expanded .chat-greeting-text { opacity: 1; transform: translateX(0); }
         .unread-badge {
           position: absolute;
-          top: -4px;
-          right: -4px;
-          width: 16px;
-          height: 16px;
+          top: -4px; right: -4px;
+          width: 16px; height: 16px;
           background: #ef4444;
           border-radius: 50%;
           border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.15);
         }
 
         /* ── Panel ── */
@@ -570,18 +612,18 @@ export default function Chatbot() {
           right: 28px;
           z-index: 9998;
           width: 380px;
-          max-height: min(500px, calc(100vh - 120px));
+          max-height: min(560px, calc(100vh - 120px));
           display: flex;
           flex-direction: column;
           border-radius: 32px;
           overflow: hidden;
           background: var(--color-bg-panel);
-          backdrop-filter: blur(16px) saturate(180%);
-          -webkit-backdrop-filter: blur(16px) saturate(180%);
-          box-shadow: var(--shadow-xl), 0 0 0 1.5px rgba(245, 158, 11, 0.2);
+          backdrop-filter: blur(20px) saturate(180%);
+          -webkit-backdrop-filter: blur(20px) saturate(180%);
+          box-shadow: var(--shadow-xl), 0 0 0 1.5px rgba(245,158,11,0.2);
           font-family: var(--font-sans);
           color: var(--color-text);
-          border: 1px solid rgba(255, 255, 255, 0.3);
+          border: 1px solid rgba(255,255,255,0.35);
         }
 
         /* ── Header ── */
@@ -595,439 +637,216 @@ export default function Chatbot() {
           backdrop-filter: blur(8px);
           flex-shrink: 0;
         }
-        .header-left {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .logo-wrapper {
-          width: 44px;
-          height: 44px;
-          border-radius: 14px;
-          overflow: hidden;
-          box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
-          flex-shrink: 0;
-        }
-        .logo-wrapper img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .header-title {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 1.25rem;
-          letter-spacing: -0.02em;
-          color: #1f2937;
-        }
-        .header-title span {
-          color: var(--color-primary);
-          font-weight: 800;
-        }
-        .header-status {
-          font-size: 0.75rem;
-          color: var(--color-text-soft);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .online-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #22c55e;
-          box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
-          animation: pulse-dot 2s infinite;
-        }
-        .header-actions {
-          display: flex;
-          gap: 6px;
-        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo-wrapper { width: 44px; height: 44px; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 12px rgba(245,158,11,0.2); flex-shrink: 0; }
+        .logo-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+        .header-title { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; color: #1f2937; }
+        .header-title span { color: var(--color-primary); font-weight: 800; }
+        .header-status { font-size: 0.75rem; color: var(--color-text-soft); display: flex; align-items: center; gap: 6px; }
+        .online-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,0.2); animation: pulse-dot 2s infinite; }
+        .header-actions { display: flex; gap: 6px; }
         .icon-btn {
-          width: 34px;
-          height: 34px;
-          border-radius: 12px;
-          border: 1px solid rgba(245, 158, 11, 0.25);
-          background: rgba(255, 255, 255, 0.5);
-          color: #b45309;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s;
-          backdrop-filter: blur(4px);
+          width: 34px; height: 34px; border-radius: 12px;
+          border: 1px solid rgba(245,158,11,0.25);
+          background: rgba(255,255,255,0.5);
+          color: #b45309; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.2s; backdrop-filter: blur(4px);
         }
-        .icon-btn:hover {
-          background: rgba(251, 191, 36, 0.15);
-          border-color: var(--color-primary);
-          transform: scale(1.05);
-          box-shadow: var(--shadow-sm);
-        }
-        .icon-btn:active {
-          transform: scale(0.95);
-        }
+        .icon-btn:hover { background: rgba(251,191,36,0.15); border-color: var(--color-primary); transform: scale(1.05); box-shadow: var(--shadow-sm); }
+        .icon-btn:active { transform: scale(0.95); }
 
         /* ── Messages area ── */
         .messages-container {
-          flex: 1;
-          overflow-y: auto;
+          flex: 1; overflow-y: auto;
           padding: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          min-height: 0;
-          position: relative;
+          display: flex; flex-direction: column; gap: 12px;
+          min-height: 0; position: relative;
           scrollbar-width: thin;
-          scrollbar-color: rgba(245, 158, 11, 0.3) transparent;
-          background: rgba(255, 255, 255, 0.3);
+          scrollbar-color: rgba(245,158,11,0.3) transparent;
+          background: rgba(255,255,255,0.3);
         }
-        .messages-container::-webkit-scrollbar {
-          width: 5px;
-        }
-        .messages-container::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .messages-container::-webkit-scrollbar-thumb {
-          background: rgba(245, 158, 11, 0.3);
-          border-radius: 20px;
-        }
+        .messages-container::-webkit-scrollbar { width: 5px; }
+        .messages-container::-webkit-scrollbar-track { background: transparent; }
+        .messages-container::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.3); border-radius: 20px; }
 
         /* ── Empty state ── */
-        .empty-state {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          padding: 24px;
-          text-align: center;
-        }
-        .empty-logo {
-          width: 72px;
-          height: 72px;
-          border-radius: 24px;
-          opacity: 0.9;
-          box-shadow: 0 8px 20px rgba(245, 158, 11, 0.15);
-        }
-        .empty-title {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 1.25rem;
-          color: #1f2937;
-        }
-        .empty-sub {
-          font-size: 0.9rem;
-          color: var(--color-text-soft);
-          line-height: 1.6;
-          max-width: 260px;
-        }
-        .suggestion-chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          justify-content: center;
-          margin-top: 8px;
-        }
+        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center; }
+        .empty-logo { width: 72px; height: 72px; border-radius: 24px; opacity: 0.9; box-shadow: 0 8px 20px rgba(245,158,11,0.15); }
+        .empty-title { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: #1f2937; }
+        .empty-sub { font-size: 0.9rem; color: var(--color-text-soft); line-height: 1.6; max-width: 260px; }
+        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
         .chip {
-          padding: 8px 16px;
-          border-radius: 40px;
-          border: 1.5px solid rgba(245, 158, 11, 0.3);
-          background: rgba(255, 255, 255, 0.6);
-          color: #b45309;
-          font-size: 0.85rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-          backdrop-filter: blur(4px);
+          padding: 8px 16px; border-radius: 40px;
+          border: 1.5px solid rgba(245,158,11,0.3);
+          background: rgba(255,255,255,0.6); color: #b45309;
+          font-size: 0.85rem; font-weight: 500; cursor: pointer;
+          transition: all 0.2s; backdrop-filter: blur(4px);
         }
-        .chip:hover {
-          background: white;
-          border-color: var(--color-primary);
-          box-shadow: var(--shadow-sm);
+        .chip:hover { background: white; border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+
+        /* ── Quick replies bar ── */
+        .quick-replies {
+          padding: 10px 16px 0;
+          display: flex; gap: 8px; overflow-x: auto;
+          scrollbar-width: none; flex-shrink: 0;
         }
+        .quick-replies::-webkit-scrollbar { display: none; }
+        .quick-reply-chip {
+          white-space: nowrap; padding: 6px 14px; border-radius: 40px;
+          border: 1.5px solid rgba(245,158,11,0.25);
+          background: rgba(255,255,255,0.7); color: #92400e;
+          font-size: 0.8rem; font-weight: 500; cursor: pointer;
+          transition: all 0.2s; flex-shrink: 0;
+        }
+        .quick-reply-chip:hover { background: white; border-color: var(--color-primary); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
         /* ── Bubbles ── */
-        .message-group {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .message-group.user {
-          align-items: flex-end;
-        }
-        .message-group.assistant {
-          align-items: flex-start;
-        }
-
+        .message-group { display: flex; flex-direction: column; gap: 2px; }
+        .message-group.user { align-items: flex-end; }
+        .message-group.assistant { align-items: flex-start; }
         .bubble {
-          max-width: 85%;
-          padding: 12px 18px;
-          font-size: 0.95rem;
-          line-height: 1.5;
-          word-break: break-word;
-          border-radius: 24px;
-          position: relative;
-          white-space: pre-wrap;
+          max-width: 85%; padding: 12px 18px;
+          font-size: 0.95rem; line-height: 1.5;
+          word-break: break-word; border-radius: 24px;
+          position: relative; white-space: pre-wrap;
           box-shadow: var(--shadow-sm);
         }
         .bubble.user {
           background: linear-gradient(145deg, #f59e0b, #fbbf24);
-          color: #1a0800;
-          font-weight: 500;
+          color: #1a0800; font-weight: 500;
           border-bottom-right-radius: 8px;
-          box-shadow: 0 6px 14px rgba(245, 158, 11, 0.25);
+          box-shadow: 0 6px 14px rgba(245,158,11,0.25);
         }
         .bubble.assistant {
-          background: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(8px);
-          color: #1f2937;
-          border: 1.5px solid rgba(245, 158, 11, 0.15);
+          background: rgba(255,255,255,0.95);
+          backdrop-filter: blur(8px); color: #1f2937;
+          border: 1.5px solid rgba(245,158,11,0.15);
           border-bottom-left-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         }
-        .bubble.bubble-error {
-          border: 1.5px solid rgba(239, 68, 68, 0.3) !important;
-          background: rgba(255, 245, 245, 0.95) !important;
-        }
-
+        .bubble.bubble-error { border: 1.5px solid rgba(239,68,68,0.3) !important; background: rgba(255,245,245,0.95) !important; }
         .retry-btn {
-          margin-left: 8px;
-          background: none;
-          border: none;
-          color: #b45309;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          padding: 2px 6px;
-          border-radius: 30px;
-          transition: background 0.2s;
-          vertical-align: middle;
+          margin-left: 8px; background: none; border: none; color: #b45309; cursor: pointer;
+          display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 30px;
+          transition: background 0.2s; vertical-align: middle;
         }
-        .retry-btn:hover {
-          background: rgba(245, 158, 11, 0.15);
-        }
+        .retry-btn:hover { background: rgba(245,158,11,0.15); }
 
+        /* ── Timestamp & actions ── */
         .timestamp {
-          font-size: 0.7rem;
-          color: #9ca3af;
-          padding: 4px 8px 0;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 4px;
+          font-size: 0.7rem; color: #9ca3af; padding: 4px 8px 0;
+          font-weight: 500; display: flex; align-items: center; gap: 4px;
+          flex-wrap: wrap;
         }
-        .msg-status {
-          display: flex;
-          align-items: center;
-          gap: 2px;
+        .msg-status { display: flex; align-items: center; gap: 2px; }
+        .msg-status.sent { color: #22c55e; }
+        .msg-status.error { color: #ef4444; }
+        .msg-actions { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
+        .msg-action-btn {
+          background: none; border: none; cursor: pointer;
+          color: #d1d5db; padding: 3px 5px; border-radius: 8px;
+          display: inline-flex; align-items: center;
+          transition: all 0.15s;
         }
-        .msg-status.sent {
-          color: #22c55e;
-        }
-        .msg-status.error {
-          color: #ef4444;
-        }
+        .msg-action-btn:hover { color: #9ca3af; background: rgba(0,0,0,0.05); }
+        .msg-action-btn.active-green { color: #22c55e; }
+        .msg-action-btn.active-red { color: #ef4444; }
 
         /* ── Typing indicator ── */
         .typing-bubble {
-          background: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(8px);
-          border: 1.5px solid rgba(245, 158, 11, 0.15);
-          border-radius: 28px;
-          border-bottom-left-radius: 8px;
+          background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
+          border: 1.5px solid rgba(245,158,11,0.15);
+          border-radius: 28px; border-bottom-left-radius: 8px;
           padding: 14px 22px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
+          display: flex; align-items: center; gap: 6px;
           box-shadow: var(--shadow-sm);
         }
-        .dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #f59e0b;
-          animation: bounce 1.4s infinite ease-in-out;
-        }
-        .dot:nth-child(2) {
-          animation-delay: 0.2s;
-        }
-        .dot:nth-child(3) {
-          animation-delay: 0.4s;
-        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; animation: bounce 1.4s infinite ease-in-out; }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
 
         /* ── Scroll-to-bottom ── */
         .scroll-bottom-btn {
-          position: absolute;
-          bottom: 16px;
-          right: 16px;
-          width: 38px;
-          height: 38px;
-          border-radius: 50%;
-          background: white;
-          backdrop-filter: blur(5px);
-          border: 1.5px solid rgba(245, 158, 11, 0.3);
-          color: #f59e0b;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          box-shadow: var(--shadow-md);
-          transition: all 0.2s;
+          position: absolute; bottom: 16px; right: 16px;
+          width: 38px; height: 38px; border-radius: 50%;
+          background: white; backdrop-filter: blur(5px);
+          border: 1.5px solid rgba(245,158,11,0.3);
+          color: #f59e0b; display: flex; align-items: center; justify-content: center;
+          cursor: pointer; box-shadow: var(--shadow-md); transition: all 0.2s;
         }
-        .scroll-bottom-btn:hover {
-          background: white;
-          border-color: #f59e0b;
-          transform: scale(1.1);
-          box-shadow: var(--shadow-lg);
-        }
+        .scroll-bottom-btn:hover { background: white; border-color: #f59e0b; transform: scale(1.1); box-shadow: var(--shadow-lg); }
 
         /* ── Footer / Input ── */
         .footer {
-          padding: 14px 16px 18px;
+          padding: 12px 16px 16px;
           border-top: 1px solid var(--color-border);
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(8px);
-          flex-shrink: 0;
+          background: rgba(255,255,255,0.75);
+          backdrop-filter: blur(8px); flex-shrink: 0;
         }
         .input-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+          display: flex; align-items: center; gap: 6px;
           background: white;
-          border: 1.5px solid rgba(245, 158, 11, 0.2);
+          border: 1.5px solid rgba(245,158,11,0.2);
           border-radius: 32px;
-          padding: 4px 4px 4px 20px;
+          padding: 4px 4px 4px 18px;
           transition: border-color 0.2s, box-shadow 0.2s;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
         }
-        .input-row:focus-within {
-          border-color: #f59e0b;
-          box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.1);
-        }
+        .input-row:focus-within { border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(245,158,11,0.1); }
         .chat-input {
-          flex: 1;
-          background: transparent;
-          border: none;
-          outline: none;
-          font-size: 0.95rem;
-          font-family: inherit;
-          color: #1f2937;
-          padding: 10px 0;
+          flex: 1; background: transparent; border: none; outline: none;
+          font-size: 0.95rem; font-family: inherit; color: #1f2937; padding: 10px 0;
         }
-        .chat-input::placeholder {
-          color: #9ca3af;
-          font-weight: 400;
+        .chat-input::placeholder { color: #9ca3af; font-weight: 400; }
+
+        /* ── Voice button ── */
+        .voice-btn {
+          width: 36px; height: 36px; border-radius: 50%;
+          border: none; background: transparent; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          color: #d1d5db; transition: all 0.2s; flex-shrink: 0;
         }
+        .voice-btn:hover { color: #f59e0b; background: rgba(245,158,11,0.08); }
+        .voice-btn.listening { color: #ef4444; animation: pulse-mic 1.2s infinite; }
+
         .send-btn {
-          width: 44px;
-          height: 44px;
-          border-radius: 30px;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          width: 44px; height: 44px; border-radius: 30px; border: none; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
           background: linear-gradient(145deg, #f59e0b, #fbbf24);
-          color: #1a0800;
-          box-shadow: 0 6px 14px rgba(245, 158, 11, 0.4);
-          transition: transform 0.15s, filter 0.15s, opacity 0.15s;
-          flex-shrink: 0;
+          color: #1a0800; box-shadow: 0 6px 14px rgba(245,158,11,0.4);
+          transition: transform 0.15s, filter 0.15s, opacity 0.15s; flex-shrink: 0;
         }
-        .send-btn:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-          box-shadow: none;
-        }
-        .send-btn:not(:disabled):hover {
-          filter: brightness(1.05);
-          transform: scale(1.05);
-        }
-        .send-btn:not(:disabled):active {
-          transform: scale(0.95);
-        }
-        .footer-hint {
-          font-size: 0.7rem;
-          color: #9ca3af;
-          text-align: center;
-          margin-top: 10px;
-          letter-spacing: 0.2px;
-        }
+        .send-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+        .send-btn:not(:disabled):hover { filter: brightness(1.05); transform: scale(1.05); }
+        .send-btn:not(:disabled):active { transform: scale(0.95); }
+
+        .char-counter { font-size: 0.7rem; color: #d1d5db; flex-shrink: 0; padding-right: 4px; }
+        .char-counter.near-limit { color: #f59e0b; }
+        .char-counter.at-limit { color: #ef4444; }
+        .footer-hint { font-size: 0.7rem; color: #9ca3af; text-align: center; margin-top: 8px; letter-spacing: 0.2px; }
 
         /* ── Error banner ── */
         .error-banner {
-          color: #ef4444;
-          font-size: 0.85rem;
-          text-align: center;
+          color: #ef4444; font-size: 0.85rem; text-align: center;
           padding: 8px 12px;
-          background: rgba(239, 68, 68, 0.08);
-          border-radius: 40px;
-          border: 1px solid rgba(239, 68, 68, 0.2);
-          margin: 0 4px;
-          backdrop-filter: blur(4px);
-        }
-
-        /* ── Character counter ── */
-        .char-counter {
-          font-size: 0.7rem;
-          color: #d1d5db;
-          flex-shrink: 0;
-          padding-right: 4px;
-        }
-        .char-counter.near-limit {
-          color: #f59e0b;
-        }
-        .char-counter.at-limit {
-          color: #ef4444;
+          background: rgba(239,68,68,0.08); border-radius: 40px;
+          border: 1px solid rgba(239,68,68,0.2); margin: 0 4px; backdrop-filter: blur(4px);
         }
 
         /* ── Responsive ── */
-        @media (max-height: 700px) {
-          .chat-panel {
-            max-height: calc(100vh - 100px);
-            bottom: 80px;
-          }
-        }
+        @media (max-height: 700px) { .chat-panel { max-height: calc(100vh - 100px); bottom: 80px; } }
         @media (max-width: 480px) {
-          .chat-panel {
-            width: calc(100vw - 32px);
-            right: 16px;
-            bottom: 96px;
-            max-height: calc(100vh - 120px);
-          }
-          .chat-trigger {
-            right: 20px;
-            bottom: 20px;
-          }
+          .chat-panel { width: calc(100vw - 32px); right: 16px; bottom: 96px; max-height: calc(100vh - 120px); }
+          .chat-trigger { right: 20px; bottom: 20px; }
         }
 
         /* ── Keyframes ── */
-        @keyframes pulse-dot {
-          0%, 100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.5;
-            transform: scale(0.9);
-          }
-        }
-        @keyframes bounce {
-          0%, 80%, 100% {
-            transform: translateY(0);
-          }
-          40% {
-            transform: translateY(-6px);
-          }
-        }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.9); } }
+        @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+        @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         @media (prefers-reduced-motion: reduce) {
-          *,
-          *::before,
-          *::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-          }
+          *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
         }
       `}</style>
 
@@ -1106,6 +925,21 @@ export default function Chatbot() {
               </div>
             </div>
 
+            {/* Quick replies */}
+            {showQuickReplies && (
+              <div className="quick-replies">
+                {QUICK_REPLIES.map((r) => (
+                  <button
+                    key={r}
+                    className="quick-reply-chip"
+                    onClick={() => sendMessage(r)}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Messages */}
             <div className="messages-container" ref={messagesContainerRef}>
               {messages.length === 0 && !isLoading ? (
@@ -1126,7 +960,13 @@ export default function Chatbot() {
               ) : (
                 <AnimatePresence initial={false}>
                   {messages.map((msg) => (
-                    <MessageBubble key={msg.id} message={msg} onRetry={retryMessage} />
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      onRetry={retryMessage}
+                      onFeedback={setFeedback}
+                      onCopy={setCopied}
+                    />
                   ))}
                 </AnimatePresence>
               )}
@@ -1141,7 +981,6 @@ export default function Chatbot() {
 
               <div ref={messagesEndRef} />
 
-              {/* Scroll-to-bottom — inside the scrollable container so it stays visible */}
               <ScrollToBottomButton onClick={scrollToBottom} isVisible={showScrollBtn} />
             </div>
 
@@ -1167,6 +1006,15 @@ export default function Chatbot() {
                     {2000 - input.length}
                   </span>
                 )}
+                <motion.button
+                  className={`voice-btn ${isListening ? "listening" : ""}`}
+                  onClick={toggleVoice}
+                  aria-label={isListening ? "Stop voice input" : "Start voice input"}
+                  title={isListening ? "Stop listening" : "Voice input"}
+                  type="button"
+                >
+                  {isListening ? <MicOff size={17} /> : <Mic size={17} />}
+                </motion.button>
                 <motion.button
                   className="send-btn"
                   onClick={handleSend}

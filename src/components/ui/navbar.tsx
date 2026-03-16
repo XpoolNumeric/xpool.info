@@ -184,64 +184,102 @@ interface LogoProps {
   onClick?: () => void;
 }
 
-const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => (
-  <Link
-    to="/"
-    onClick={onClick}
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: small ? 8 : 10,
-      textDecoration: "none",
-      flexShrink: 0,
-    }}
-  >
-    <div
+const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => {
+  const [firstName, setFirstName] = useState("");
+
+  useEffect(() => {
+    const updateName = () => {
+      const storedProfile = localStorage.getItem("profile");
+      if (storedProfile) {
+        try {
+          const profile = JSON.parse(storedProfile);
+          if (profile.fullName) {
+            const first = profile.fullName.trim().split(" ")[0];
+            setFirstName(first.charAt(0).toUpperCase() + first.slice(1).toLowerCase());
+          } else {
+            setFirstName("");
+          }
+        } catch (e) {
+          setFirstName("");
+        }
+      } else {
+        setFirstName("");
+      }
+    };
+
+    updateName();
+    window.addEventListener("storage", updateName);
+    const interval = setInterval(updateName, 2000);
+    return () => {
+      window.removeEventListener("storage", updateName);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <Link
+      to="/"
+      onClick={onClick}
       style={{
-        position: "relative",
-        width: small ? 28 : 36,
-        height: small ? 28 : 36,
-        borderRadius: small ? 8 : 10,
-        overflow: "hidden",
-        boxShadow: `0 2px 12px ${T.orange}40, 0 0 0 1px ${T.orange}20`,
+        display: "flex",
+        alignItems: "center",
+        gap: small ? 8 : 10,
+        textDecoration: "none",
         flexShrink: 0,
       }}
     >
-      <img
-        src={xpoolLogo}
-        alt="Xpool logo"
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
       <div
         style={{
-          position: "absolute",
-          top: 2,
-          left: 3,
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: "rgba(255,255,255,0.35)",
-          filter: "blur(2px)",
-          pointerEvents: "none",
+          position: "relative",
+          width: small ? 28 : 36,
+          height: small ? 28 : 36,
+          borderRadius: small ? 8 : 10,
+          overflow: "hidden",
+          boxShadow: `0 2px 12px ${T.orange}40, 0 0 0 1px ${T.orange}20`,
+          flexShrink: 0,
         }}
-      />
-    </div>
-    <span
-      style={{
-        fontFamily: "'Syne', sans-serif",
-        fontWeight: 800,
-        fontSize: small ? "1.15rem" : "1.4rem",
-        letterSpacing: "-0.03em",
-        lineHeight: 1,
-        userSelect: "none" as const,
-      }}
-    >
-      {/* Swapped colors: X now orange, pool navy on desktop; on mobile X navy, pool gold */}
-      <span style={{ color: mobileStyle ? T.navy : T.orange }}>X</span>
-      <span style={{ color: mobileStyle ? "#FFD700" : T.navy }}>pool</span>
-    </span>
-  </Link>
-);
+      >
+        <img
+          src={xpoolLogo}
+          alt="Xpool logo"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: 2,
+            left: 3,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.35)",
+            filter: "blur(2px)",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
+      <span
+        style={{
+          fontFamily: "'Syne', sans-serif",
+          fontWeight: 800,
+          fontSize: small ? "1.15rem" : "1.4rem",
+          letterSpacing: "-0.03em",
+          lineHeight: 1,
+          userSelect: "none" as const,
+        }}
+      >
+        {firstName ? (
+          <span style={{ color: mobileStyle ? T.navy : T.navy }}>Hi, {firstName}</span>
+        ) : (
+          <>
+            <span style={{ color: mobileStyle ? T.navy : T.orange }}>X</span>
+            <span style={{ color: mobileStyle ? "#FFD700" : T.navy }}>pool</span>
+          </>
+        )}
+      </span>
+    </Link>
+  );
+};
 
 /* ─────────────────────────────────────────────────────────
    Support Button – now a clickable tel link
