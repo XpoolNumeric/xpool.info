@@ -19,6 +19,11 @@ import {
   Copy,
   ThumbsUp,
   ThumbsDown,
+  Sparkles,
+  Phone,
+  Mail,
+  MapPin,
+  Zap,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,26 +43,32 @@ interface Message {
 }
 
 const SUGGESTIONS = [
-  "How do I book a ride?",
-  "What cities are covered?",
-  "How are drivers verified?",
-  "Average pickup time?",
+  "🚀 How do I book a ride?",
+  "🛡️ How are drivers verified?",
+  "📞 Customer Support info?",
+  "📱 When does the app launch?",
 ];
 
 const QUICK_REPLIES = [
-  "Track my ride",
-  "Cancel booking",
-  "Contact support",
-  "Pricing info",
+  "⚡ Safety features",
+  "📍 Where are you based?",
+  "📞 Contact support",
+  "💰 Pricing options",
+  "🎁 Any offers?",
+  "🏍️ Become a Captain",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Gemini API Call  ← UPDATED API KEY
+// Gemini API Call
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GEMINI_API_KEY = "AIzaSyCd2aFf6zOwI_vfDWF8lqfcQ59oSKI3eQA";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 async function fetchGeminiReply(messages: Message[]): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    throw new Error("Missing VITE_GEMINI_API_KEY in .env.local file. Please add your Gemini API key.");
+  }
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
   const formattedMessages = messages.reduce((acc, m) => {
@@ -70,21 +81,24 @@ async function fetchGeminiReply(messages: Message[]): Promise<string> {
     return acc;
   }, [] as { role: string; parts: { text: string }[] }[]);
 
-  const systemInstruction = `You are the incredibly upbeat, witty, and slightly cheeky AI sidekick for Xpool – India's absolute coolest premium ride-pooling and hailing app! Your mission is to help users book rides, answer questions with pizzazz, and keep the vibes high.
+  const systemInstruction = `You are Xpool, the highly professional, super friendly, engaging, and remarkably competent AI assistant for Xpool — India's premiere ride-pooling and bike taxi app! Your personality: warm, energetic, and helpful. You celebrate the user and their questions. Use occasional friendly emojis (1-2 max per response) to add warmth.
 
-Keep your responses lightning-fast, surprisingly short, and delightfully funny. If someone goes completely off-topic, creatively and politely steer them back to our stellar rides!
+Keep your responses upbeat, concise (1-3 sentences max), and extremely helpful. Talk purely in natural, engaging conversational sentences. You should use bolding (**) to emphasize important words or main texts. Do not use bullet points or lists.
 
-Xpool Cheat Sheet (The Real Scoop):
-1. THE FLEX: 30+ Pan-India cities (Chennai HQ!), 50K+ Happy riders, 12K+ "Super-Captain" drivers (all verified superheroes). 4.8★ App rating. 
-2. HOW WE ROLL: Book in seconds -> Get matched with a Captain -> Live tracking -> Easy Pay (UPI/Cash/Wallet) -> 5-star Rating.
-3. WHY US: Zero hidden costs, secure in-app calls, SOS button for safety, and prices that make regular cabs look expensive.
-4. HOLLER: Call us 24/7 at +91 7904790007 or email support@xpool.app.
+XPOOL KNOWLEDGE BASE (THE FACTS):
+- PLATFORM: India's fastest and smartest taxi pooling app. Launching our amazing Android and iOS app in about 14 days! Users can opt-in for launch notifications on our Download page.
+- THE FLEX: We operate in 30+ Pan-India cities with our vibrant HQ in Chennai, India. We boast 50K+ Happy active riders, 12K+ KYC-Verified Captains, an impressive 4.8-star app rating, and a 99% safety score! Our average pickup time is just 5 minutes.
+- HOW IT WORKS (5 Steps): 1. Book your ride and see fare estimates instantly (fares up to 50% cheaper than cabs/autos). 2. Get matched with a nearby Captain (see their photo, bike number, rating, live location). 3. Enjoy a safe ride (Captains are background-verified, helmets provided!). 4. Enjoy seamless payments via UPI, Wallet, Cards, or Cash. 5. Rate and review.
+- 11 KEY FEATURES: Quick Booking, Real-Time GPS Tracking, Secure In-App Chat and Call (no personal numbers shared!), Mandatory OTP Verification for every ride, Transparent Fares (no hidden costs!), Multiple Payment Options, Strict Safety Protocols including an SOS button, Ride History and Invoices, Ratings, Promotions and Referral rewards, and Admin Dashboard.
+- CONTACT & SUPPORT: Our 24/7 Live Support team is legendarily fast with an average response time of under 2 minutes! Users can call us at +91 7904790007 or drop an email at support@xpool.app anytime. We are always ready to help!
 
-CRITICAL RULES:
-- Keep it insanely short (1-2 sentences max!). 
-- Use plain text ONLY. ABSOLUTELY NO BOLDING, MARKS, OR HASHES. 
-- No lists! Speak like a witty human having a quick chat. 
-- If you're unsure, just be funny and point them to support.`;
+RULES FOR YOUR RESPONSES:
+- Always proactively provide our phone number (+91 7904790007) and email (support@xpool.app) whenever users ask about contact info, support, or how to reach us.
+- Be catchy, professional, and warmly empathetic. Skip the robotic jargon. Sound like a friendly human expert!
+- Use bolding (**) for main texts or keywords to make them stand out! Absolutely NO bullet points or lists. 
+- Keep it delightfully short and impactful (1-3 sentences maximum).
+
+Help users out with a smile and the above knowledge!`;
 
   const payload = {
     systemInstruction: {
@@ -93,8 +107,8 @@ CRITICAL RULES:
     },
     contents: formattedMessages,
     generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 800,
+      temperature: 0.75,
+      maxOutputTokens: 400,
     },
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -120,13 +134,13 @@ CRITICAL RULES:
     const data = await response.json();
     let replyText = data.candidates[0].content.parts[0].text;
 
-    // Strip any residual markdown formatting
-    replyText = replyText.replace(/\*\*(.*?)\*\*/g, "$1");
-    replyText = replyText.replace(/\*(.*?)\*/g, "$1");
+    // Strip any residual markdown formatting EXCEPT bolding (**)
+    replyText = replyText.replace(/\*(?!\*)(.*?)\*(?!\*)/g, "$1"); // Strip single asterisks but NOT double
     replyText = replyText.replace(/__(.*?)__/g, "$1");
-    replyText = replyText.replace(/^\s*[\*\-]\s+/gm, "• ");
+    replyText = replyText.replace(/^[\*\-]\s+/gm, "");
+    replyText = replyText.replace(/#{1,6}\s+/g, "");
 
-    return replyText;
+    return replyText.trim();
   } catch (error) {
     console.error("Gemini API error:", error);
     throw new Error("Failed to communicate with AI.");
@@ -277,12 +291,31 @@ const ScrollToBottomButton = ({
 const TypingIndicator = () => (
   <div className="message-group assistant">
     <div className="typing-bubble">
+      <div className="typing-avatar">
+        <Sparkles size={10} />
+      </div>
       <span className="dot" />
       <span className="dot" />
       <span className="dot" />
+      <span className="typing-label">Xpool is thinking…</span>
     </div>
   </div>
 );
+
+const renderTextWithBold = (text: string) => {
+  if (!text) return text;
+  // Split on **double star** first, then *single star* — both render as bold
+  const parts = text.split(/(\*\*.*?\*\*|\*[^*]+\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      return <strong key={i}>{part.slice(1, -1)}</strong>;
+    }
+    return part;
+  });
+};
 
 const MessageBubble = ({
   message,
@@ -307,17 +340,23 @@ const MessageBubble = ({
   return (
     <motion.div
       className={`message-group ${message.role}`}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       layout
     >
+      {message.role === "assistant" && (
+        <div className="assistant-avatar">
+          <Sparkles size={12} />
+        </div>
+      )}
+
       <div
         className={`bubble ${message.role} ${message.status === "error" ? "bubble-error" : ""
           }`}
       >
-        {message.content}
+        {renderTextWithBold(message.content)}
         {message.status === "error" && (
           <button
             className="retry-btn"
@@ -333,7 +372,7 @@ const MessageBubble = ({
       <div className="timestamp">
         {timeStr}
         {message.status === "sending" && (
-          <span className="msg-status"> · Sending…</span>
+          <span className="msg-status">· Sending…</span>
         )}
         {message.status === "sent" && (
           <span className="msg-status sent" aria-label="Sent">
@@ -341,10 +380,9 @@ const MessageBubble = ({
           </span>
         )}
         {message.status === "error" && (
-          <span className="msg-status error"> · Failed</span>
+          <span className="msg-status error">· Failed</span>
         )}
 
-        {/* Action buttons for assistant messages */}
         {message.role === "assistant" && (
           <span className="msg-actions">
             <button
@@ -378,6 +416,24 @@ const MessageBubble = ({
   );
 };
 
+// Contact info quick bar
+const ContactBar = () => (
+  <div className="contact-bar">
+    <a href="tel:+917904790007" className="contact-pill" title="Call us">
+      <Phone size={11} />
+      <span>+91 7904790007</span>
+    </a>
+    <a href="mailto:support@xpool.app" className="contact-pill" title="Email us">
+      <Mail size={11} />
+      <span>support@xpool.app</span>
+    </a>
+    <span className="contact-pill location" title="Our base">
+      <MapPin size={11} />
+      <span>Chennai, India</span>
+    </span>
+  </div>
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -400,14 +456,15 @@ export default function Chatbot() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [showGreeting, setShowGreeting] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [showContactBar, setShowContactBar] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   const recognitionRef = useRef<any>(null);
 
   // ── Greeting timeout ─────────────────────────────────────────────────────
   useEffect(() => {
-    const t1 = setTimeout(() => setShowGreeting(true), 800);
-    const t2 = setTimeout(() => setShowGreeting(false), 4000);
+    const t1 = setTimeout(() => setShowGreeting(true), 1000);
+    const t2 = setTimeout(() => setShowGreeting(false), 5000);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
@@ -510,14 +567,14 @@ export default function Chatbot() {
   const panelVariants: any = prefersReducedMotion
     ? { hidden: {}, visible: {}, exit: {} }
     : {
-      hidden: { opacity: 0, y: 20, scale: 0.95 },
+      hidden: { opacity: 0, y: 24, scale: 0.94 },
       visible: {
         opacity: 1, y: 0, scale: 1,
-        transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
+        transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
       },
       exit: {
-        opacity: 0, y: 10, scale: 0.95,
-        transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+        opacity: 0, y: 12, scale: 0.95,
+        transition: { duration: 0.22, ease: [0.4, 0, 1, 1] },
       },
     };
 
@@ -527,25 +584,28 @@ export default function Chatbot() {
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
         :root {
-          --color-primary: #f59e0b;
-          --color-primary-light: #fbbf24;
-          --color-primary-lighter: #fde68a;
-          --color-primary-dark: #d97706;
-          --color-bg-panel: rgba(255, 255, 255, 0.88);
-          --color-bg-header: rgba(255, 247, 235, 0.85);
-          --color-text: #1f2937;
-          --color-text-soft: #6b7280;
-          --color-border: rgba(245, 158, 11, 0.2);
-          --shadow-sm: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-          --shadow-md: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-          --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
-          --shadow-xl: 0 25px 50px -12px rgba(0,0,0,0.25);
-          --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          --font-display: 'Syne', var(--font-sans);
+          --primary: #f59e0b;
+          --primary-light: #fbbf24;
+          --primary-lighter: #fde68a;
+          --primary-dark: #d97706;
+          --primary-glow: rgba(245,158,11,0.35);
+          --bg-panel: rgba(255,255,255,0.92);
+          --bg-header: rgba(255,251,235,0.95);
+          --text: #1f2937;
+          --text-soft: #6b7280;
+          --border: rgba(245,158,11,0.18);
+          --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+          --shadow-md: 0 8px 24px rgba(0,0,0,0.09);
+          --shadow-lg: 0 20px 40px rgba(0,0,0,0.12);
+          --shadow-xl: 0 28px 60px rgba(0,0,0,0.18);
+          --shadow-amber: 0 12px 32px rgba(245,158,11,0.4);
+          --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          --radius: 28px;
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         /* ── Trigger ── */
         .chat-trigger {
@@ -563,67 +623,81 @@ export default function Chatbot() {
           display: flex;
           align-items: center;
           justify-content: flex-start;
-          background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%);
-          box-shadow: 0 10px 25px -5px rgba(245,158,11,0.5), 0 0 0 2px rgba(255,255,255,0.4) inset !important;
+          background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #f97316 100%);
+          box-shadow: var(--shadow-amber), 0 0 0 3px rgba(255,255,255,0.5) inset;
           transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
           -webkit-tap-highlight-color: transparent;
           overflow: hidden;
         }
+        .chat-trigger::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 60%);
+          border-radius: inherit;
+        }
         .chat-trigger:not(.chat-open):hover, .chat-trigger.expanded {
-          width: 250px;
+          width: 260px;
           padding: 0 20px 0 12px;
-          transform: scale(1.04) translateY(-4px);
-          box-shadow: 0 15px 35px -5px rgba(245,158,11,0.6), 0 0 0 3px rgba(255,255,255,0.6) inset !important;
+          transform: scale(1.04) translateY(-5px);
+          box-shadow: 0 18px 40px -5px rgba(245,158,11,0.65), 0 0 0 3px rgba(255,255,255,0.6) inset;
         }
         .chat-trigger.chat-open { width: 64px !important; padding: 0 !important; justify-content: center; }
         .chat-trigger.chat-open:hover {
           transform: scale(1.08) translateY(-4px);
-          box-shadow: 0 15px 35px -5px rgba(245,158,11,0.6), 0 0 0 3px rgba(255,255,255,0.6) inset !important;
+          box-shadow: 0 18px 40px -5px rgba(245,158,11,0.65), 0 0 0 3px rgba(255,255,255,0.6) inset;
         }
         .chat-trigger:active { transform: scale(0.96) translateY(0) !important; }
-        .chat-trigger img { width: 40px; height: 40px; border-radius: 16px; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.1); flex-shrink: 0; }
+        .chat-trigger img { width: 40px; height: 40px; border-radius: 16px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.15); flex-shrink: 0; position: relative; z-index: 1; }
         .chat-greeting-text {
           white-space: nowrap;
-          font-family: var(--font-sans);
+          font-family: var(--font);
           font-weight: 700;
-          font-size: 0.95rem;
+          font-size: 0.9rem;
           color: #1a0800;
           margin-left: 14px;
           opacity: 0;
-          transform: translateX(10px);
+          transform: translateX(12px);
           transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+          position: relative; z-index: 1;
+          display: flex; flex-direction: column; gap: 1px;
+        }
+        .chat-greeting-text small {
+          font-size: 0.7rem; font-weight: 500; opacity: 0.7;
         }
         .chat-trigger:not(.chat-open):hover .chat-greeting-text,
         .chat-trigger.expanded .chat-greeting-text { opacity: 1; transform: translateX(0); }
         .unread-badge {
           position: absolute;
           top: -4px; right: -4px;
-          width: 16px; height: 16px;
+          width: 18px; height: 18px;
           background: #ef4444;
           border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+          border: 2.5px solid white;
+          box-shadow: 0 2px 6px rgba(239,68,68,0.4);
+          animation: badge-pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
         }
+        @keyframes badge-pop { from { transform: scale(0); } to { transform: scale(1); } }
 
         /* ── Panel ── */
         .chat-panel {
           position: fixed;
-          bottom: 104px;
+          bottom: 108px;
           right: 28px;
           z-index: 9998;
-          width: 380px;
-          max-height: min(560px, calc(100vh - 120px));
+          width: 390px;
+          max-height: min(580px, calc(100vh - 124px));
           display: flex;
           flex-direction: column;
-          border-radius: 32px;
+          border-radius: var(--radius);
           overflow: hidden;
-          background: var(--color-bg-panel);
-          backdrop-filter: blur(20px) saturate(180%);
-          -webkit-backdrop-filter: blur(20px) saturate(180%);
-          box-shadow: var(--shadow-xl), 0 0 0 1.5px rgba(245,158,11,0.2);
-          font-family: var(--font-sans);
-          color: var(--color-text);
-          border: 1px solid rgba(255,255,255,0.35);
+          background: var(--bg-panel);
+          backdrop-filter: blur(24px) saturate(200%);
+          -webkit-backdrop-filter: blur(24px) saturate(200%);
+          box-shadow: var(--shadow-xl), 0 0 0 1.5px rgba(245,158,11,0.15);
+          font-family: var(--font);
+          color: var(--text);
+          border: 1px solid rgba(255,255,255,0.5);
         }
 
         /* ── Header ── */
@@ -631,101 +705,162 @@ export default function Chatbot() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 16px 18px;
-          background: var(--color-bg-header);
-          border-bottom: 1px solid var(--color-border);
-          backdrop-filter: blur(8px);
+          padding: 14px 16px;
+          background: var(--bg-header);
+          border-bottom: 1px solid var(--border);
           flex-shrink: 0;
+          position: relative;
+        }
+        .panel-header::after {
+          content: '';
+          position: absolute;
+          bottom: 0; left: 0; right: 0; height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(245,158,11,0.3), transparent);
         }
         .header-left { display: flex; align-items: center; gap: 12px; }
-        .logo-wrapper { width: 44px; height: 44px; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 12px rgba(245,158,11,0.2); flex-shrink: 0; }
+        .logo-wrapper {
+          width: 44px; height: 44px; border-radius: 14px; overflow: hidden;
+          box-shadow: 0 4px 14px rgba(245,158,11,0.25);
+          flex-shrink: 0; position: relative;
+        }
         .logo-wrapper img { width: 100%; height: 100%; object-fit: cover; }
-        .header-title { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; color: #1f2937; }
-        .header-title span { color: var(--color-primary); font-weight: 800; }
-        .header-status { font-size: 0.75rem; color: var(--color-text-soft); display: flex; align-items: center; gap: 6px; }
-        .online-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,0.2); animation: pulse-dot 2s infinite; }
+        .header-name { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; letter-spacing: -0.02em; color: #1f2937; line-height: 1.1; display: flex; align-items: center; }
+        .header-name > span:first-child { color: var(--primary); }
+        .header-sub { font-size: 0.72rem; color: var(--text-soft); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+        .online-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,0.25); animation: pulse-dot 2s infinite; }
+        .ai-badge {
+          font-family: var(--font);
+          font-size: 0.6rem; font-weight: 700; letter-spacing: 0.05em;
+          background: linear-gradient(135deg, #f59e0b, #f97316);
+          color: white !important; padding: 2px 6px; border-radius: 6px; margin-left: 6px;
+          box-shadow: 0 2px 6px rgba(245,158,11,0.3);
+        }
         .header-actions { display: flex; gap: 6px; }
         .icon-btn {
           width: 34px; height: 34px; border-radius: 12px;
-          border: 1px solid rgba(245,158,11,0.25);
-          background: rgba(255,255,255,0.5);
+          border: 1px solid rgba(245,158,11,0.2);
+          background: rgba(255,255,255,0.6);
           color: #b45309; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           transition: all 0.2s; backdrop-filter: blur(4px);
         }
-        .icon-btn:hover { background: rgba(251,191,36,0.15); border-color: var(--color-primary); transform: scale(1.05); box-shadow: var(--shadow-sm); }
-        .icon-btn:active { transform: scale(0.95); }
+        .icon-btn:hover { background: rgba(251,191,36,0.15); border-color: var(--primary); transform: scale(1.06); box-shadow: var(--shadow-sm); }
+        .icon-btn:active { transform: scale(0.94); }
+
+        /* ── Contact bar ── */
+        .contact-bar {
+          display: flex; gap: 6px; flex-wrap: wrap;
+          padding: 8px 16px 6px; flex-shrink: 0;
+          border-bottom: 1px solid var(--border);
+          background: rgba(255,251,235,0.6);
+        }
+        .contact-pill {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 0.7rem; font-weight: 600; color: #92400e;
+          background: rgba(251,191,36,0.12); border: 1px solid rgba(245,158,11,0.2);
+          padding: 3px 8px; border-radius: 20px; text-decoration: none;
+          transition: all 0.18s; cursor: pointer; white-space: nowrap;
+        }
+        .contact-pill:hover { background: rgba(245,158,11,0.18); border-color: var(--primary); color: #78350f; }
+        .contact-pill.location { cursor: default; }
 
         /* ── Messages area ── */
         .messages-container {
           flex: 1; overflow-y: auto;
-          padding: 20px;
-          display: flex; flex-direction: column; gap: 12px;
+          padding: 18px 16px;
+          display: flex; flex-direction: column; gap: 14px;
           min-height: 0; position: relative;
           scrollbar-width: thin;
-          scrollbar-color: rgba(245,158,11,0.3) transparent;
-          background: rgba(255,255,255,0.3);
+          scrollbar-color: rgba(245,158,11,0.25) transparent;
+          background: linear-gradient(180deg, rgba(255,251,235,0.15) 0%, rgba(255,255,255,0.05) 100%);
         }
-        .messages-container::-webkit-scrollbar { width: 5px; }
+        .messages-container::-webkit-scrollbar { width: 4px; }
         .messages-container::-webkit-scrollbar-track { background: transparent; }
-        .messages-container::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.3); border-radius: 20px; }
+        .messages-container::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.25); border-radius: 20px; }
 
         /* ── Empty state ── */
-        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center; }
-        .empty-logo { width: 72px; height: 72px; border-radius: 24px; opacity: 0.9; box-shadow: 0 8px 20px rgba(245,158,11,0.15); }
-        .empty-title { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: #1f2937; }
-        .empty-sub { font-size: 0.9rem; color: var(--color-text-soft); line-height: 1.6; max-width: 260px; }
-        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+        .empty-state {
+          flex: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 14px;
+          padding: 20px; text-align: center;
+        }
+        .empty-hero {
+          width: 76px; height: 76px; border-radius: 24px;
+          background: linear-gradient(135deg, #f59e0b, #fbbf24);
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: var(--shadow-amber); position: relative;
+        }
+        .empty-hero img { width: 56px; height: 56px; border-radius: 16px; object-fit: cover; }
+        .empty-hero-ring {
+          position: absolute; inset: -6px; border-radius: 30px;
+          border: 2px dashed rgba(245,158,11,0.3);
+          animation: spin-slow 10s linear infinite;
+        }
+        @keyframes spin-slow { to { transform: rotate(360deg); } }
+        .empty-greeting {
+          font-family: var(--font-display); font-weight: 800;
+          font-size: 1.15rem; color: #1f2937;
+          line-height: 1.3;
+        }
+        .empty-greeting span { color: var(--primary); }
+        .empty-sub { font-size: 0.85rem; color: var(--text-soft); line-height: 1.6; max-width: 260px; }
+        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-top: 4px; }
         .chip {
-          padding: 8px 16px; border-radius: 40px;
-          border: 1.5px solid rgba(245,158,11,0.3);
-          background: rgba(255,255,255,0.6); color: #b45309;
-          font-size: 0.85rem; font-weight: 500; cursor: pointer;
+          padding: 7px 14px; border-radius: 40px;
+          border: 1.5px solid rgba(245,158,11,0.25);
+          background: rgba(255,255,255,0.7); color: #b45309;
+          font-size: 0.82rem; font-weight: 600; cursor: pointer;
           transition: all 0.2s; backdrop-filter: blur(4px);
         }
-        .chip:hover { background: white; border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+        .chip:hover { background: white; border-color: var(--primary); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 
         /* ── Quick replies bar ── */
         .quick-replies {
-          padding: 10px 16px 0;
-          display: flex; gap: 8px; overflow-x: auto;
+          padding: 10px 14px 0;
+          display: flex; gap: 7px; overflow-x: auto;
           scrollbar-width: none; flex-shrink: 0;
         }
         .quick-replies::-webkit-scrollbar { display: none; }
         .quick-reply-chip {
-          white-space: nowrap; padding: 6px 14px; border-radius: 40px;
-          border: 1.5px solid rgba(245,158,11,0.25);
-          background: rgba(255,255,255,0.7); color: #92400e;
-          font-size: 0.8rem; font-weight: 500; cursor: pointer;
+          white-space: nowrap; padding: 6px 13px; border-radius: 40px;
+          border: 1.5px solid rgba(245,158,11,0.22);
+          background: rgba(255,255,255,0.75); color: #92400e;
+          font-size: 0.78rem; font-weight: 600; cursor: pointer;
           transition: all 0.2s; flex-shrink: 0;
         }
-        .quick-reply-chip:hover { background: white; border-color: var(--color-primary); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+        .quick-reply-chip:hover { background: white; border-color: var(--primary); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
         /* ── Bubbles ── */
-        .message-group { display: flex; flex-direction: column; gap: 2px; }
+        .message-group { display: flex; flex-direction: column; gap: 3px; }
         .message-group.user { align-items: flex-end; }
         .message-group.assistant { align-items: flex-start; }
+        .assistant-avatar {
+          width: 26px; height: 26px; border-radius: 10px;
+          background: linear-gradient(135deg, #f59e0b, #f97316);
+          display: flex; align-items: center; justify-content: center;
+          color: white; margin-bottom: 4px; flex-shrink: 0;
+          box-shadow: 0 4px 10px rgba(245,158,11,0.3);
+        }
         .bubble {
-          max-width: 85%; padding: 12px 18px;
-          font-size: 0.95rem; line-height: 1.5;
-          word-break: break-word; border-radius: 24px;
+          max-width: 85%; padding: 11px 16px;
+          font-size: 0.92rem; line-height: 1.55;
+          word-break: break-word; border-radius: 22px;
           position: relative; white-space: pre-wrap;
-          box-shadow: var(--shadow-sm);
         }
         .bubble.user {
           background: linear-gradient(145deg, #f59e0b, #fbbf24);
           color: #1a0800; font-weight: 500;
-          border-bottom-right-radius: 8px;
-          box-shadow: 0 6px 14px rgba(245,158,11,0.25);
+          border-bottom-right-radius: 6px;
+          box-shadow: 0 6px 18px rgba(245,158,11,0.3);
         }
         .bubble.assistant {
-          background: rgba(255,255,255,0.95);
+          background: rgba(255,255,255,0.97);
           backdrop-filter: blur(8px); color: #1f2937;
-          border: 1.5px solid rgba(245,158,11,0.15);
-          border-bottom-left-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+          border: 1.5px solid rgba(245,158,11,0.12);
+          border-bottom-left-radius: 6px;
+          box-shadow: var(--shadow-sm);
         }
-        .bubble.bubble-error { border: 1.5px solid rgba(239,68,68,0.3) !important; background: rgba(255,245,245,0.95) !important; }
+        .bubble.bubble-error { border: 1.5px solid rgba(239,68,68,0.3) !important; background: rgba(255,245,245,0.97) !important; }
         .retry-btn {
           margin-left: 8px; background: none; border: none; color: #b45309; cursor: pointer;
           display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 30px;
@@ -735,17 +870,17 @@ export default function Chatbot() {
 
         /* ── Timestamp & actions ── */
         .timestamp {
-          font-size: 0.7rem; color: #9ca3af; padding: 4px 8px 0;
+          font-size: 0.68rem; color: #9ca3af; padding: 2px 6px 0;
           font-weight: 500; display: flex; align-items: center; gap: 4px;
           flex-wrap: wrap;
         }
         .msg-status { display: flex; align-items: center; gap: 2px; }
         .msg-status.sent { color: #22c55e; }
         .msg-status.error { color: #ef4444; }
-        .msg-actions { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
+        .msg-actions { display: flex; align-items: center; gap: 3px; margin-left: 4px; }
         .msg-action-btn {
           background: none; border: none; cursor: pointer;
-          color: #d1d5db; padding: 3px 5px; border-radius: 8px;
+          color: #d1d5db; padding: 3px 5px; border-radius: 7px;
           display: inline-flex; align-items: center;
           transition: all 0.15s;
         }
@@ -755,96 +890,106 @@ export default function Chatbot() {
 
         /* ── Typing indicator ── */
         .typing-bubble {
-          background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
-          border: 1.5px solid rgba(245,158,11,0.15);
-          border-radius: 28px; border-bottom-left-radius: 8px;
-          padding: 14px 22px;
+          background: rgba(255,255,255,0.97); backdrop-filter: blur(8px);
+          border: 1.5px solid rgba(245,158,11,0.12);
+          border-radius: 22px; border-bottom-left-radius: 6px;
+          padding: 12px 18px;
           display: flex; align-items: center; gap: 6px;
           box-shadow: var(--shadow-sm);
         }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; animation: bounce 1.4s infinite ease-in-out; }
-        .dot:nth-child(2) { animation-delay: 0.2s; }
-        .dot:nth-child(3) { animation-delay: 0.4s; }
+        .typing-avatar {
+          width: 20px; height: 20px; border-radius: 8px;
+          background: linear-gradient(135deg, #f59e0b, #f97316);
+          display: flex; align-items: center; justify-content: center;
+          color: white; flex-shrink: 0;
+        }
+        .typing-label {
+          font-size: 0.75rem; color: var(--text-soft); margin-left: 4px;
+          font-style: italic;
+        }
+        .dot { width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #f97316); animation: bounce 1.4s infinite ease-in-out; }
+        .dot:nth-child(3) { animation-delay: 0.16s; }
+        .dot:nth-child(4) { animation-delay: 0.32s; }
 
         /* ── Scroll-to-bottom ── */
         .scroll-bottom-btn {
-          position: absolute; bottom: 16px; right: 16px;
-          width: 38px; height: 38px; border-radius: 50%;
+          position: absolute; bottom: 14px; right: 14px;
+          width: 36px; height: 36px; border-radius: 50%;
           background: white; backdrop-filter: blur(5px);
-          border: 1.5px solid rgba(245,158,11,0.3);
+          border: 1.5px solid rgba(245,158,11,0.25);
           color: #f59e0b; display: flex; align-items: center; justify-content: center;
           cursor: pointer; box-shadow: var(--shadow-md); transition: all 0.2s;
         }
-        .scroll-bottom-btn:hover { background: white; border-color: #f59e0b; transform: scale(1.1); box-shadow: var(--shadow-lg); }
+        .scroll-bottom-btn:hover { border-color: #f59e0b; transform: scale(1.1); box-shadow: var(--shadow-lg); }
 
         /* ── Footer / Input ── */
         .footer {
-          padding: 12px 16px 16px;
-          border-top: 1px solid var(--color-border);
-          background: rgba(255,255,255,0.75);
+          padding: 10px 14px 14px;
+          border-top: 1px solid var(--border);
+          background: rgba(255,255,255,0.8);
           backdrop-filter: blur(8px); flex-shrink: 0;
         }
         .input-row {
-          display: flex; align-items: center; gap: 6px;
+          display: flex; align-items: center; gap: 5px;
           background: white;
-          border: 1.5px solid rgba(245,158,11,0.2);
-          border-radius: 32px;
-          padding: 4px 4px 4px 18px;
+          border: 1.5px solid rgba(245,158,11,0.18);
+          border-radius: 30px;
+          padding: 4px 4px 4px 16px;
           transition: border-color 0.2s, box-shadow 0.2s;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
-        .input-row:focus-within { border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(245,158,11,0.1); }
+        .input-row:focus-within { border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(245,158,11,0.1), 0 2px 8px rgba(0,0,0,0.04); }
         .chat-input {
           flex: 1; background: transparent; border: none; outline: none;
-          font-size: 0.95rem; font-family: inherit; color: #1f2937; padding: 10px 0;
+          font-size: 0.93rem; font-family: inherit; color: #1f2937; padding: 9px 0;
         }
         .chat-input::placeholder { color: #9ca3af; font-weight: 400; }
-
-        /* ── Voice button ── */
         .voice-btn {
-          width: 36px; height: 36px; border-radius: 50%;
+          width: 34px; height: 34px; border-radius: 50%;
           border: none; background: transparent; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: #d1d5db; transition: all 0.2s; flex-shrink: 0;
         }
         .voice-btn:hover { color: #f59e0b; background: rgba(245,158,11,0.08); }
         .voice-btn.listening { color: #ef4444; animation: pulse-mic 1.2s infinite; }
-
         .send-btn {
-          width: 44px; height: 44px; border-radius: 30px; border: none; cursor: pointer;
+          width: 42px; height: 42px; border-radius: 28px; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          background: linear-gradient(145deg, #f59e0b, #fbbf24);
-          color: #1a0800; box-shadow: 0 6px 14px rgba(245,158,11,0.4);
+          background: linear-gradient(145deg, #f97316, #f59e0b, #fbbf24);
+          color: #1a0800; box-shadow: 0 6px 16px rgba(245,158,11,0.45);
           transition: transform 0.15s, filter 0.15s, opacity 0.15s; flex-shrink: 0;
         }
-        .send-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
-        .send-btn:not(:disabled):hover { filter: brightness(1.05); transform: scale(1.05); }
-        .send-btn:not(:disabled):active { transform: scale(0.95); }
-
-        .char-counter { font-size: 0.7rem; color: #d1d5db; flex-shrink: 0; padding-right: 4px; }
+        .send-btn:disabled { opacity: 0.38; cursor: not-allowed; box-shadow: none; }
+        .send-btn:not(:disabled):hover { filter: brightness(1.06); transform: scale(1.06); }
+        .send-btn:not(:disabled):active { transform: scale(0.94); }
+        .char-counter { font-size: 0.68rem; color: #d1d5db; flex-shrink: 0; padding-right: 4px; }
         .char-counter.near-limit { color: #f59e0b; }
         .char-counter.at-limit { color: #ef4444; }
-        .footer-hint { font-size: 0.7rem; color: #9ca3af; text-align: center; margin-top: 8px; letter-spacing: 0.2px; }
+        .footer-hint {
+          font-size: 0.68rem; color: #9ca3af; text-align: center; margin-top: 7px;
+          letter-spacing: 0.15px; display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .footer-hint-dot { width: 3px; height: 3px; border-radius: 50%; background: #d1d5db; }
 
         /* ── Error banner ── */
         .error-banner {
-          color: #ef4444; font-size: 0.85rem; text-align: center;
+          color: #ef4444; font-size: 0.83rem; text-align: center;
           padding: 8px 12px;
-          background: rgba(239,68,68,0.08); border-radius: 40px;
-          border: 1px solid rgba(239,68,68,0.2); margin: 0 4px; backdrop-filter: blur(4px);
+          background: rgba(239,68,68,0.07); border-radius: 40px;
+          border: 1px solid rgba(239,68,68,0.18); margin: 0 4px; backdrop-filter: blur(4px);
         }
 
         /* ── Responsive ── */
-        @media (max-height: 700px) { .chat-panel { max-height: calc(100vh - 100px); bottom: 80px; } }
+        @media (max-height: 700px) { .chat-panel { max-height: calc(100vh - 104px); bottom: 84px; } }
         @media (max-width: 480px) {
-          .chat-panel { width: calc(100vw - 32px); right: 16px; bottom: 96px; max-height: calc(100vh - 120px); }
-          .chat-trigger { right: 20px; bottom: 20px; }
+          .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 100px; max-height: calc(100vh - 116px); }
+          .chat-trigger { right: 18px; bottom: 18px; }
         }
 
         /* ── Keyframes ── */
-        @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.9); } }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
         @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
-        @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
         @media (prefers-reduced-motion: reduce) {
           *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
         }
@@ -864,7 +1009,10 @@ export default function Chatbot() {
         ) : (
           <>
             <img src="/chatbotlogo.png" alt="Xpool" />
-            <span className="chat-greeting-text">Hi, ask me anything!</span>
+            <span className="chat-greeting-text">
+              Hi! I'm Xpool
+              <small>Ask me anything about Xpool</small>
+            </span>
           </>
         )}
         {hasUnread && !isOpen && <span className="unread-badge" aria-label="New message" />}
@@ -881,7 +1029,7 @@ export default function Chatbot() {
             exit="exit"
             role="dialog"
             aria-modal="true"
-            aria-label="Xpool ride assistant chat"
+            aria-label="Xpool AI assistant chat"
             tabIndex={-1}
             onKeyDown={handlePanelKeyDown}
           >
@@ -892,16 +1040,25 @@ export default function Chatbot() {
                   <img src="/chatbotlogo.png" alt="Xpool logo" />
                 </div>
                 <div>
-                  <div className="header-title">
-                    <span>X</span>pool
+                  <div className="header-name">
+                    <span>X</span>pool <span className="ai-badge">AI</span>
                   </div>
-                  <div className="header-status">
+                  <div className="header-sub">
                     <span className="online-dot" />
-                    Online · Ride AI
+                    Online · Xpool Ride Assistant
                   </div>
                 </div>
               </div>
               <div className="header-actions">
+                <motion.button
+                  className="icon-btn"
+                  onClick={() => setShowContactBar(v => !v)}
+                  title="Contact info"
+                  whileTap={{ scale: 0.9 }}
+                  aria-label="Show contact info"
+                >
+                  <Phone size={15} />
+                </motion.button>
                 {messages.length > 0 && (
                   <motion.button
                     className="icon-btn"
@@ -910,7 +1067,7 @@ export default function Chatbot() {
                     whileTap={{ scale: 0.9 }}
                     aria-label="Clear chat"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                   </motion.button>
                 )}
                 <motion.button
@@ -920,10 +1077,24 @@ export default function Chatbot() {
                   whileTap={{ scale: 0.9 }}
                   aria-label="Close chat"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </motion.button>
               </div>
             </div>
+
+            {/* Contact bar (toggled) */}
+            <AnimatePresence>
+              {showContactBar && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ContactBar />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Quick replies */}
             {showQuickReplies && (
@@ -944,10 +1115,15 @@ export default function Chatbot() {
             <div className="messages-container" ref={messagesContainerRef}>
               {messages.length === 0 && !isLoading ? (
                 <div className="empty-state">
-                  <img src="/chatbotlogo.png" className="empty-logo" alt="" aria-hidden="true" />
-                  <div className="empty-title">Ready to ride?</div>
+                  <div className="empty-hero">
+                    <img src="/chatbotlogo.png" aria-hidden="true" alt="" />
+                    <div className="empty-hero-ring" aria-hidden="true" />
+                  </div>
+                  <div className="empty-greeting">
+                    Hey there! I'm <span>Xpool</span> 👋
+                  </div>
                   <div className="empty-sub">
-                    Ask anything about bookings, pricing, driver safety, or coverage.
+                    Your personal guide to everything Xpool — rides, safety, pricing, and more. What can I help you with?
                   </div>
                   <div className="suggestion-chips">
                     {SUGGESTIONS.map((s) => (
@@ -990,7 +1166,7 @@ export default function Chatbot() {
                 <input
                   ref={inputRef}
                   className="chat-input"
-                  placeholder="Ask about your ride…"
+                  placeholder="Ask about rides, pricing, safety…"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -1013,7 +1189,7 @@ export default function Chatbot() {
                   title={isListening ? "Stop listening" : "Voice input"}
                   type="button"
                 >
-                  {isListening ? <MicOff size={17} /> : <Mic size={17} />}
+                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                 </motion.button>
                 <motion.button
                   className="send-btn"
@@ -1022,10 +1198,15 @@ export default function Chatbot() {
                   aria-label="Send message"
                   whileTap={!input.trim() || isLoading ? {} : { scale: 0.92 }}
                 >
-                  <ArrowRight size={18} strokeWidth={2.5} />
+                  <ArrowRight size={17} strokeWidth={2.5} />
                 </motion.button>
               </div>
-              <div className="footer-hint">Press Enter to send · Powered by Xpool AI</div>
+              <div className="footer-hint">
+                <Zap size={10} color="#f59e0b" />
+                Press Enter to send
+                <span className="footer-hint-dot" />
+                Powered by Xpool AI
+              </div>
             </div>
           </motion.div>
         )}

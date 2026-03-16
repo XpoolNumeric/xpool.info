@@ -29,7 +29,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import MapView from "./MapView";
+
 
 
 /* ===================== Injected Styles (full fallback stacks) ===================== */
@@ -291,44 +291,100 @@ const BookingSection = () => {
   const debouncedDrop = useDebounce(dropLocation);
 
   useEffect(() => {
-    if (isLoaded && !autocompleteService.current) {
-      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-    }
-  }, [isLoaded]);
-
-  useEffect(() => {
-    if (!autocompleteService.current || activeBox !== "pickup" || !debouncedPickup) {
+    let isActive = true;
+    if (!isLoaded || activeBox !== "pickup" || !debouncedPickup) {
       setPickupPredictions([]);
       return;
     }
-    autocompleteService.current.getPlacePredictions(
-      { input: debouncedPickup, componentRestrictions: { country: "IN" } },
-      (predictions: any, status: any) => {
-        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
-          setPickupPredictions(predictions.map((p: any) => p.description));
+
+    const fetchSuggestions = async () => {
+      try {
+        const mapsPlaces = (window as any).google.maps.places;
+        if (mapsPlaces.AutocompleteSuggestion) {
+          const response = await mapsPlaces.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+            input: debouncedPickup,
+            region: "IN",
+          });
+          if (isActive && response.suggestions) {
+            setPickupPredictions(
+              response.suggestions.map((s: any) => s.placePrediction?.text?.text || s.placePrediction?.description || "")
+            );
+          }
         } else {
-          setPickupPredictions([]);
+          // Fallback to legacy
+          if (!autocompleteService.current) {
+            autocompleteService.current = new mapsPlaces.AutocompleteService();
+          }
+          autocompleteService.current.getPlacePredictions(
+            { input: debouncedPickup, componentRestrictions: { country: "IN" } },
+            (predictions: any, status: any) => {
+              if (!isActive) return;
+              if (status === mapsPlaces.PlacesServiceStatus.OK && predictions) {
+                setPickupPredictions(predictions.map((p: any) => p.description));
+              } else {
+                setPickupPredictions([]);
+              }
+            }
+          );
         }
+      } catch (err) {
+        if (isActive) setPickupPredictions([]);
       }
-    );
-  }, [debouncedPickup, activeBox]);
+    };
+
+    fetchSuggestions();
+    return () => {
+      isActive = false;
+    };
+  }, [debouncedPickup, activeBox, isLoaded]);
 
   useEffect(() => {
-    if (!autocompleteService.current || activeBox !== "drop" || !debouncedDrop) {
+    let isActive = true;
+    if (!isLoaded || activeBox !== "drop" || !debouncedDrop) {
       setDropPredictions([]);
       return;
     }
-    autocompleteService.current.getPlacePredictions(
-      { input: debouncedDrop, componentRestrictions: { country: "IN" } },
-      (predictions: any, status: any) => {
-        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
-          setDropPredictions(predictions.map((p: any) => p.description));
+
+    const fetchSuggestions = async () => {
+      try {
+        const mapsPlaces = (window as any).google.maps.places;
+        if (mapsPlaces.AutocompleteSuggestion) {
+          const response = await mapsPlaces.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+            input: debouncedDrop,
+            region: "IN",
+          });
+          if (isActive && response.suggestions) {
+            setDropPredictions(
+              response.suggestions.map((s: any) => s.placePrediction?.text?.text || s.placePrediction?.description || "")
+            );
+          }
         } else {
-          setDropPredictions([]);
+          // Fallback to legacy
+          if (!autocompleteService.current) {
+            autocompleteService.current = new mapsPlaces.AutocompleteService();
+          }
+          autocompleteService.current.getPlacePredictions(
+            { input: debouncedDrop, componentRestrictions: { country: "IN" } },
+            (predictions: any, status: any) => {
+              if (!isActive) return;
+              if (status === mapsPlaces.PlacesServiceStatus.OK && predictions) {
+                setDropPredictions(predictions.map((p: any) => p.description));
+              } else {
+                setDropPredictions([]);
+              }
+            }
+          );
         }
+      } catch (err) {
+        if (isActive) setDropPredictions([]);
       }
-    );
-  }, [debouncedDrop, activeBox]);
+    };
+
+    fetchSuggestions();
+    return () => {
+      isActive = false;
+    };
+  }, [debouncedDrop, activeBox, isLoaded]);
 
   const pickupSuggestions = useMemo(() => {
     if (activeBox !== "pickup" || !debouncedPickup) return [];
