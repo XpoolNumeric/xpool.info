@@ -42,21 +42,95 @@ interface Message {
   copied?: boolean;
 }
 
-const SUGGESTIONS = [
-  "🚀 How do I book a ride?",
-  "🛡️ How are drivers verified?",
-  "📞 Customer Support info?",
-  "📱 When does the app launch?",
-];
+// ─── Language Config ───────────────────────────────────────────────────────
 
-const QUICK_REPLIES = [
-  "⚡ Safety features",
-  "📍 Where are you based?",
-  "📞 Contact support",
-  "💰 Pricing options",
-  "🎁 Any offers?",
-  "🏍️ Become a Captain",
-];
+interface LangConfig {
+  label: string;
+  flag: string;
+  greeting: string;
+  sub: string;
+  placeholder: string;
+  suggestions: string[];
+  quickReplies: string[];
+  promptInstruction: string;
+}
+
+const LANGUAGES: Record<string, LangConfig> = {
+  en: {
+    label: "EN", flag: "🇬🇧",
+    greeting: "Hey there! I'm Xpool",
+    sub: "Your personal guide to rides, safety, pricing & more. What's up?",
+    placeholder: "Ask about rides, pricing, safety…",
+    suggestions: ["🚀 How do I book a ride?", "🛡️ How are drivers verified?", "📞 Customer Support?", "📱 When does the app launch?"],
+    quickReplies: ["⚡ Safety features", "📍 Where are you?", "📞 Contact support", "💰 Pricing?", "🎁 Any offers?", "🏍️ Become a Captain"],
+    promptInstruction: "Always reply in English. Keep it short, catchy, friendly and fun!",
+  },
+  hi: {
+    label: "हिं", flag: "🇮🇳",
+    greeting: "नमस्ते! मैं Xpool हूँ 👋",
+    sub: "राइड, सेफ्टी, प्राइसिंग – सब कुछ पूछो! मैं यहाँ हूँ 😊",
+    placeholder: "राइड, प्राइस, सेफ्टी के बारे में पूछें…",
+    suggestions: ["🚀 राइड कैसे बुक करें?", "🛡️ ड्राइवर कैसे वेरीफाई होते हैं?", "📞 कस्टमर सपोर्ट?", "📱 ऐप कब लॉन्च होगा?"],
+    quickReplies: ["⚡ सेफ्टी फीचर", "📍 आप कहाँ हैं?", "📞 सपोर्ट", "💰 प्राइसिंग?", "🎁 ऑफर?", "🏍️ कैप्टन बनें"],
+    promptInstruction: "हमेशा हिंदी में जवाब दो। छोटा, मज़ेदार, दोस्ताना और कैची जवाब दो!",
+  },
+  ta: {
+    label: "தமி", flag: "🇮🇳",
+    greeting: "வணக்கம்! நான் Xpool 👋",
+    sub: "ரைடு, பாதுகாப்பு, விலை – எல்லாவற்றையும் கேளுங்கள்! 😊",
+    placeholder: "ரைடு, விலை, பாதுகாப்பு பற்றி கேளுங்கள்…",
+    suggestions: ["🚀 ரைடு எப்படி பேசுவது?", "🛡️ டிரைவர் எப்படி சரிபார்க்கப்படுகிறார்?", "📞 சப்போர்ட்?", "📱 ஆப் எப்போது?"],
+    quickReplies: ["⚡ பாதுகாப்பு", "📍 இருப்பிடம்?", "📞 தொடர்பு", "💰 விலை?", "🎁 ஆஃபர்?", "🏍️ கேப்டன் ஆகுங்கள்"],
+    promptInstruction: "எப்போதும் தமிழில் பதில் கொடு. குறுகியதாக, நட்பாக, கவர்ச்சியாக பதில் கொடு!",
+  },
+  te: {
+    label: "తె", flag: "🇮🇳",
+    greeting: "నమస్కారం! నేను Xpool 👋",
+    sub: "రైడ్, భద్రత, ధర – అన్నీ అడగండి! 😊",
+    placeholder: "రైడ్, ధర, భద్రత గురించి అడగండి…",
+    suggestions: ["🚀 రైడ్ బుక్ చేయడం ఎలా?", "🛡️ డ్రైవర్లు ఎలా వేరిఫై అవుతారు?", "📞 సపోర్ట్?", "📱 యాప్ ఎప్పుడు?"],
+    quickReplies: ["⚡ భద్రత", "📍 మీరు ఎక్కడ?", "📞 సంప్రదించండి", "💰 ధర?", "🎁 ఆఫర్లు?", "🏍️ క్యాప్టెన్ అవ్వండి"],
+    promptInstruction: "ఎల్లప్పుడూ తెలుగులో జవాబివ్వు. చిన్నగా, స్నేహపూర్వకంగా, ఆకర్షణీయంగా జవాబివ్వు!",
+  },
+  fr: {
+    label: "FR", flag: "🇫🇷",
+    greeting: "Salut ! Je suis Xpool 👋",
+    sub: "Votre guide pour les trajets, la sécurité et les tarifs. Je suis là ! 😊",
+    placeholder: "Posez une question sur les trajets…",
+    suggestions: ["🚀 Comment réserver?", "🛡️ Comment les conducteurs sont-ils vérifiés?", "📞 Support client?", "📱 Lancement de l'app?"],
+    quickReplies: ["⚡ Sécurité", "📍 Où êtes-vous?", "📞 Support", "💰 Tarifs?", "🎁 Offres?", "🏍️ Devenir Capitaine"],
+    promptInstruction: "Réponds toujours en français. Sois court, sympa, accrocheur et fun!",
+  },
+  es: {
+    label: "ES", flag: "🇪🇸",
+    greeting: "¡Hola! Soy Xpool 👋",
+    sub: "Tu guía de viajes, seguridad y precios. ¡Pregúntame! 😊",
+    placeholder: "Pregunta sobre viajes, precios, seguridad…",
+    suggestions: ["🚀 ¿Cómo reservar?", "🛡️ ¿Cómo se verifican los conductores?", "📞 ¿Soporte?", "📱 ¿Cuándo lanza la app?"],
+    quickReplies: ["⚡ Seguridad", "📍 ¿Dónde están?", "📞 Soporte", "💰 ¿Precios?", "🎁 ¿Ofertas?", "🏍️ Sé Capitán"],
+    promptInstruction: "Responde siempre en español. ¡Sé corto, amigable, pegadizo y divertido!",
+  },
+  ar: {
+    label: "AR", flag: "🇸🇦",
+    greeting: "أهلاً! أنا Xpool 👋",
+    sub: "دليلك للرحلات والأمان والأسعار. اسألني! 😊",
+    placeholder: "اسأل عن الرحلات، الأسعار، الأمان…",
+    suggestions: ["🚀 كيف أحجز رحلة؟", "🛡️ كيف يتم التحقق من السائقين؟", "📞 الدعم?", "📱 متى يتم الإطلاق؟"],
+    quickReplies: ["⚡ الأمان", "📍 أين أنتم?", "📞 الدعم", "💰 الأسعار?", "🎁 العروض?", "🏍️ كن قائداً"],
+    promptInstruction: "رد دائماً بالعربية. كن قصيراً وودوداً وجذاباً وممتعاً!",
+  },
+  ja: {
+    label: "JP", flag: "🇯🇵",
+    greeting: "こんにちは！Xpoolです 👋",
+    sub: "乗車・安全・料金について何でも聞いてください！😊",
+    placeholder: "乗車、料金、安全について質問してください…",
+    suggestions: ["🚀 乗車のブック方法?", "🛡️ ドライバーの確認方法?", "📞 サポート?", "📱 アプリのリリース日はいつ?"],
+    quickReplies: ["⚡ 安全機能", "📍 どこにいますか?", "📞 サポート", "💰 料金?", "🎁 特典?", "🏍️ キャプテンになる"],
+    promptInstruction: "常に日本語で答えてください。短く、親切で、キャッチーで楽しい返答をしてください！",
+  },
+};
+
+const DEFAULT_LANG = "en";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Gemini API Call
@@ -64,7 +138,7 @@ const QUICK_REPLIES = [
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-async function fetchGeminiReply(messages: Message[]): Promise<string> {
+async function fetchGeminiReply(messages: Message[], languageInstruction: string): Promise<string> {
   if (!GEMINI_API_KEY) {
     throw new Error("Missing VITE_GEMINI_API_KEY in .env.local file. Please add your Gemini API key.");
   }
@@ -81,24 +155,23 @@ async function fetchGeminiReply(messages: Message[]): Promise<string> {
     return acc;
   }, [] as { role: string; parts: { text: string }[] }[]);
 
-  const systemInstruction = `You are Xpool, the highly professional, super friendly, engaging, and remarkably competent AI assistant for Xpool — India's premiere ride-pooling and bike taxi app! Your personality: warm, energetic, and helpful. You celebrate the user and their questions. Use occasional friendly emojis (1-2 max per response) to add warmth.
+  const systemInstruction = `You are **Xpool** — India's coolest, friendliest, and smartest AI ride assistant! 🚀 You are warm, energetic, witty, and always helpful. You celebrate every question and make the user feel amazing. Use 1-2 friendly emojis per response.
 
-Keep your responses upbeat, concise (1-3 sentences max), and extremely helpful. Talk purely in natural, engaging conversational sentences. You should use bolding (**) to emphasize important words or main texts. Do not use bullet points or lists.
+KEY LANGUAGE RULE: ${languageInstruction} Adapt your entire personality, tone, and vocabulary to that language naturally — don't just translate, THINK in that language!
 
-XPOOL KNOWLEDGE BASE (THE FACTS):
-- PLATFORM: India's fastest and smartest taxi pooling app. Launching our amazing Android and iOS app in about 14 days! Users can opt-in for launch notifications on our Download page.
-- THE FLEX: We operate in 30+ Pan-India cities with our vibrant HQ in Chennai, India. We boast 50K+ Happy active riders, 12K+ KYC-Verified Captains, an impressive 4.8-star app rating, and a 99% safety score! Our average pickup time is just 5 minutes.
-- HOW IT WORKS (5 Steps): 1. Book your ride and see fare estimates instantly (fares up to 50% cheaper than cabs/autos). 2. Get matched with a nearby Captain (see their photo, bike number, rating, live location). 3. Enjoy a safe ride (Captains are background-verified, helmets provided!). 4. Enjoy seamless payments via UPI, Wallet, Cards, or Cash. 5. Rate and review.
-- 11 KEY FEATURES: Quick Booking, Real-Time GPS Tracking, Secure In-App Chat and Call (no personal numbers shared!), Mandatory OTP Verification for every ride, Transparent Fares (no hidden costs!), Multiple Payment Options, Strict Safety Protocols including an SOS button, Ride History and Invoices, Ratings, Promotions and Referral rewards, and Admin Dashboard.
-- CONTACT & SUPPORT: Our 24/7 Live Support team is legendarily fast with an average response time of under 2 minutes! Users can call us at +91 7904790007 or drop an email at support@xpool.app anytime. We are always ready to help!
+XPOOL FACTS:
+- India's #1 ride-pooling & bike taxi app — 30+ cities, Chennai HQ.
+- **50K+ happy riders**, **12K+ KYC-verified Captains**, **4.8★ rating**, **99% safety score**, avg pickup in just **5 minutes**!
+- Fares up to **50% cheaper** than cabs & autos. App launching on Android & iOS in ~14 days!
+- Book → Match with a Captain (see photo, bike no., live location) → Safe verified ride → Pay via UPI/Card/Cash/Wallet → Rate & repeat.
+- Features: Quick Booking, Real-Time GPS, Secure In-App Chat/Call, OTP Verification, Transparent Fares, SOS Button, Referral Rewards.
+- 24/7 Support: **+91 7904790007** | **support@xpool.app** — avg response under 2 minutes!
 
-RULES FOR YOUR RESPONSES:
-- Always proactively provide our phone number (+91 7904790007) and email (support@xpool.app) whenever users ask about contact info, support, or how to reach us.
-- Be catchy, professional, and warmly empathetic. Skip the robotic jargon. Sound like a friendly human expert!
-- Use bolding (**) for main texts or keywords to make them stand out! Absolutely NO bullet points or lists. 
-- Keep it delightfully short and impactful (1-3 sentences maximum).
-
-Help users out with a smile and the above knowledge!`;
+RESPONSE RULES:
+- **1-3 sentences MAX** — short, punchy, memorable. No bullet points or lists.
+- Use **bold** for key words. Sound like a cool, knowledgeable friend — NOT a corporate bot.
+- Always share phone/email when users ask about support or contact.
+- Be catchy, upbeat, empathetic, and always end on a positive note!`;
 
   const payload = {
     systemInstruction: {
@@ -151,7 +224,7 @@ Help users out with a smile and the above knowledge!`;
 // Custom Hook: useChat
 // ─────────────────────────────────────────────────────────────────────────────
 
-function useChat() {
+function useChat(languageInstruction: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,7 +260,7 @@ function useChat() {
           (m) => m.id !== userMsg.id && m.status !== "error"
         );
         const apiMessages: Message[] = [...previousMsgs, userMsg];
-        const reply = await fetchGeminiReply(apiMessages);
+        const reply = await fetchGeminiReply(apiMessages, languageInstruction);
 
         setMessages((prev) =>
           prev.map((m) => (m.id === userMsg.id ? { ...m, status: "sent" } : m))
@@ -439,6 +512,10 @@ const ContactBar = () => (
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Chatbot() {
+  const [activeLang, setActiveLang] = useState(DEFAULT_LANG);
+  const [showLangMenu, setShowLangMenu] = useState(false);
+  const langConfig = LANGUAGES[activeLang];
+
   const {
     messages,
     isLoading,
@@ -448,7 +525,7 @@ export default function Chatbot() {
     retryMessage,
     setFeedback,
     setCopied,
-  } = useChat();
+  } = useChat(langConfig.promptInstruction);
 
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -579,12 +656,43 @@ export default function Chatbot() {
     };
 
   const showQuickReplies = messages.length > 0 && !isLoading;
+  const handleLangSelect = (code: string) => { setActiveLang(code); setShowLangMenu(false); };
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        /* ── Language Selector ── */
+        .lang-wrapper { position: relative; }
+        .lang-btn {
+          height: 34px; padding: 0 10px; border-radius: 12px;
+          border: 1px solid rgba(245,158,11,0.2);
+          background: rgba(255,255,255,0.6);
+          color: #b45309; cursor: pointer; font-size: 0.78rem; font-weight: 700;
+          display: flex; align-items: center; gap: 4px;
+          transition: all 0.2s; backdrop-filter: blur(4px);
+          font-family: var(--font);
+        }
+        .lang-btn:hover { background: rgba(251,191,36,0.15); border-color: var(--primary); transform: scale(1.04); }
+        .lang-menu {
+          position: absolute; top: calc(100% + 6px); right: 0;
+          background: white; border-radius: 14px;
+          box-shadow: 0 12px 30px rgba(0,0,0,0.12), 0 0 0 1px rgba(245,158,11,0.12);
+          overflow: hidden; min-width: 140px; z-index: 100;
+          animation: lang-pop 0.18s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes lang-pop { from { opacity:0; transform: scale(0.9) translateY(-6px); } to { opacity:1; transform: scale(1) translateY(0); } }
+        .lang-option {
+          display: flex; align-items: center; gap: 8px;
+          padding: 9px 14px; font-size: 0.82rem; font-weight: 600;
+          color: #374151; cursor: pointer; transition: background 0.15s;
+          font-family: var(--font);
+        }
+        .lang-option:hover { background: rgba(245,158,11,0.08); color: #92400e; }
+        .lang-option.active { background: rgba(245,158,11,0.12); color: #b45309; }
+        .lang-flag { font-size: 1rem; }
         
         :root {
           --primary: #f59e0b;
@@ -1050,6 +1158,34 @@ export default function Chatbot() {
                 </div>
               </div>
               <div className="header-actions">
+                {/* Language selector */}
+                <div className="lang-wrapper">
+                  <button
+                    className="lang-btn"
+                    onClick={() => setShowLangMenu(v => !v)}
+                    aria-label="Select language"
+                    title="Change language"
+                  >
+                    <span className="lang-flag">{langConfig.flag}</span>
+                    {langConfig.label}
+                    <ChevronDown size={11} />
+                  </button>
+                  {showLangMenu && (
+                    <div className="lang-menu" role="menu">
+                      {Object.entries(LANGUAGES).map(([code, cfg]) => (
+                        <div
+                          key={code}
+                          className={`lang-option ${activeLang === code ? "active" : ""}`}
+                          onClick={() => handleLangSelect(code)}
+                          role="menuitem"
+                        >
+                          <span className="lang-flag">{cfg.flag}</span>
+                          {cfg.label === code.toUpperCase() ? cfg.label : `${cfg.flag} ${cfg.label}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <motion.button
                   className="icon-btn"
                   onClick={() => setShowContactBar(v => !v)}
@@ -1099,7 +1235,7 @@ export default function Chatbot() {
             {/* Quick replies */}
             {showQuickReplies && (
               <div className="quick-replies">
-                {QUICK_REPLIES.map((r) => (
+                {langConfig.quickReplies.map((r) => (
                   <button
                     key={r}
                     className="quick-reply-chip"
@@ -1120,13 +1256,13 @@ export default function Chatbot() {
                     <div className="empty-hero-ring" aria-hidden="true" />
                   </div>
                   <div className="empty-greeting">
-                    Hey there! I'm <span>Xpool</span> 👋
+                    {langConfig.greeting.split("Xpool")[0]}<span>Xpool</span>{langConfig.greeting.split("Xpool")[1]}
                   </div>
                   <div className="empty-sub">
-                    Your personal guide to everything Xpool — rides, safety, pricing, and more. What can I help you with?
+                    {langConfig.sub}
                   </div>
                   <div className="suggestion-chips">
-                    {SUGGESTIONS.map((s) => (
+                    {langConfig.suggestions.map((s) => (
                       <button key={s} className="chip" onClick={() => sendMessage(s)}>
                         {s}
                       </button>
@@ -1166,7 +1302,7 @@ export default function Chatbot() {
                 <input
                   ref={inputRef}
                   className="chat-input"
-                  placeholder="Ask about rides, pricing, safety…"
+                  placeholder={langConfig.placeholder}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
