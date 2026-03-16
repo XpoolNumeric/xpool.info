@@ -165,7 +165,7 @@ XPOOL FACTS:
 - Fares up to **50% cheaper** than cabs & autos. App launching on Android & iOS in ~14 days!
 - Book → Match with a Captain (see photo, bike no., live location) → Safe verified ride → Pay via UPI/Card/Cash/Wallet → Rate & repeat.
 - Features: Quick Booking, Real-Time GPS, Secure In-App Chat/Call, OTP Verification, Transparent Fares, SOS Button, Referral Rewards.
-- 24/7 Support: **+91 7904790007** | **support@xpool.app** — avg response under 2 minutes!
+- 24/7 Support: **+91 7904790007** | **xpool.help@gmail.com** — avg response under 2 minutes!
 
 RESPONSE RULES:
 - **1-3 sentences MAX** — short, punchy, memorable. No bullet points or lists.
@@ -496,9 +496,9 @@ const ContactBar = () => (
       <Phone size={11} />
       <span>+91 7904790007</span>
     </a>
-    <a href="mailto:support@xpool.app" className="contact-pill" title="Email us">
-      <Mail size={11} />
-      <span>support@xpool.app</span>
+    <a href="mailto:xpool.help@gmail.com" className="contact-pill" title="Email us">
+      <Mail size={12} />
+      <span>xpool.help@gmail.com</span>
     </a>
     <span className="contact-pill location" title="Our base">
       <MapPin size={11} />

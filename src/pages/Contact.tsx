@@ -55,9 +55,9 @@ const contactMethods: ContactMethod[] = [
     description:
       "For partnerships, business inquiries, or detailed support requests, drop us an email.",
     icon: Mail,
-    value: "support@xpool.app",
-    label: "Send Email",
-    href: "mailto:support@xpool.app",
+    value: "xpool.help@gmail.com",
+    label: "Email Support",
+    href: "mailto:xpool.help@gmail.com",
     badge: "Quick Reply",
     from: "#f97316",
     to: "#fb923c",
@@ -640,7 +640,7 @@ const Contact: FC = () => {
                     Call Support
                   </a>
                   <a
-                    href="mailto:support@xpool.app"
+                    href="mailto:xpool.help@gmail.com"
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 btn-ghost-light px-7 py-4 rounded-2xl text-sm sm:text-base font-semibold"
                   >
                     <Mail className="w-5 h-5" />
