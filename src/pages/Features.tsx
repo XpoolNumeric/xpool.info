@@ -26,7 +26,7 @@ interface Feature {
   id: number;
   title: string;
   description: string;
-  icon: React.ElementType;
+  image: string;
   accent?: string;
 }
 
@@ -45,7 +45,7 @@ const features: Feature[] = [
     title: "Quick Ride Booking",
     description:
       "Book your ride in seconds. Enter pickup and drop locations and get instantly matched with nearby drivers.",
-    icon: Smartphone,
+    image: "/features/booking.png",
     accent: "#FF6B35",
   },
   {
@@ -53,7 +53,7 @@ const features: Feature[] = [
     title: "Real-Time Location Tracking",
     description:
       "Track your driver's live location from acceptance to destination with precise GPS updates.",
-    icon: MapPin,
+    image: "/features/tracking.png",
     accent: "#FF8C42",
   },
   {
@@ -61,7 +61,7 @@ const features: Feature[] = [
     title: "Seamless Communication",
     description:
       "Chat or call drivers securely within the app—no need to share personal phone numbers.",
-    icon: MessageCircle,
+    image: "/features/communication.png",
     accent: "#FFA552",
   },
   {
@@ -69,7 +69,7 @@ const features: Feature[] = [
     title: "OTP Ride Verification",
     description:
       "Every ride starts with OTP verification to ensure rider safety and prevent misuse.",
-    icon: KeyRound,
+    image: "/features/otp.png",
     accent: "#FF6B35",
   },
   {
@@ -77,7 +77,7 @@ const features: Feature[] = [
     title: "Transparent & Affordable Fares",
     description:
       "Real-time fare calculation with zero hidden charges. What you see is what you pay.",
-    icon: DollarSign,
+    image: "/features/fares.png",
     accent: "#FF8C42",
   },
   {
@@ -85,7 +85,7 @@ const features: Feature[] = [
     title: "Multiple Payment Options",
     description:
       "Pay via UPI, Wallet, Debit/Credit Card, or Cash—whatever suits you best.",
-    icon: CreditCard,
+    image: "/features/payments.png",
     accent: "#FFA552",
   },
   {
@@ -93,7 +93,7 @@ const features: Feature[] = [
     title: "Driver & Customer Safety",
     description:
       "Verified drivers, SOS support, and strict safety protocols for peace of mind.",
-    icon: Shield,
+    image: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     accent: "#FF6B35",
   },
   {
@@ -101,7 +101,7 @@ const features: Feature[] = [
     title: "Ride History & Invoices",
     description:
       "Access trip history, download invoices, and manage ride expenses easily.",
-    icon: Clock,
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     accent: "#FF8C42",
   },
   {
@@ -109,7 +109,7 @@ const features: Feature[] = [
     title: "Ratings & Reviews",
     description:
       "Rate drivers and provide feedback to improve service quality across the platform.",
-    icon: Star,
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     accent: "#FFA552",
   },
   {
@@ -117,7 +117,7 @@ const features: Feature[] = [
     title: "Promotions & Offers",
     description:
       "Get exclusive discounts, referral rewards, and seasonal offers directly in-app.",
-    icon: Gift,
+    image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     accent: "#FF6B35",
   },
   {
@@ -125,7 +125,7 @@ const features: Feature[] = [
     title: "Admin Dashboard",
     description:
       "Advanced admin tools for monitoring rides, managing drivers, and maintaining quality.",
-    icon: Settings,   // ✅ Now Settings is properly imported
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     accent: "#FF8C42",
   },
 ];
@@ -251,27 +251,41 @@ const FeaturesStyles = () => (
       background: white;
       border: 1px solid var(--color-amber-200);
       border-radius: 1.5rem;
-      padding: 2rem;
+      padding: 0;
       box-shadow: var(--shadow-md);
       transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .feature-card:hover {
       border-color: var(--color-amber-400);
-      box-shadow: var(--shadow-lg);
+      box-shadow: var(--shadow-xl);
       transform: translateY(-4px);
     }
+    .feature-card:hover .feature-img {
+      transform: scale(1.05);
+    }
 
-    /* ----- Icon wrap ----- */
-    .icon-wrap {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 1rem;
-      background: rgba(251, 191, 36, 0.12);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 1.25rem;
-      border: 1px solid rgba(245, 158, 11, 0.2);
+    /* ----- Image wrap ----- */
+    .img-wrap {
+      position: relative;
+      width: 100%;
+      height: 12rem;
+      overflow: hidden;
+      background: var(--color-gray-100);
+    }
+    .feature-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .img-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 90%);
+      z-index: 1;
     }
 
     /* ----- Disable animations for reduced motion ----- */
@@ -404,7 +418,6 @@ StatsBadgeCard.displayName = "StatsBadgeCard";
 /** Individual feature card – animated with fadeUp */
 const FeatureCard: FC<{ feature: Feature; index: number }> = memo(
   ({ feature, index }) => {
-    const Icon = feature.icon;
     const prefersReducedMotion = useReducedMotion();
 
     return (
@@ -418,22 +431,40 @@ const FeatureCard: FC<{ feature: Feature; index: number }> = memo(
           },
         }}
         whileHover={!prefersReducedMotion ? { y: -5, transition: { duration: 0.2 } } : undefined}
-        className="feature-card relative"
+        className="feature-card relative group"
         style={{ transform: "translateZ(0)" }}
       >
-        <div className="icon-wrap">
-          <Icon size={24} className="text-amber-600" strokeWidth={1.8} />
+        <div className="img-wrap">
+          <div className="img-overlay" />
+          <img 
+            src={feature.image} 
+            alt={feature.title} 
+            className="feature-img"
+            loading="lazy"
+          />
+          <h3 className="absolute bottom-4 left-5 right-5 text-xl lg:text-2xl font-bold text-white z-10 font-syne drop-shadow-md">
+            {feature.title}
+          </h3>
+          
+          {/* Optional ghost number */}
+          <span
+            className="absolute top-3 right-4 text-4xl font-black text-white/30 select-none z-10 drop-shadow-sm"
+            aria-hidden="true"
+          >
+            {feature.id.toString().padStart(2, "0")}
+          </span>
         </div>
-        <h3 className="text-lg font-bold text-gray-900 mb-2 font-syne">{feature.title}</h3>
-        <p className="text-sm text-gray-500 leading-relaxed font-dmsans">{feature.description}</p>
-
-        {/* Optional ghost number */}
-        <span
-          className="absolute bottom-3 right-4 text-7xl font-black text-amber-100 select-none"
-          aria-hidden="true"
-        >
-          {feature.id.toString().padStart(2, "0")}
-        </span>
+        
+        <div className="p-5 flex-grow bg-white/60 backdrop-blur-md relative">
+          {/* Glowing accent border top */}
+          <div 
+            className="absolute top-0 left-0 w-full h-[2.5px]" 
+            style={{ 
+              background: `linear-gradient(90deg, transparent, ${feature.accent || 'var(--color-amber-500)'}, transparent)` 
+            }} 
+          />
+          <p className="text-sm text-gray-500 leading-relaxed font-dmsans">{feature.description}</p>
+        </div>
       </motion.div>
     );
   }

@@ -1500,7 +1500,7 @@ export default function Chatbot() {
                   </div>
                   <div className="header-sub">
                     <span className="online-dot" />
-                    Online · Xpool Ride Assistant
+                    Xpool Ride Assistant
                   </div>
                 </div>
               </div>
