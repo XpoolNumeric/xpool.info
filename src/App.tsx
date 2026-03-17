@@ -11,6 +11,7 @@ import Features from "./pages/Features";
 import HowItWorks from "./pages/HowItWorks";
 import Contact from "./pages/Contact";
 import Download from "./pages/Download"; // ✅ ADD THIS
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 // Ride flow
@@ -35,6 +36,7 @@ const App = (): JSX.Element => {
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/download" element={<Download />} /> {/* ✅ NEW */}
+          <Route path="/profile" element={<Profile />} />
 
           {/* Ride flow */}
           <Route path="/vehicles" element={<VehicleTypeSelection />} />

@@ -154,7 +154,9 @@ const ProfileSummaryDialog = ({
     }
 
     // 2. Always fallback/sync with local storage
-    localStorage.setItem("profile", JSON.stringify(profile));
+    const stored = JSON.parse(localStorage.getItem("profile") || "{}");
+    localStorage.setItem("profile", JSON.stringify({ ...stored, ...profile, isLoggedIn: true }));
+    window.dispatchEvent(new Event("storage"));
 
     setTimeout(() => {
       setSaved(true);

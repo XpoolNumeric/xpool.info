@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Phone, Download, Menu, X, Sparkles, ChevronRight } from "lucide-react";
+import { Phone, Download, Menu, X, Sparkles, ChevronRight, LogOut, User } from "lucide-react";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
 
 /* ─────────────────────────────────────────────────────────
@@ -395,6 +395,78 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
 };
 
 /* ─────────────────────────────────────────────────────────
+   Profile Button
+───────────────────────────────────────────────────────── */
+const ProfileButton = ({ profile, fullWidth = false }: { profile: any, fullWidth?: boolean }) => {
+  const [hovered, setHovered] = useState(false);
+  const picture = profile?.picture;
+  const initial = profile?.fullName?.charAt(0)?.toUpperCase() || "U";
+  return (
+    <Link
+      to="/profile"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        padding: "4px 14px 4px 4px",
+        borderRadius: 999,
+        background: hovered ? T.ivory : T.white,
+        border: `1.5px solid ${hovered ? T.borderHover : T.border}`,
+        boxShadow: hovered ? `0 0 0 3px ${T.orangeGlow}` : "none",
+        textDecoration: "none",
+        transition: "all 0.22s ease",
+        width: fullWidth ? "100%" : "auto",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, overflow: "hidden", background: `linear-gradient(135deg, ${T.orange}, ${T.gold})`, display: "flex", alignItems: "center", justifyContent: "center", color: T.white, fontWeight: "bold", fontSize: "0.85rem" }}>
+        {picture ? <img src={picture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initial}
+      </div>
+      <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.85rem", color: T.navy }}>Profile</span>
+    </Link>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
+   Logout Button
+───────────────────────────────────────────────────────── */
+const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void, fullWidth?: boolean }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onLogout}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        padding: "9px 16px",
+        borderRadius: 999,
+        background: hovered ? "rgba(239, 68, 68, 0.05)" : "transparent",
+        border: `1.5px solid ${hovered ? "rgba(239, 68, 68, 0.4)" : "transparent"}`,
+        textDecoration: "none",
+        transition: "all 0.22s ease",
+        color: hovered ? "rgb(239, 68, 68)" : T.muted,
+        cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif",
+        fontWeight: 600,
+        fontSize: "0.85rem",
+        width: fullWidth ? "100%" : "auto",
+        boxSizing: "border-box",
+      }}
+    >
+      <LogOut style={{ width: 14, height: 14, flexShrink: 0 }} />
+      Logout
+    </button>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
    Main Navbar
 ───────────────────────────────────────────────────────── */
 const Navbar = () => {
@@ -402,8 +474,32 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [hideBar, setHideBar] = useState(false);
   const [mouseX, setMouseX] = useState(0.5);
+  const [profile, setProfile] = useState<any>(null);
   const lastScrollY = useRef(0);
   const location = useLocation();
+
+  useEffect(() => {
+    const updateProfile = () => {
+      const stored = localStorage.getItem("profile");
+      if (stored) {
+        try { 
+          const p = JSON.parse(stored);
+          // Support older sessions where isLoggedIn wasn't set explicitly
+          const isActive = p.isLoggedIn || p.fullName || p.email || p.phone;
+          setProfile(isActive ? p : null);
+        } catch { setProfile(null); }
+      } else { setProfile(null); }
+    };
+    updateProfile();
+    window.addEventListener("storage", updateProfile);
+    return () => window.removeEventListener("storage", updateProfile);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("profile");
+    window.dispatchEvent(new Event("storage"));
+    setProfile(null);
+  };
 
   useEffect(() => {
     const fn = () => {
@@ -496,8 +592,17 @@ const Navbar = () => {
 
             {/* Desktop CTAs */}
             <div className="hidden md:flex" style={{ alignItems: "center", gap: 10 }}>
-              <SupportButton />
-              <DownloadButton />
+              {profile ? (
+                <>
+                  <ProfileButton profile={profile} />
+                  <LogoutButton onLogout={handleLogout} />
+                </>
+              ) : (
+                <>
+                  <SupportButton />
+                  <DownloadButton />
+                </>
+              )}
             </div>
 
             {/* Mobile Hamburger */}
@@ -757,8 +862,17 @@ const Navbar = () => {
             marginTop: 8,
           }}
         >
-          <SupportButton fullWidth />
-          <DownloadButton fullWidth />
+          {profile ? (
+            <>
+              <ProfileButton profile={profile} fullWidth />
+              <LogoutButton onLogout={() => { handleLogout(); setIsOpen(false); }} fullWidth />
+            </>
+          ) : (
+            <>
+              <SupportButton fullWidth />
+              <DownloadButton fullWidth />
+            </>
+          )}
         </div>
       </div>
 
