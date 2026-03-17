@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion, Variants } from "framer-motion";
+import { GoogleMap, useLoadScript, DirectionsRenderer, MarkerF } from "@react-google-maps/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Car,
@@ -9,11 +10,13 @@ import {
   Phone,
   Star,
   MapPin,
-  ArrowDown,
   Clock,
   Navigation,
   Sparkles,
   Share2,
+  CheckCircle2,
+  CarTaxiFront,
+  Truck,
 } from "lucide-react";
 
 /* -------------------- TYPES -------------------- */
@@ -37,9 +40,55 @@ interface DriverInfo {
 /* -------------------- CONSTANTS -------------------- */
 const VEHICLE_ICONS: Record<VehicleKey, React.ElementType> = {
   bike: Bike,
-  auto: Car,
+  auto: CarTaxiFront,
   car: Car,
-  xl: Car,
+  xl: Truck,
+};
+
+interface PricingTier {
+  maxKm: number;
+  name: string;
+  rate: number;
+  baseFare?: number;
+}
+
+const PRICING_CONFIG: Record<VehicleKey, PricingTier[]> = {
+  car: [
+    { maxKm: 10, name: "Short Trip", rate: 18, baseFare: 50 },
+    { maxKm: 50, name: "Suburban", rate: 15, baseFare: 80 },
+    { maxKm: 100, name: "Nearby Cities", rate: 14, baseFare: 120 },
+    { maxKm: 250, name: "Medium", rate: 13, baseFare: 150 },
+    { maxKm: 500, name: "Long", rate: 12, baseFare: 200 },
+    { maxKm: 1000, name: "Very Long", rate: 11, baseFare: 300 },
+    { maxKm: Infinity, name: "Interstate", rate: 10, baseFare: 500 },
+  ],
+  bike: [
+    { maxKm: 10, name: "Quick Bike", rate: 13, baseFare: 35 },
+    { maxKm: 50, name: "Urban Bike", rate: 11, baseFare: 55 },
+    { maxKm: 100, name: "City Connect", rate: 10, baseFare: 70 },
+    { maxKm: 150, name: "Long Ride", rate: 9, baseFare: 100 },
+    { maxKm: Infinity, name: "Inter-City", rate: 8, baseFare: 120 },
+  ],
+  auto: [
+    { maxKm: 15, name: "Local Auto", rate: 12, baseFare: 25 },
+    { maxKm: Infinity, name: "Regular", rate: 10, baseFare: 40 },
+  ],
+  xl: [
+    { maxKm: 20, name: "City XL", rate: 25, baseFare: 100 },
+    { maxKm: Infinity, name: "Long XL", rate: 22, baseFare: 150 },
+  ],
+};
+
+const calculateFare = (vehicleType: VehicleKey, km: number) => {
+  const config = PRICING_CONFIG[vehicleType] || PRICING_CONFIG.car;
+  const tier = config.find(t => km <= t.maxKm) || config[config.length - 1];
+  const base = tier.baseFare || 0;
+  return {
+    total: Math.round(base + (km * tier.rate)),
+    rate: tier.rate,
+    tierName: tier.name,
+    baseFare: base
+  };
 };
 
 const FALLBACK_DRIVER: DriverInfo = {
@@ -50,6 +99,8 @@ const FALLBACK_DRIVER: DriverInfo = {
   vehicleNumber: "TN 09 AB 1234",
   etaMinutes: 5,
 };
+
+const LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
 
 /* -------------------- CUSTOM HOOKS -------------------- */
 function useLocalStorage<T>(key: string, initialValue: T): [T, boolean, Error | null] {
@@ -85,23 +136,18 @@ function useVehicleType(defaultType: VehicleKey = "car"): [VehicleKey, boolean] 
 }
 
 function useRideSummary(): [RideSummary | null, boolean, Error | null] {
-  const [savedRide, loading, error] = useLocalStorage<RideSummary | null>("rideSummary", null);
-  return [savedRide, loading, error];
+  return useLocalStorage<RideSummary | null>("rideSummary", null);
 }
 
 function useEtaCountdown(initialEta: number): number {
   const [eta, setEta] = useState(initialEta);
-
   useEffect(() => {
     if (eta <= 0) return;
-
     const timer = setInterval(() => {
       setEta((prev) => Math.max(prev - 1, 0));
     }, 60000);
-
     return () => clearInterval(timer);
   }, [eta]);
-
   return eta;
 }
 
@@ -123,13 +169,146 @@ const fadeUp: Variants = {
 const Header = ({ title, subtitle }: { title: string; subtitle: string }) => (
   <motion.header variants={fadeUp} className="text-center space-y-2">
     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100/50 border border-green-200/50 text-[10px] font-bold tracking-wider text-green-700 uppercase mb-2">
-      <CheckCircle2 className="w-3 h-3" />
+      <Sparkles className="w-3 h-3 text-green-600" />
       Ride Booked
     </div>
     <h1 className="text-3xl font-black text-gray-900 tracking-tight font-syne">{title}</h1>
-    <p className="text-sm font-semibold text-gray-500">{subtitle}</p>
+    <p className="text-sm font-semibold text-gray-400">{subtitle}</p>
   </motion.header>
 );
+
+const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop: string; onDistanceCalculated: (km: number) => void }) => {
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
+    libraries: LIBRARIES,
+  });
+
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  useEffect(() => {
+    if (isLoaded && pickup && drop) {
+      const directionsService = new google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: pickup,
+          destination: drop,
+          travelMode: google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result) {
+            setDirections(result);
+            const distanceMeters = result.routes[0]?.legs[0]?.distance?.value;
+            if (distanceMeters) {
+               onDistanceCalculated(distanceMeters / 1000);
+            }
+          }
+        }
+      );
+    }
+  }, [isLoaded, pickup, drop, onDistanceCalculated]);
+
+  const mapOptions = useMemo(() => ({
+    disableDefaultUI: true,
+    zoomControl: false,
+    mapTypeControl: false,
+    scaleControl: false,
+    streetViewControl: false,
+    rotateControl: false,
+    fullscreenControl: false,
+    styles: [
+      {
+        featureType: "all",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#7c93a3" }, { lightness: "-10" }]
+      },
+      {
+        featureType: "administrative.locality",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#57534e" }]
+      },
+      {
+        featureType: "landscape",
+        elementType: "geometry",
+        stylers: [{ color: "#f5f5f5" }]
+      },
+      {
+        featureType: "poi",
+        elementType: "geometry",
+        stylers: [{ color: "#eeeeee" }]
+      },
+      {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#ffffff" }]
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#e9e9e9" }]
+      }
+    ]
+  }), []);
+
+  if (!isLoaded) return <Skeleton className="h-64 w-full rounded-3xl" />;
+
+  return (
+    <motion.div variants={fadeUp} className="relative h-64 w-full rounded-3xl overflow-hidden border border-amber-900/10 shadow-lg bg-slate-100">
+      <GoogleMap
+        mapContainerStyle={{ width: "100%", height: "100%" }}
+        options={mapOptions}
+        onLoad={(map) => { mapRef.current = map; }}
+      >
+        {directions && (
+          <DirectionsRenderer
+            directions={directions}
+            options={{
+              suppressMarkers: true,
+              polylineOptions: {
+                strokeColor: "#f59e0b",
+                strokeWeight: 6,
+                strokeOpacity: 0.8,
+              },
+            }}
+          />
+        )}
+        
+        {/* Custom Markers */}
+        {directions && directions.routes[0].legs[0].start_location && (
+          <MarkerF
+            position={directions.routes[0].legs[0].start_location}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: "#f59e0b",
+              fillOpacity: 1,
+              strokeWeight: 4,
+              strokeColor: "#ffffff",
+            }}
+          />
+        )}
+        {directions && directions.routes[0].legs[0].end_location && (
+          <MarkerF
+            position={directions.routes[0].legs[0].end_location}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: "#ea580c",
+              fillOpacity: 1,
+              strokeWeight: 4,
+              strokeColor: "#ffffff",
+            }}
+          />
+        )}
+      </GoogleMap>
+
+      <div className="absolute top-4 left-4 flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-gray-200/50 shadow-sm z-10">
+        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+        <span className="text-[10px] font-black text-gray-700 tracking-wider">REAL MAP PREVIEW</span>
+      </div>
+    </motion.div>
+  );
+};
 
 const RideSummaryCard = ({ ride }: { ride: RideSummary }) => (
   <motion.div variants={fadeUp} className="p-4 rounded-2xl bg-white/60 border border-amber-900/10 shadow-sm text-left relative overflow-hidden" style={{ backdropFilter: "blur(12px)" }}>
@@ -176,6 +355,50 @@ const VehicleCard = ({ type, vehicleNumber, eta }: { type: VehicleKey; vehicleNu
   );
 };
 
+const FareDetailsCard = ({ details }: { details: { tierName: string; baseRate: number; total: number; km: string; baseFare: number } }) => (
+  <motion.div variants={fadeUp} className="p-4 rounded-2xl bg-[#0a0a0a] border border-gray-800 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] overflow-hidden relative" style={{ backgroundImage: "linear-gradient(145deg, #1f1f1f 0%, #0a0a0a 100%)" }}>
+    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-[40px] pointer-events-none" />
+    <div className="absolute bottom-[-10%] left-[-10%] w-24 h-24 bg-orange-500/10 rounded-full blur-[30px] pointer-events-none" />
+    <div className="absolute top-[-2px] left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50 blur-[2px]" />
+    
+    <div className="flex justify-between items-start relative z-10">
+      <div className="space-y-3">
+        <div>
+          <p className="text-[10px] font-black tracking-widest text-[#a8a29e] uppercase mb-1 drop-shadow-sm">Estimated Fare</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-4xl font-black text-white font-syne tracking-tight">₹{details.total}</span>
+          </div>
+        </div>
+        
+        <div className="flex flex-col gap-1.5 pt-1">
+           <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 bg-white/5 w-max px-2 py-1 rounded-md border border-white/5">
+             <span className="text-amber-500/80">BASE FARE</span>
+             <span className="text-white">₹{details.baseFare}</span>
+           </div>
+           <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 bg-white/5 w-max px-2 py-1 rounded-md border border-white/5">
+             <span className="text-amber-500/80">DISTANCE</span>
+             <span className="text-white">₹{details.baseRate} × {details.km} km</span>
+           </div>
+        </div>
+      </div>
+
+      <div className="text-right flex flex-col items-end gap-3">
+        <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1.5 rounded-xl border border-white/5 backdrop-blur-md">
+          <MapPin className="w-3.5 h-3.5 text-amber-500" />
+          <span className="text-sm font-black text-white tracking-tight">{details.km} km</span>
+        </div>
+        <div className="inline-flex items-center justify-center text-[9px] font-black tracking-widest text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-lg border border-amber-400/20 backdrop-blur-xl uppercase shadow-[0_0_15px_rgba(251,191,36,0.1)]">
+          {details.tierName}
+        </div>
+      </div>
+    </div>
+    
+    <div className="absolute bottom-[-10px] right-[-10px] text-[40px] font-black text-white/[0.03] pointer-events-none select-none italic">
+      FARE CALC
+    </div>
+  </motion.div>
+);
+
 const DriverCard = ({ driver, onCall }: { driver: DriverInfo; onCall: () => void }) => (
   <motion.div variants={fadeUp} className="p-4 rounded-2xl bg-white/60 border border-gray-200/50 shadow-sm space-y-4" style={{ backdropFilter: "blur(12px)" }}>
     <div className="flex items-center gap-4">
@@ -202,9 +425,9 @@ const DriverCard = ({ driver, onCall }: { driver: DriverInfo; onCall: () => void
         <Phone className="h-5 w-5" strokeWidth={2.5} />
       </motion.button>
     </div>
-    
+
     <div className="h-1 w-full bg-gray-100 rounded-full" />
-    
+
     <div className="flex items-center justify-between text-xs font-bold text-gray-500">
       <div className="flex items-center gap-2">
         <Navigation className="h-4 w-4 text-amber-500" strokeWidth={2.5} />
@@ -232,6 +455,20 @@ const RideConfirmed = () => {
   const [ride, rideLoading, rideError] = useRideSummary();
   const [driver] = useState<DriverInfo>(FALLBACK_DRIVER);
   const eta = useEtaCountdown(driver.etaMinutes);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+
+  const priceDetails = useMemo(() => {
+    if (!distanceKm) return null;
+    const { total, rate, tierName, baseFare } = calculateFare(vehicleType, distanceKm);
+    
+    return {
+      tierName,
+      baseRate: rate,
+      total,
+      km: distanceKm.toFixed(1),
+      baseFare
+    };
+  }, [distanceKm, vehicleType]);
 
   const handleCallDriver = useCallback(() => {
     window.location.href = `tel:${driver.phone}`;
@@ -264,7 +501,7 @@ const RideConfirmed = () => {
       <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-multiply" style={{ backgroundImage: "radial-gradient(rgba(245,158,11,0.15) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
 
       <main className="relative z-10 px-4 py-8 sm:py-12 flex justify-center min-h-screen h-full pb-24">
-        <motion.div 
+        <motion.div
           className="w-full max-w-md flex flex-col space-y-6"
           variants={staggerContainer}
           initial="hidden"
@@ -276,7 +513,11 @@ const RideConfirmed = () => {
             <LoadingSkeleton />
           ) : (
             <>
+              {ride && <RealMap pickup={ride.pickup} drop={ride.drop} onDistanceCalculated={setDistanceKm} />}
+
               {ride && <RideSummaryCard ride={ride} />}
+
+              {priceDetails && <FareDetailsCard details={priceDetails} />}
 
               <VehicleCard
                 type={vehicleType}

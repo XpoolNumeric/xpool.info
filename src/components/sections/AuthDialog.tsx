@@ -22,9 +22,148 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  MapPin,
+  Navigation,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProfileSummaryDialog from "./ProfileSummaryDialog";
+import {
+  APIProvider,
+  Map,
+  useMapsLibrary,
+  useMap,
+} from '@vis.gl/react-google-maps';
+
+/* -------------------- MAP COMPONENTS -------------------- */
+
+/**
+ * Renders the route on the map using Google Directions Service
+ */
+const Directions = ({ origin, destination }: { origin: string; destination: string }) => {
+  const map = useMap();
+  const routesLib = useMapsLibrary('routes');
+  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService>();
+  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer>();
+  const [routeIndex, setRouteIndex] = useState(0);
+
+  useEffect(() => {
+    if (!routesLib || !map) return;
+    setDirectionsService(new routesLib.DirectionsService());
+    setDirectionsRenderer(new routesLib.DirectionsRenderer({
+      map,
+      suppressMarkers: false,
+      polylineOptions: {
+        strokeColor: '#f59e0b',
+        strokeWeight: 5,
+        strokeOpacity: 0.8
+      }
+    }));
+  }, [routesLib, map]);
+
+  useEffect(() => {
+    if (!directionsService || !directionsRenderer) return;
+
+    directionsService.route({
+      origin: origin,
+      destination: destination,
+      travelMode: google.maps.TravelMode.DRIVING,
+      provideRouteAlternatives: true
+    }).then(response => {
+      directionsRenderer.setDirections(response);
+    });
+  }, [directionsService, directionsRenderer, origin, destination]);
+
+  return null;
+};
+
+const mapCustomStyle = [
+  {
+    "elementType": "geometry",
+    "stylers": [{ "color": "#f5f5f5" }]
+  },
+  {
+    "elementType": "labels.icon",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#616161" }]
+  },
+  {
+    "elementType": "labels.text.stroke",
+    "stylers": [{ "color": "#f5f5f5" }]
+  },
+  {
+    "featureType": "administrative.land_parcel",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#bdbdbd" }]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "geometry",
+    "stylers": [{ "color": "#eeeeee" }]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#757575" }]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "geometry",
+    "stylers": [{ "color": "#e5e5e5" }]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#9e9e9e" }]
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry",
+    "stylers": [{ "color": "#ffffff" }]
+  },
+  {
+    "featureType": "road.arterial",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#757575" }]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "geometry",
+    "stylers": [{ "color": "#dadada" }]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#616161" }]
+  },
+  {
+    "featureType": "road.local",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#9e9e9e" }]
+  },
+  {
+    "featureType": "transit.line",
+    "elementType": "geometry",
+    "stylers": [{ "color": "#e5e5e5" }]
+  },
+  {
+    "featureType": "transit.station",
+    "elementType": "geometry",
+    "stylers": [{ "color": "#eeeeee" }]
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry",
+    "stylers": [{ "color": "#c9c9c9" }]
+  },
+  {
+    "featureType": "water",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#9e9e9e" }]
+  }
+];
 
 // ---------- Constants ----------
 const PHONE_REGEX = /^[6-9]\d{9}$/;
@@ -722,6 +861,28 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleAuthPhone, setGoogleAuthPhone] = useState("");
+  const [rideData, setRideData] = useState<any>(null);
+
+  // ---------- Auto-Login Check ----------
+  useEffect(() => {
+    if (open) {
+      const storedProfile = localStorage.getItem("profile");
+      const savedRide = localStorage.getItem("rideSummary");
+
+      if (savedRide) {
+        setRideData(JSON.parse(savedRide));
+      }
+
+      if (storedProfile) {
+        const profile = JSON.parse(storedProfile);
+        if (profile.fullName && profile.email && profile.isLoggedIn) {
+          // Skip sign-in if already logged in and has profile data
+          onClose();
+          navigate("/vehicles");
+        }
+      }
+    }
+  }, [open, onClose, navigate]);
 
   // ---------- Phone OTP Verify → Profile ----------
   const handleVerify = useCallback(async () => {
@@ -736,9 +897,10 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
       window.dispatchEvent(new Event("storage"));
 
       onClose();
-      setShowProfileDialog(true);
+      // If we have ride data, we can go straight to vehicle selection
+      navigate("/vehicles");
     }
-  }, [verifyOtp, phone, onClose]);
+  }, [verifyOtp, phone, onClose, navigate]);
 
   // ---------- Google Auth → Fetch user info → Profile ----------
   const handleGoogleSuccess = useCallback(async (tokenResponse: any) => {
@@ -779,9 +941,10 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
       setGoogleAuthPhone(profile.phone || "");
 
       // Close auth dialog → open profile dialog
+      // Close auth dialog → go to vehicle selection
       setGoogleLoading(false);
       onClose();
-      setShowProfileDialog(true);
+      navigate("/vehicles");
     } catch (err: any) {
       console.error("Failed to fetch Google user info:", err);
       setError("Google sign-in failed. Please try again.");
@@ -811,107 +974,123 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
       <AuthStyles />
 
       <Dialog open={open} onOpenChange={handleCloseAuth}>
-        <DialogContent
-          className="auth-dialog-content sm:max-w-md p-0 overflow-hidden rounded-3xl shadow-2xl w-[calc(100%-2rem)] mx-auto border-0"
-          aria-describedby={step === "phone" ? "phone-desc" : "otp-desc"}
-        >
-          {/* Dot grid overlay */}
-          <div className="auth-dot-grid absolute inset-0 pointer-events-none rounded-3xl" aria-hidden="true" style={{ zIndex: 0 }} />
+        <DialogContent className="auth-dialog-content sm:max-w-[420px] p-0 overflow-hidden rounded-3xl border-0">
+          <div className="auth-dot-grid absolute inset-0 opacity-10 pointer-events-none rounded-3xl" />
 
-          <div className="relative" style={{ zIndex: 1 }}>
-            <TrustBar />
-            <StepBadge currentStep={step === "phone" ? 1 : 2} />
+          <TrustBar />
 
-            <div className="p-4 sm:p-6">
-              <DialogHeader className="space-y-2">
-                {/* Sparkle icon */}
-                <motion.div
-                  initial={{ opacity: 0, rotate: -30, scale: 0.5 }}
-                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex justify-center"
-                >
-                  <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/60 border border-amber-200/50 shadow-sm">
-                    <Sparkles className="h-6 w-6 text-amber-600" />
-                  </div>
-                </motion.div>
-
-                <DialogTitle
-                  className="text-center text-2xl font-extrabold text-gray-900"
-                  style={{ fontFamily: "'Inter', sans-serif" }}
-                >
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={step}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.25 }}
-                    >
-                      {step === "phone" ? "Welcome to Xpool" : "Enter Verification Code"}
-                    </motion.span>
-                  </AnimatePresence>
-                </DialogTitle>
-
-                <p
-                  id={step === "phone" ? "phone-desc" : "otp-desc"}
-                  className="text-center text-sm text-gray-500"
-                  style={{ fontFamily: "'Inter', sans-serif" }}
-                >
-                  {step === "phone"
-                    ? "Sign in to book rides, track drivers & earn rewards"
-                    : `We've sent a 6-digit code to +91 ${phone}`}
-                </p>
-              </DialogHeader>
-
+          <div className="p-6 md:p-8 space-y-6 relative z-10">
+            {/* Visual Header / Map */}
+            <div className="relative h-48 rounded-2xl overflow-hidden bg-amber-50/50 border border-amber-500/10 shadow-inner group">
               <AnimatePresence mode="wait">
-                {step === "phone" ? (
-                  <motion.div key="phone" {...fadeSlide}>
-                    <PhoneStep
-                      phone={phone}
-                      setPhone={setPhone}
-                      isValidPhone={isValidPhone}
-                      loading={loading}
-                      onSendOtp={sendOtp}
-                      error={error}
-                    />
+                {rideData?.pickup && rideData?.drop ? (
+                  <motion.div
+                    key="map"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0"
+                  >
+                    <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string}>
+                      <Map
+                        defaultCenter={{ lat: 13.0827, lng: 80.2707 }}
+                        defaultZoom={11}
+                        gestureHandling={'none'}
+                        disableDefaultUI={true}
+                        styles={mapCustomStyle}
+                      >
+                        <Directions origin={rideData.pickup} destination={rideData.drop} />
+                      </Map>
+                    </APIProvider>
+                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-white/90 to-transparent">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                          <MapPin className="h-3 w-3 text-amber-500" />
+                          <span className="truncate">{rideData.pickup}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-900">
+                          <Navigation className="h-3 w-3 text-orange-600" />
+                          <span className="truncate">{rideData.drop}</span>
+                        </div>
+                      </div>
+                    </div>
                   </motion.div>
                 ) : (
-                  <motion.div key="otp" {...fadeSlide}>
-                    <OtpStep
-                      phone={phone}
-                      otp={otp}
-                      setOtp={setOtp}
-                      loading={loading}
-                      onVerify={handleVerify}
-                      onBack={() => setStep("phone")}
-                      onResend={handleResend}
-                      resendTimer={resendTimer}
-                      error={error}
-                    />
+                  <motion.div
+                    key="placeholder"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center"
+                  >
+                    <div className="h-16 w-16 bg-amber-100/50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Sparkles className="h-8 w-8 text-amber-500" />
+                    </div>
+                    <p className="text-sm font-bold text-gray-800">Your Journey Awaits</p>
+                    <p className="text-[10px] font-medium text-gray-500 mt-1 uppercase tracking-widest">Connect to continue</p>
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              <div id="recaptcha-container" className="my-2 flex justify-center"></div>
-
-              <SocialLogin
-                onGoogleSuccess={handleGoogleSuccess}
-                googleLoading={googleLoading}
-              />
-
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { delay: 0.3 } }}
-                className="mt-5 text-[11px] text-center text-gray-400 px-2 leading-relaxed"
-                style={{ fontFamily: "'Inter', sans-serif" }}
-              >
-                By continuing, you agree to our{" "}
-                <span className="auth-policy-link cursor-pointer">Terms of Service</span>{" "}
-                &{" "}
-                <span className="auth-policy-link cursor-pointer">Privacy Policy</span>
-              </motion.p>
             </div>
+
+            <DialogHeader className="space-y-3">
+              <div className="space-y-1">
+                <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
+                  {step === "phone" ? "Welcome to Xpool" : "Verify Number"}
+                </DialogTitle>
+                <p className="text-sm font-medium text-gray-500 leading-relaxed">
+                  {step === "phone"
+                    ? "Verify your account to enjoy seamless rides across India."
+                    : `Enter the OTP sent to +91 ${phone} to proceed.`}
+                </p>
+              </div>
+            </DialogHeader>
+
+            <AnimatePresence mode="wait">
+              {step === "phone" ? (
+                <motion.div key="phone" {...fadeSlide}>
+                  <PhoneStep
+                    phone={phone}
+                    setPhone={setPhone}
+                    isValidPhone={isValidPhone}
+                    loading={loading}
+                    onSendOtp={sendOtp}
+                    error={error}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div key="otp" {...fadeSlide}>
+                  <OtpStep
+                    phone={phone}
+                    otp={otp}
+                    setOtp={setOtp}
+                    loading={loading}
+                    onVerify={handleVerify}
+                    onBack={() => setStep("phone")}
+                    onResend={handleResend}
+                    resendTimer={resendTimer}
+                    error={error}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div id="recaptcha-container" className="my-2 flex justify-center"></div>
+
+            <SocialLogin
+              onGoogleSuccess={handleGoogleSuccess}
+              googleLoading={googleLoading}
+            />
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: { delay: 0.3 } }}
+              className="mt-2 text-[11px] text-center text-gray-400 px-2 leading-relaxed"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              By continuing, you agree to our{" "}
+              <span className="auth-policy-link cursor-pointer">Terms</span>{" "}
+              &{" "}
+              <span className="auth-policy-link cursor-pointer">Privacy</span>
+            </motion.p>
           </div>
         </DialogContent>
       </Dialog>

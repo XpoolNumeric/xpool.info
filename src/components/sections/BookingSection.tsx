@@ -438,16 +438,29 @@ const BookingSection = () => {
 
   const handleBook = useCallback(() => {
     setLoading(true);
+
+    // Save ride details safely to localStorage
+    const rideDetails = {
+      pickup: pickupLocation,
+      drop: dropLocation,
+      rideType,
+      date: pickupDate,
+      time: pickupTime,
+      timestamp: new Date().toISOString()
+    };
+    
+    localStorage.setItem("rideSummary", JSON.stringify(rideDetails));
+
     setTimeout(() => {
       setLoading(false);
-      
+
       let isLoggedAndComplete = false;
       try {
         const profileStr = localStorage.getItem("profile");
         if (profileStr) {
           const profile = JSON.parse(profileStr);
           if (profile.fullName && profile.email && profile.city && profile.dob) {
-            isLoggedAndComplete = true; 
+            isLoggedAndComplete = true;
           }
         }
       } catch (e) {
@@ -460,7 +473,7 @@ const BookingSection = () => {
         setShowAuthDialog(true);
       }
     }, 700);
-  }, [navigate]);
+  }, [navigate, pickupLocation, dropLocation, rideType, pickupDate, pickupTime]);
 
   const styleElement = useMemo(() => <style>{bookingStyles}</style>, []);
 

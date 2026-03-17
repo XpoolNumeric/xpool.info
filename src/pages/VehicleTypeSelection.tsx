@@ -28,7 +28,7 @@ const vehicles: Vehicle[] = [
     id: "bike",
     name: "Bike",
     desc: "Fastest & cheapest",
-    price: "₹10–15 / km",
+    price: "₹35 base + ₹13/km",
     eta: "2–4 min",
     icon: Bike,
   },
@@ -36,7 +36,7 @@ const vehicles: Vehicle[] = [
     id: "auto",
     name: "Auto",
     desc: "Affordable everyday rides",
-    price: "₹15–20 / km",
+    price: "₹12–15 / km",
     eta: "3–5 min",
     icon: CarTaxiFront,
   },
@@ -44,7 +44,7 @@ const vehicles: Vehicle[] = [
     id: "car",
     name: "Car",
     desc: "Comfort & AC rides",
-    price: "₹20–30 / km",
+    price: "₹50 base + ₹18/km",
     eta: "4–6 min",
     icon: Car,
   },
@@ -81,12 +81,21 @@ const VehicleTypeSelection = () => {
   useEffect(() => {
     setIsRendered(true);
     const saved = localStorage.getItem("vehicleType");
-    if (saved) setSelected(saved as VehicleId);
+    if (saved) {
+      try {
+        setSelected(JSON.parse(saved) as VehicleId);
+      } catch (e) {
+        // Fallback for previous unparsed saves
+        if (["bike", "auto", "car", "xl"].includes(saved)) {
+           setSelected(saved as VehicleId);
+        }
+      }
+    }
   }, []);
 
   const handleContinue = () => {
     if (!selected) return;
-    localStorage.setItem("vehicleType", selected);
+    localStorage.setItem("vehicleType", JSON.stringify(selected));
     navigate("/searching");
   };
 

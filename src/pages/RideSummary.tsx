@@ -7,12 +7,12 @@ import {
   Phone,
   Star,
   MapPin,
-  ArrowDown,
   Clock,
   CheckCircle2,
   Navigation,
-  CreditCard,
   Receipt,
+  CarTaxiFront,
+  Truck,
 } from "lucide-react";
 
 /* ---------------- TYPES ---------------- */
@@ -26,16 +26,53 @@ interface RideSummaryData {
 /* ---------------- CONFIG ---------------- */
 const VEHICLE_ICONS: Record<VehicleKey, React.ElementType> = {
   bike: Bike,
-  auto: Car,
+  auto: CarTaxiFront,
   car: Car,
-  xl: Car,
+  xl: Truck,
 };
 
-const FARE_BY_VEHICLE: Record<VehicleKey, number> = {
-  bike: 10,
-  auto: 15,
-  car: 20,
-  xl: 30,
+interface PricingTier {
+  maxKm: number;
+  name: string;
+  rate: number;
+  baseFare?: number;
+}
+
+const PRICING_CONFIG: Record<VehicleKey, PricingTier[]> = {
+  car: [
+    { maxKm: 10, name: "Short Trip", rate: 18, baseFare: 50 },
+    { maxKm: 50, name: "Suburban", rate: 15, baseFare: 80 },
+    { maxKm: 100, name: "Nearby Cities", rate: 14, baseFare: 120 },
+    { maxKm: Infinity, name: "Interstate", rate: 10, baseFare: 500 },
+  ],
+  bike: [
+    { maxKm: 10, name: "Quick Bike", rate: 13, baseFare: 35 },
+    { maxKm: 50, name: "Urban Bike", rate: 11, baseFare: 55 },
+    { maxKm: 100, name: "City Connect", rate: 10, baseFare: 70 },
+    { maxKm: 150, name: "Long Ride", rate: 9, baseFare: 100 },
+    { maxKm: Infinity, name: "Inter-City", rate: 8, baseFare: 120 },
+  ],
+  auto: [
+    { maxKm: 15, name: "Local Auto", rate: 12, baseFare: 25 },
+    { maxKm: Infinity, name: "Regular", rate: 10, baseFare: 40 },
+  ],
+  xl: [
+    { maxKm: 20, name: "City XL", rate: 25, baseFare: 100 },
+    { maxKm: Infinity, name: "Long XL", rate: 22, baseFare: 150 },
+  ],
+};
+
+const calculateFare = (vehicleType: VehicleKey, km: number) => {
+  const config = PRICING_CONFIG[vehicleType] || PRICING_CONFIG.car;
+  const tier = config.find(t => km <= t.maxKm) || config[config.length - 1];
+  const base = tier.baseFare || 0;
+  return {
+    total: Math.round(base + (km * tier.rate)),
+    rate: tier.rate,
+    tierName: tier.name,
+    baseFare: base,
+    distanceFare: Math.round(km * tier.rate)
+  };
 };
 
 /* ---------------- ANIMATION VARIANTS ---------------- */
@@ -63,9 +100,17 @@ const RideSummary = () => {
   /* ---------------- LOAD DATA SAFELY ---------------- */
   useEffect(() => {
     try {
-      const savedVehicle = localStorage.getItem("vehicleType") as VehicleKey | null;
-      if (savedVehicle && savedVehicle in VEHICLE_ICONS) {
-        setVehicleType(savedVehicle);
+      const savedVehicleRaw = localStorage.getItem("vehicleType");
+      if (savedVehicleRaw) {
+        let savedVehicle: VehicleKey;
+        try {
+          savedVehicle = JSON.parse(savedVehicleRaw) as VehicleKey;
+        } catch (e) {
+          savedVehicle = savedVehicleRaw as VehicleKey;
+        }
+        if (savedVehicle in VEHICLE_ICONS) {
+          setVehicleType(savedVehicle);
+        }
       }
 
       const savedRide = localStorage.getItem("rideSummary");
@@ -99,15 +144,15 @@ const RideSummary = () => {
 
   /* ---------------- FARE CALC ---------------- */
   const fare = useMemo(() => {
-    const base = 40;
-    const distanceKm = 6;
-    const distanceFare = distanceKm * FARE_BY_VEHICLE[vehicleType];
+    const distanceKm = 8.4; // Simulated distance for summary
+    const { total, rate, baseFare, distanceFare } = calculateFare(vehicleType, distanceKm);
     const platformFee = 10;
     return {
-      base,
-      distanceFare,
+      base: baseFare,
+      distanceFare: distanceFare,
       platformFee,
-      total: base + distanceFare + platformFee,
+      total: total + platformFee,
+      km: distanceKm
     };
   }, [vehicleType]);
 
