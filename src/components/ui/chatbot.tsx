@@ -1422,23 +1422,33 @@ export default function Chatbot() {
 
         /* ── Responsive ── */
         @media (max-height: 700px) { 
-          .chat-panel { max-height: calc(100dvh - 110px); bottom: 90px; } 
+          .chat-panel { max-height: calc(100dvh - 120px); bottom: 100px; } 
         }
         @media (max-width: 480px) {
           .chat-panel { 
             position: fixed;
-            width: calc(100vw - 24px); 
-            left: 12px;
-            right: 12px; 
-            bottom: 84px; 
-            height: calc(100dvh - 96px); 
-            max-height: 800px; 
-            border-radius: 20px;
+            width: calc(100vw - 20px); 
+            left: 10px;
+            right: 10px; 
+            bottom: 110px; 
+            height: calc(100dvh - 130px); 
+            max-height: 750px; 
+            border-radius: 24px;
             margin: 0;
+            z-index: 10000;
           }
-          .chat-trigger { right: 16px; bottom: 16px; width: 56px; height: 56px; }
-          .chat-trigger.chat-open { width: 52px !important; padding: 0 !important; height: 52px !important; bottom: 16px; right: 16px; }
+          .chat-trigger { right: 20px; bottom: 20px; width: 64px; height: 64px; }
+          .chat-trigger.chat-open { 
+            width: 56px !important; 
+            height: 56px !important; 
+            bottom: 24px; 
+            right: 24px; 
+            padding: 0 !important;
+            opacity: 0.9;
+          }
           .chat-trigger.expanded { width: 240px; }
+          .messages-container { padding: 14px 12px; }
+          .footer { padding: 8px 10px 10px; }
         }
 
         /* ── Keyframes ── */
