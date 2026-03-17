@@ -400,7 +400,7 @@ const GoogleLoginButton = ({ onSuccess, icon, label }: { onSuccess: (tokenRespon
 
 const SocialLogin = ({ onGoogleSuccess }: { onGoogleSuccess: (tokenResponse: any) => void }) => {
   return (
-    <GoogleOAuthProvider clientId="206250659332-uhhro34nbj9jqr15k578ujut5qvlu1sj.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId="933710679999-idbqpvaq2a9e0mbi0qc6vuu4nifjej96.apps.googleusercontent.com">
       <Separator className="my-6" />
       <div className="space-y-3">
         <GoogleLoginButton onSuccess={onGoogleSuccess} icon={<GoogleIcon />} label="Continue with Google" />
