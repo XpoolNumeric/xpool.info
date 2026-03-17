@@ -806,23 +806,7 @@ const MessageBubble = ({
   );
 };
 
-// Contact info quick bar
-const ContactBar = () => (
-  <div className="contact-bar">
-    <a href="tel:+917904790007" className="contact-pill" title="Call us">
-      <Phone size={11} />
-      <span>+91 7904790007</span>
-    </a>
-    <a href="mailto:xpool.help@gmail.com" className="contact-pill" title="Email us">
-      <Mail size={12} />
-      <span>xpool.help@gmail.com</span>
-    </a>
-    <span className="contact-pill location" title="Our base">
-      <MapPin size={11} />
-      <span>Chennai, India</span>
-    </span>
-  </div>
-);
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
@@ -851,7 +835,6 @@ export default function Chatbot() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [showGreeting, setShowGreeting] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [showContactBar, setShowContactBar] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   const recognitionRef = useRef<any>(null);
@@ -1550,15 +1533,6 @@ export default function Chatbot() {
                     </div>
                   )}
                 </div>
-                <motion.button
-                  className="icon-btn"
-                  onClick={() => setShowContactBar(v => !v)}
-                  title="Contact info"
-                  whileTap={{ scale: 0.9 }}
-                  aria-label="Show contact info"
-                >
-                  <Phone size={15} />
-                </motion.button>
                 {messages.length > 0 && (
                   <motion.button
                     className="icon-btn"
@@ -1582,19 +1556,7 @@ export default function Chatbot() {
               </div>
             </div>
 
-            {/* Contact bar (toggled) */}
-            <AnimatePresence>
-              {showContactBar && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ContactBar />
-                </motion.div>
-              )}
-            </AnimatePresence>
+
 
             {/* Quick replies */}
             {showQuickReplies && (
