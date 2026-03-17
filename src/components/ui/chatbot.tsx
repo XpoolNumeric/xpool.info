@@ -42,7 +42,127 @@ interface Message {
   copied?: boolean;
 }
 
-// ─── Language Config ───────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Language Auto-Detection Engine
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DetectedLanguage {
+  code: string;
+  label: string;
+  isCodeSwitch: boolean;
+  script: "latin" | "devanagari" | "tamil" | "telugu" | "arabic" | "japanese" | "mixed";
+  romanized: boolean; // e.g. Tanglish, Hinglish
+  confidence: number;
+}
+
+// Romanized Indian language word lists for detection
+const TANGLISH_MARKERS = [
+  "enna", "yenna", "naan", "nee", "avan", "aval", "avanga", "inga", "anga", "enga", "yeppo",
+  "eppo", "eppadi", "sollu", "solla", "vandhuttaen", "vandhutten", "po", "va", "da", "di",
+  "macha", "machan", "dei", "bro", "akka", "anna", "amma", "appa", "paaru", "paarunga",
+  "teriyuma", "teriyathu", "theriyum", "illai", "illa", "ille", "oru", "rendu", "moonu",
+  "naalu", "aachu", "aachi", "seri", "sari", "konjam", "romba", "super", "nalla", "kashtam",
+  "mudiyala", "mudiyathu", "panna", "pannu", "saapdrom", "saapdurom", "vanga", "vaa", "poo",
+  "pogrom", "pogalam", "solren", "sollaen", "sollaen", "vendam", "vendum", "thambi",
+  "paavam", "azhaga", "azhagana", "irukkanga", "irukkan", "iruken", "paatha", "paaatha",
+  "kelvi", "kekkalam", "kekkanom", "purinju", "purinjutu", "puriyala", "puriyathu",
+  "ungalukku", "ungaluku", "enakku", "enaku", "avankitta", "avangkitta", "kitta",
+  "kodunga", "kudunga", "edhu", "yedhu", "enthan", "endhan", "nammaku", "namakku",
+  "theriuma", "theriyuma", "paapom", "paarpom", "varom", "vaango", "vaanga",
+];
+
+const HINGLISH_MARKERS = [
+  "kya", "hai", "hain", "nahi", "nahin", "karo", "karna", "kar", "tha", "thi", "the",
+  "mujhe", "mujhe", "tumhe", "usse", "isse", "yaar", "bhai", "dost", "acha", "accha",
+  "theek", "thik", "sahi", "galat", "samjha", "samjhi", "batao", "bolo", "suno", "dekho",
+  "lelo", "dedo", "jaao", "aao", "ruko", "chalo", "hoga", "hogi", "hua", "hui", "wala",
+  "wali", "wale", "bohot", "bahut", "thoda", "zyada", "abhi", "pehle", "baad", "phir",
+  "kyunki", "isliye", "lekin", "magar", "aur", "ya", "agar", "toh", "to", "matlab",
+  "paise", "rupees", "kab", "kaha", "kaisa", "kaisi", "kitna", "kitni", "kaun", "koi",
+  "sab", "sabko", "apna", "apni", "apne", "mera", "meri", "mere", "tera", "teri", "tere",
+  "unka", "unki", "unke", "inhe", "inko", "yahan", "wahan", "idhar", "udhar",
+];
+
+const TENGLISH_MARKERS = [
+  "enti", "enthi", "emundi", "emavutundi", "cheppandi", "cheppave", "chusthanu", "chusa",
+  "vachadu", "vacchaadu", "velthanu", "velthaanu", "baagundi", "baaguntundi", "nenu",
+  "meeru", "mee", "naa", "naaku", "meeku", "vadiki", "aame", "vaallaki", "anni", "chala",
+  "chaalavunna", "ekkuva", "takkuva", "ayindi", "avutundi", "cheyyandi", "cheyyi",
+  "adugandi", "adugu", "thelusaa", "telusa", "thelusu", "ardham", "ardhamaindi",
+  "samajhavara", "okka", "rendu", "moodu", "naalu", "istapaduthaanu", "ishtapaduthaanu",
+  "bro", "anna", "akka", "mama", "maama", "manchi", "cheddhu", "pedda", "chinna",
+];
+
+const ARABIC_MARKERS = /[\u0600-\u06FF]/;
+const DEVANAGARI_MARKERS = /[\u0900-\u097F]/;
+const TAMIL_SCRIPT_MARKERS = /[\u0B80-\u0BFF]/;
+const TELUGU_SCRIPT_MARKERS = /[\u0C00-\u0C7F]/;
+const JAPANESE_MARKERS = /[\u3040-\u30FF\u4E00-\u9FFF]/;
+
+function detectLanguage(text: string): DetectedLanguage {
+  const lower = text.toLowerCase().trim();
+  const words = lower.split(/\s+/);
+  const totalWords = words.length;
+
+  // Script-based detection (highest confidence)
+  if (ARABIC_MARKERS.test(text)) {
+    return { code: "ar", label: "Arabic", isCodeSwitch: false, script: "arabic", romanized: false, confidence: 0.99 };
+  }
+  if (JAPANESE_MARKERS.test(text)) {
+    return { code: "ja", label: "Japanese", isCodeSwitch: false, script: "japanese", romanized: false, confidence: 0.99 };
+  }
+  if (TAMIL_SCRIPT_MARKERS.test(text)) {
+    return { code: "ta", label: "Tamil", isCodeSwitch: false, script: "tamil", romanized: false, confidence: 0.99 };
+  }
+  if (TELUGU_SCRIPT_MARKERS.test(text)) {
+    return { code: "te", label: "Telugu", isCodeSwitch: false, script: "telugu", romanized: false, confidence: 0.99 };
+  }
+  if (DEVANAGARI_MARKERS.test(text)) {
+    return { code: "hi", label: "Hindi", isCodeSwitch: false, script: "devanagari", romanized: false, confidence: 0.99 };
+  }
+
+  // Romanized detection (Latin script)
+  const tanglishHits = words.filter(w => TANGLISH_MARKERS.includes(w)).length;
+  const hinglishHits = words.filter(w => HINGLISH_MARKERS.includes(w)).length;
+  const tenglishHits = words.filter(w => TENGLISH_MARKERS.includes(w)).length;
+
+  const tanglishScore = tanglishHits / Math.max(totalWords, 1);
+  const hinglishScore = hinglishHits / Math.max(totalWords, 1);
+  const tenglishScore = tenglishHits / Math.max(totalWords, 1);
+
+  const maxRomanized = Math.max(tanglishScore, hinglishScore, tenglishScore);
+
+  if (maxRomanized >= 0.08) {
+    if (tanglishScore >= hinglishScore && tanglishScore >= tenglishScore) {
+      return { code: "ta", label: "Tanglish", isCodeSwitch: true, script: "latin", romanized: true, confidence: Math.min(0.95, 0.4 + tanglishScore * 2) };
+    }
+    if (tenglishScore >= hinglishScore) {
+      return { code: "te", label: "Tenglish", isCodeSwitch: true, script: "latin", romanized: true, confidence: Math.min(0.95, 0.4 + tenglishScore * 2) };
+    }
+    return { code: "hi", label: "Hinglish", isCodeSwitch: true, script: "latin", romanized: true, confidence: Math.min(0.95, 0.4 + hinglishScore * 2) };
+  }
+
+  // French detection
+  const frenchWords = ["bonjour", "merci", "oui", "non", "comment", "pourquoi", "quand", "où", "votre", "notre", "pour", "avec", "dans", "sur", "vous", "nous", "ils", "elles", "une", "les", "des", "que", "qui", "est", "sont", "avoir", "être", "faire", "aller", "vouloir", "pouvoir", "savoir"];
+  const frenchHits = words.filter(w => frenchWords.includes(w)).length;
+  if (frenchHits / Math.max(totalWords, 1) > 0.12) {
+    return { code: "fr", label: "French", isCodeSwitch: false, script: "latin", romanized: false, confidence: 0.9 };
+  }
+
+  // Spanish detection
+  const spanishWords = ["hola", "gracias", "sí", "no", "cómo", "por", "qué", "cuándo", "dónde", "para", "con", "en", "sobre", "usted", "nosotros", "ellos", "ellas", "una", "los", "las", "del", "que", "quien", "está", "son", "tener", "ser", "hacer", "ir", "querer", "poder", "saber", "español", "buenos", "días", "tarde", "noche"];
+  const spanishHits = words.filter(w => spanishWords.includes(w)).length;
+  if (spanishHits / Math.max(totalWords, 1) > 0.12) {
+    return { code: "es", label: "Spanish", isCodeSwitch: false, script: "latin", romanized: false, confidence: 0.9 };
+  }
+
+  // Default to English
+  return { code: "en", label: "English", isCodeSwitch: false, script: "latin", romanized: false, confidence: 0.85 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Language Config
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface LangConfig {
   label: string;
@@ -133,12 +253,60 @@ const LANGUAGES: Record<string, LangConfig> = {
 const DEFAULT_LANG = "en";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Gemini API Call
+// Build dynamic language instruction from detection result
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildLanguageInstruction(detected: DetectedLanguage, manualLang: string): string {
+  // If user manually selected a language, always respect that
+  if (manualLang !== DEFAULT_LANG) {
+    return LANGUAGES[manualLang]?.promptInstruction || LANGUAGES["en"].promptInstruction;
+  }
+
+  if (detected.code === "ta" && detected.romanized) {
+    return `The user is typing in TANGLISH (Tamil words written in English/Roman script, mixed with English). You MUST reply in Tanglish — use Tamil words written in English letters naturally mixed with English. Example style: "Machan, Xpool la booking romba easy da! Appo app open panni, location set pannu, Captain match aagum — super fast! 🚀". Sound like a Chennai friend texting.`;
+  }
+  if (detected.code === "hi" && detected.romanized) {
+    return `The user is typing in HINGLISH (Hindi words written in Roman/English script, mixed with English). You MUST reply in Hinglish — use Hindi words in Roman script naturally mixed with English. Example style: "Yaar, Xpool pe booking bahut easy hai! App open karo, location set karo, Captain mil jaayega — super fast! 🚀". Sound like a desi friend texting.`;
+  }
+  if (detected.code === "te" && detected.romanized) {
+    return `The user is typing in TENGLISH (Telugu words written in English/Roman script, mixed with English). You MUST reply in Tenglish — use Telugu words in Roman script mixed with English naturally. Example style: "Bro, Xpool lo booking chala easy ga undi! App open cheyyi, location set cheyyi, Captain vasthadu — super fast! 🚀". Sound like a Hyderabadi friend texting.`;
+  }
+  if (detected.code === "ta") {
+    return LANGUAGES["ta"].promptInstruction;
+  }
+  if (detected.code === "hi") {
+    return LANGUAGES["hi"].promptInstruction;
+  }
+  if (detected.code === "te") {
+    return LANGUAGES["te"].promptInstruction;
+  }
+  if (detected.code === "fr") {
+    return LANGUAGES["fr"].promptInstruction;
+  }
+  if (detected.code === "es") {
+    return LANGUAGES["es"].promptInstruction;
+  }
+  if (detected.code === "ar") {
+    return LANGUAGES["ar"].promptInstruction;
+  }
+  if (detected.code === "ja") {
+    return LANGUAGES["ja"].promptInstruction;
+  }
+
+  return LANGUAGES["en"].promptInstruction;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gemini API Call — Ultra-trained system prompt
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-async function fetchGeminiReply(messages: Message[], languageInstruction: string): Promise<string> {
+async function fetchGeminiReply(
+  messages: Message[],
+  languageInstruction: string,
+  detectedLang: DetectedLanguage
+): Promise<string> {
   if (!GEMINI_API_KEY) {
     throw new Error("Missing VITE_GEMINI_API_KEY in .env.local file. Please add your Gemini API key.");
   }
@@ -155,23 +323,166 @@ async function fetchGeminiReply(messages: Message[], languageInstruction: string
     return acc;
   }, [] as { role: string; parts: { text: string }[] }[]);
 
-  const systemInstruction = `You are **Xpool** — India's coolest, friendliest, and smartest AI ride assistant! 🚀 You are warm, energetic, witty, and always helpful. You celebrate every question and make the user feel amazing. Use 1-2 friendly emojis per response.
+  const codeSwitch = detectedLang.isCodeSwitch
+    ? `\n🔁 CODE-SWITCHING ALERT: User is writing in ${detectedLang.label} (romanized mixed language). Mirror their style exactly — reply in the same mixed script style.`
+    : "";
 
-KEY LANGUAGE RULE: ${languageInstruction} Adapt your entire personality, tone, and vocabulary to that language naturally — don't just translate, THINK in that language!
+  const systemInstruction = `You are **Xpool** — India's coolest, friendliest, smartest, and most helpful AI ride assistant! 🚀 You are warm, energetic, witty, deeply knowledgeable about Xpool, and always make the user feel amazing. Use 1-2 relevant emojis per response.
 
-XPOOL FACTS:
-- India's #1 ride-pooling & bike taxi app — 30+ cities, Chennai HQ.
-- **50K+ happy riders**, **12K+ KYC-verified Captains**, **4.8★ rating**, **99% safety score**, avg pickup in just **5 minutes**!
-- Fares up to **50% cheaper** than cabs & autos. App launching on Android & iOS in ~14 days!
-- Book → Match with a Captain (see photo, bike no., live location) → Safe verified ride → Pay via UPI/Card/Cash/Wallet → Rate & repeat.
-- Features: Quick Booking, Real-Time GPS, Secure In-App Chat/Call, OTP Verification, Transparent Fares, SOS Button, Referral Rewards.
-- 24/7 Support: **+91 7904790007** | **xpool.help@gmail.com** — avg response under 2 minutes!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 LANGUAGE & STYLE RULE (HIGHEST PRIORITY):
+${languageInstruction}${codeSwitch}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-RESPONSE RULES:
-- **1-3 sentences MAX** — short, punchy, memorable. No bullet points or lists.
-- Use **bold** for key words. Sound like a cool, knowledgeable friend — NOT a corporate bot.
-- Always share phone/email when users ask about support or contact.
-- Be catchy, upbeat, empathetic, and always end on a positive note!`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏍️ XPOOL — COMPLETE KNOWLEDGE BASE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 COMPANY OVERVIEW:
+- India's #1 ride-pooling & bike taxi platform, headquartered in Chennai, Tamil Nadu
+- Operating in 30+ cities across India with rapid expansion plans
+- Mission: Make daily commutes affordable, safe, and eco-friendly for every Indian
+- Founded by passionate mobility enthusiasts who want to solve urban transport chaos
+
+📊 KEY STATS (memorize these!):
+- 50,000+ happy riders and growing daily
+- 12,000+ KYC-verified Captains (drivers) onboarded
+- 4.8★ average user rating (out of 5)
+- 99% safety score — industry-leading
+- Average pickup time: just 5 minutes
+- Fares up to 50% cheaper than cabs and autos
+- App launching on Android & iOS in approximately 14 days
+
+🚀 HOW XPOOL WORKS — STEP BY STEP:
+1. Download the Xpool app (Android/iOS — launching soon!)
+2. Enter your pickup & drop location
+3. Browse available Captains nearby on real-time map
+4. Book instantly — see Captain's photo, name, bike number, live location
+5. OTP-verified pickup for maximum security
+6. Enjoy a safe, verified ride with in-app tracking
+7. Pay via UPI / Debit Card / Credit Card / Cash / Wallet
+8. Rate your Captain and earn reward points
+9. Refer friends → earn Xpool credits on every referral!
+
+🛡️ SAFETY FEATURES (detail every one if asked):
+- All Captains undergo strict KYC (Know Your Customer) verification
+- Government ID verification (Aadhaar, PAN, DL)
+- Background check on criminal records
+- Bike and vehicle document verification (RC, insurance, fitness certificate)
+- Real-time GPS tracking shared with user and emergency contacts
+- SOS Emergency Button — one tap alerts police + emergency contacts with live location
+- Secure in-app calling & chatting (phone numbers hidden for privacy)
+- OTP-based pickup confirmation — Captain cannot mark ride started without user OTP
+- Ride sharing with trusted contacts (live trip sharing via link)
+- 24/7 safety monitoring team
+- Panic button triggers instant response protocol
+- Women safety mode: option to prefer women Captains where available
+- Ride recording (audio) available for disputed cases
+- Insurance coverage for every ride
+
+💰 PRICING & ECONOMICS:
+- Base fare: transparent, no surge pricing during normal hours
+- Up to 50% cheaper than OLA/UBER/local autos
+- Pool rides save even more — split costs with co-riders
+- Dynamic pricing only during extreme peak/rain — always shown upfront
+- No hidden charges, no cancellation fee for first cancellation
+- Wallet top-up bonuses: add ₹500 get ₹50 extra, add ₹1000 get ₹120 extra
+- Referral code: share with friends, earn ₹50 per successful signup
+- Frequent rider discounts available after 10 rides/month
+- Corporate plans available for offices (bulk booking, GST invoice)
+- Student discount: 15% off with valid college ID verification
+
+📱 APP FEATURES (comprehensive list):
+- Smart route optimization (shortest + least traffic route)
+- Scheduled rides: book up to 7 days in advance
+- Favorite locations: save Home, Work, Gym with one tap
+- Ride history with detailed receipts (GST-compatible)
+- In-app support chat (response < 2 minutes)
+- Captain rating system: 5-star with detailed review categories
+- Night mode & accessibility features
+- Battery-efficient tracking
+- Offline booking confirmation SMS backup
+- Multi-language UI: English, Tamil, Hindi, Telugu, Kannada, Malayalam
+
+🏍️ BECOMING A CAPTAIN (driver) — COMPLETE GUIDE:
+Requirements:
+  • Valid Driving License (2-wheeler)
+  • Aadhaar Card + PAN Card
+  • Bike RC (Registration Certificate)
+  • Bike Insurance (valid)
+  • Pollution Certificate (PUC)
+  • Smartphone with Android 8+ or iOS 12+
+  • Minimum age: 18 years
+  • Bike: max 10 years old, good condition
+
+Process:
+  1. Download Xpool Captain App (coming soon to Play Store)
+  2. Fill registration form with documents
+  3. KYC verification (usually 24-48 hours)
+  4. Attend 1-hour onboarding session (online or offline)
+  5. Activate account and start earning immediately!
+
+Earnings:
+  • Earn ₹15,000–₹35,000/month working full-time
+  • Part-time: ₹5,000–₹12,000/month
+  • Weekly payout directly to bank account
+  • Performance bonuses for 4.8★+ rating
+  • Fuel incentive bonus for completing 5+ rides/day
+  • Referral bonus for bringing new Captains
+
+🌆 CITIES (30+):
+Chennai (HQ), Mumbai, Delhi, Bangalore, Hyderabad, Pune, Kolkata, Ahmedabad, Jaipur, Lucknow, Chandigarh, Coimbatore, Madurai, Trichy, Salem, Vellore, Tiruppur, Erode, Kochi, Thiruvananthapuram, Visakhapatnam, Vijayawada, Guntur, Nellore, Warangal, Nashik, Nagpur, Surat, Vadodara, Indore, Bhopal + more expanding every month!
+
+📞 CONTACT & SUPPORT:
+- Phone: **+91 7904790007** (24/7, response < 2 mins)
+- Email: **xpool.help@gmail.com** (response < 30 mins)
+- In-app chat: fastest channel, < 2 minute response
+- Headquarters: Chennai, Tamil Nadu, India
+- Social: @xpoolofficial on Instagram, Twitter, Facebook
+
+❓ COMMON QUESTIONS & BEST ANSWERS:
+
+Q: When is the app launching?
+A: Xpool app launches on both Android & iOS in approximately 14 days! Stay tuned — it's going to be epic 🚀
+
+Q: Is it safe to ride with Xpool?
+A: Absolutely! Every Captain is KYC-verified with ID check, background verification, and your ride is tracked live. Plus you have an SOS button, OTP pickup, and 24/7 support. 99% safety score! 🛡️
+
+Q: How much cheaper is Xpool vs Ola/Uber?
+A: Up to 50% cheaper! A ₹150 Ola ride could be just ₹75 on Xpool. Pooling saves even more — sometimes 60-70% off!
+
+Q: I want to be a Captain / driver. How?
+A: You need a valid DL, bike RC+insurance, Aadhaar & PAN. Register on Xpool Captain app, get verified in 24-48 hours, and start earning ₹15k-₹35k/month! 🏍️
+
+Q: What payment methods does Xpool accept?
+A: UPI (PhonePe, GPay, Paytm), Debit/Credit cards, Cash, and Xpool Wallet. Super flexible!
+
+Q: What happens if my Captain doesn't arrive?
+A: You can cancel for free and instantly rebook. Our support team at +91 7904790007 is there 24/7 if needed.
+
+Q: Does Xpool have a referral program?
+A: Yes! Share your referral code, earn ₹50 for every friend who completes their first ride. No limit on referrals! 🎁
+
+Q: I have a complaint about a Captain.
+A: Report immediately via in-app support or call +91 7904790007. Every complaint is investigated within 2 hours and Captain may be suspended pending review.
+
+Q: Are rides available at night?
+A: Yes! Xpool operates 24/7. Night rides (10 PM - 6 AM) have slightly higher fares but full safety features enabled.
+
+Q: Can I pre-book a ride?
+A: Yes! Schedule rides up to 7 days in advance. Perfect for airport trips, early morning commutes, and important appointments.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 RESPONSE RULES (non-negotiable):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. **1-3 sentences MAX** — short, punchy, memorable. No bullet lists unless explicitly asked.
+2. Use **bold** for key numbers, names, contact info.
+3. Sound like a cool, knowledgeable FRIEND — never corporate, never robotic.
+4. Always share phone (+91 7904790007) and email (xpool.help@gmail.com) when support/contact is asked.
+5. Be catchy, upbeat, empathetic, enthusiastic — end on a positive note.
+6. Never make up information. If unsure, direct to support contact.
+7. Never compare negatively to competitors. Simply highlight Xpool's strengths.
+8. If the question has no clear answer in the knowledge base, guide them to contact support warmly.`;
 
   const payload = {
     systemInstruction: {
@@ -181,7 +492,7 @@ RESPONSE RULES:
     contents: formattedMessages,
     generationConfig: {
       temperature: 0.75,
-      maxOutputTokens: 400,
+      maxOutputTokens: 450,
     },
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -208,7 +519,7 @@ RESPONSE RULES:
     let replyText = data.candidates[0].content.parts[0].text;
 
     // Strip any residual markdown formatting EXCEPT bolding (**)
-    replyText = replyText.replace(/\*(?!\*)(.*?)\*(?!\*)/g, "$1"); // Strip single asterisks but NOT double
+    replyText = replyText.replace(/\*(?!\*)(.*?)\*(?!\*)/g, "$1");
     replyText = replyText.replace(/__(.*?)__/g, "$1");
     replyText = replyText.replace(/^[\*\-]\s+/gm, "");
     replyText = replyText.replace(/#{1,6}\s+/g, "");
@@ -221,13 +532,14 @@ RESPONSE RULES:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Custom Hook: useChat
+// Custom Hook: useChat — with auto language detection per message
 // ─────────────────────────────────────────────────────────────────────────────
 
-function useChat(languageInstruction: string) {
+function useChat(manualLang: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastDetected, setLastDetected] = useState<DetectedLanguage>({ code: "en", label: "English", isCodeSwitch: false, script: "latin", romanized: false, confidence: 0.85 });
 
   const messagesRef = useRef<Message[]>([]);
   useEffect(() => {
@@ -242,6 +554,11 @@ function useChat(languageInstruction: string) {
       if (retryId) {
         setMessages((prev) => prev.filter((m) => m.id !== retryId));
       }
+
+      // Auto-detect language from this message
+      const detected = detectLanguage(trimmed);
+      setLastDetected(detected);
+      const langInstruction = buildLanguageInstruction(detected, manualLang);
 
       const userMsg: Message = {
         id: crypto.randomUUID(),
@@ -260,7 +577,7 @@ function useChat(languageInstruction: string) {
           (m) => m.id !== userMsg.id && m.status !== "error"
         );
         const apiMessages: Message[] = [...previousMsgs, userMsg];
-        const reply = await fetchGeminiReply(apiMessages, languageInstruction);
+        const reply = await fetchGeminiReply(apiMessages, langInstruction, detected);
 
         setMessages((prev) =>
           prev.map((m) => (m.id === userMsg.id ? { ...m, status: "sent" } : m))
@@ -284,7 +601,7 @@ function useChat(languageInstruction: string) {
         setIsLoading(false);
       }
     },
-    [isLoading]
+    [isLoading, manualLang]
   );
 
   const clearMessages = useCallback(() => {
@@ -325,6 +642,7 @@ function useChat(languageInstruction: string) {
     messages,
     isLoading,
     error,
+    lastDetected,
     sendMessage,
     clearMessages,
     retryMessage,
@@ -334,7 +652,7 @@ function useChat(languageInstruction: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-components
+// Sub-components (UI unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ScrollToBottomButton = ({
@@ -377,7 +695,6 @@ const TypingIndicator = () => (
 
 const renderTextWithBold = (text: string) => {
   if (!text) return text;
-  // Split on **double star** first, then *single star* — both render as bold
   const parts = text.split(/(\*\*.*?\*\*|\*[^*]+\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
@@ -520,12 +837,13 @@ export default function Chatbot() {
     messages,
     isLoading,
     error,
+    lastDetected,
     sendMessage,
     clearMessages,
     retryMessage,
     setFeedback,
     setCopied,
-  } = useChat(langConfig.promptInstruction);
+  } = useChat(activeLang);
 
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -658,6 +976,9 @@ export default function Chatbot() {
   const showQuickReplies = messages.length > 0 && !isLoading;
   const handleLangSelect = (code: string) => { setActiveLang(code); setShowLangMenu(false); };
 
+  // Determine active lang config — if manual override or use detected
+  const displayLangConfig = langConfig;
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <>
@@ -693,6 +1014,18 @@ export default function Chatbot() {
         .lang-option:hover { background: rgba(245,158,11,0.08); color: #92400e; }
         .lang-option.active { background: rgba(245,158,11,0.12); color: #b45309; }
         .lang-flag { font-size: 1rem; }
+
+        /* ── Auto-detect badge ── */
+        .auto-detect-badge {
+          display: inline-flex; align-items: center; gap: 3px;
+          font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em;
+          background: linear-gradient(135deg, #10b981, #059669);
+          color: white; padding: 2px 7px; border-radius: 20px;
+          margin-left: 5px; box-shadow: 0 2px 6px rgba(16,185,129,0.35);
+          animation: badge-appear 0.3s cubic-bezier(0.34,1.56,0.64,1);
+          vertical-align: middle;
+        }
+        @keyframes badge-appear { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
         
         :root {
           --primary: #f59e0b;
@@ -1088,10 +1421,24 @@ export default function Chatbot() {
         }
 
         /* ── Responsive ── */
-        @media (max-height: 700px) { .chat-panel { max-height: calc(100vh - 104px); bottom: 84px; } }
+        @media (max-height: 700px) { 
+          .chat-panel { max-height: calc(100dvh - 110px); bottom: 90px; } 
+        }
         @media (max-width: 480px) {
-          .chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 100px; max-height: calc(100vh - 116px); }
-          .chat-trigger { right: 18px; bottom: 18px; }
+          .chat-panel { 
+            position: fixed;
+            width: calc(100vw - 24px); 
+            left: 12px;
+            right: 12px; 
+            bottom: 84px; 
+            height: calc(100dvh - 96px); 
+            max-height: 800px; 
+            border-radius: 20px;
+            margin: 0;
+          }
+          .chat-trigger { right: 16px; bottom: 16px; width: 56px; height: 56px; }
+          .chat-trigger.chat-open { width: 52px !important; padding: 0 !important; height: 52px !important; bottom: 16px; right: 16px; }
+          .chat-trigger.expanded { width: 240px; }
         }
 
         /* ── Keyframes ── */
@@ -1149,7 +1496,14 @@ export default function Chatbot() {
                 </div>
                 <div>
                   <div className="header-name">
-                    <span>X</span>pool <span className="ai-badge">AI</span>
+                    <span>X</span>pool
+                    <span className="ai-badge">AI</span>
+                    {/* Auto-detect indicator — shows when a romanized/code-switched language is detected */}
+                    {lastDetected.isCodeSwitch && messages.length > 0 && (
+                      <span className="auto-detect-badge" title={`Auto-detected: ${lastDetected.label}`}>
+                        🌐 {lastDetected.label}
+                      </span>
+                    )}
                   </div>
                   <div className="header-sub">
                     <span className="online-dot" />
@@ -1166,8 +1520,8 @@ export default function Chatbot() {
                     aria-label="Select language"
                     title="Change language"
                   >
-                    <span className="lang-flag">{langConfig.flag}</span>
-                    {langConfig.label}
+                    <span className="lang-flag">{displayLangConfig.flag}</span>
+                    {displayLangConfig.label}
                     <ChevronDown size={11} />
                   </button>
                   {showLangMenu && (
@@ -1235,7 +1589,7 @@ export default function Chatbot() {
             {/* Quick replies */}
             {showQuickReplies && (
               <div className="quick-replies">
-                {langConfig.quickReplies.map((r) => (
+                {displayLangConfig.quickReplies.map((r) => (
                   <button
                     key={r}
                     className="quick-reply-chip"
@@ -1256,13 +1610,13 @@ export default function Chatbot() {
                     <div className="empty-hero-ring" aria-hidden="true" />
                   </div>
                   <div className="empty-greeting">
-                    {langConfig.greeting.split("Xpool")[0]}<span>Xpool</span>{langConfig.greeting.split("Xpool")[1]}
+                    {displayLangConfig.greeting.split("Xpool")[0]}<span>Xpool</span>{displayLangConfig.greeting.split("Xpool")[1]}
                   </div>
                   <div className="empty-sub">
-                    {langConfig.sub}
+                    {displayLangConfig.sub}
                   </div>
                   <div className="suggestion-chips">
-                    {langConfig.suggestions.map((s) => (
+                    {displayLangConfig.suggestions.map((s) => (
                       <button key={s} className="chip" onClick={() => sendMessage(s)}>
                         {s}
                       </button>
@@ -1302,7 +1656,7 @@ export default function Chatbot() {
                 <input
                   ref={inputRef}
                   className="chat-input"
-                  placeholder={langConfig.placeholder}
+                  placeholder={displayLangConfig.placeholder}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
