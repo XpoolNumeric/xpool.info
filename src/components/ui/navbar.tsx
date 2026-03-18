@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Phone, Download, Menu, X, Sparkles, ChevronRight, LogOut, User } from "lucide-react";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
+import AuthDialog from "@/components/sections/AuthDialog";
 
 /* ─────────────────────────────────────────────────────────
    Design Tokens
@@ -467,6 +468,93 @@ const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void, f
 };
 
 /* ─────────────────────────────────────────────────────────
+   Sign Action Button
+───────────────────────────────────────────────────────── */
+const SignActionBtn = ({ 
+  profile, 
+  onOpenAuth, 
+  fullWidth = false 
+}: { 
+  profile: any, 
+  onOpenAuth: () => void, 
+  fullWidth?: boolean 
+}) => {
+  const [hovered, setHovered] = useState(false);
+
+  const handleClick = () => {
+    if (profile) {
+      // Logged in: auto scroll to booking section
+      const el = document.getElementById("booking-section");
+      if (el) {
+        const absoluteTop = el.getBoundingClientRect().top + window.pageYOffset;
+        window.scrollTo({ top: absoluteTop - 80, behavior: "smooth" });
+      }
+    } else {
+      // Not logged in: scroll to top and show auth dialog
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      onOpenAuth();
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        padding: "9px 22px",
+        borderRadius: 999,
+        fontFamily: "'DM Sans', sans-serif",
+        fontWeight: 800,
+        fontSize: "0.83rem",
+        letterSpacing: "0.02em",
+        color: T.white,
+        background: hovered
+          ? `linear-gradient(135deg, ${T.navyMid} 0%, ${T.navy} 100%)`
+          : `linear-gradient(135deg, ${T.navy} 0%, ${T.navyMid} 100%)`,
+        border: `1.5px solid ${hovered ? T.orange : "transparent"}`,
+        boxShadow: hovered ? `0 0 0 3px ${T.orangeGlow}` : "0 4px 12px rgba(10,15,28,0.15)",
+        cursor: "pointer",
+        transform: hovered ? "translateY(-2px) scale(1.02)" : "translateY(0) scale(1)",
+        transition: "all 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+        width: fullWidth ? "100%" : "auto",
+        whiteSpace: "nowrap" as const,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%)",
+          backgroundSize: "200% 100%",
+          backgroundPosition: hovered ? "100% 0" : "-100% 0",
+          transition: "background-position 0.55s ease",
+          borderRadius: 999,
+          pointerEvents: "none",
+        }}
+      />
+      {profile ? (
+        <>
+          <Sparkles style={{ width: 14, height: 14, color: T.orange, position: "relative" }} />
+          <span style={{ position: "relative" }}>Book Ride</span>
+        </>
+      ) : (
+        <>
+          <User style={{ width: 14, height: 14, color: T.orange, position: "relative" }} />
+          <span style={{ position: "relative" }}>Sign In</span>
+        </>
+      )}
+    </button>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────
    Main Navbar
 ───────────────────────────────────────────────────────── */
 const Navbar = () => {
@@ -475,6 +563,7 @@ const Navbar = () => {
   const [hideBar, setHideBar] = useState(false);
   const [mouseX, setMouseX] = useState(0.5);
   const [profile, setProfile] = useState<any>(null);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
   const lastScrollY = useRef(0);
   const location = useLocation();
 
@@ -594,12 +683,14 @@ const Navbar = () => {
             <div className="hidden md:flex" style={{ alignItems: "center", gap: 10 }}>
               {profile ? (
                 <>
+                  <SignActionBtn profile={profile} onOpenAuth={() => setShowAuthDialog(true)} />
                   <ProfileButton profile={profile} />
                   <LogoutButton onLogout={handleLogout} />
                 </>
               ) : (
                 <>
                   <SupportButton />
+                  <SignActionBtn profile={profile} onOpenAuth={() => setShowAuthDialog(true)} />
                   <DownloadButton />
                 </>
               )}
@@ -864,17 +955,21 @@ const Navbar = () => {
         >
           {profile ? (
             <>
+              <SignActionBtn profile={profile} onOpenAuth={() => { setIsOpen(false); setShowAuthDialog(true); }} fullWidth />
               <ProfileButton profile={profile} fullWidth />
               <LogoutButton onLogout={() => { handleLogout(); setIsOpen(false); }} fullWidth />
             </>
           ) : (
             <>
               <SupportButton fullWidth />
+              <SignActionBtn profile={profile} onOpenAuth={() => { setIsOpen(false); setShowAuthDialog(true); }} fullWidth />
               <DownloadButton fullWidth />
             </>
           )}
         </div>
       </div>
+
+      <AuthDialog open={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
 
       {/* ── Global Keyframes ── */}
       <style>{`
