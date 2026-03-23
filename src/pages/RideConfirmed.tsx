@@ -17,7 +17,10 @@ import {
   CheckCircle2,
   CarTaxiFront,
   Truck,
+  Users,
+  ChevronLeft,
 } from "lucide-react";
+import { calculateTieredFare } from "@/utils/fareCalculator";
 
 /* -------------------- TYPES -------------------- */
 const VEHICLE_TYPES = ["bike", "auto", "car", "xl"] as const;
@@ -26,6 +29,9 @@ type VehicleKey = (typeof VEHICLE_TYPES)[number];
 interface RideSummary {
   pickup: string;
   drop: string;
+  distanceKm?: number;
+  durationMin?: number;
+  passengers?: number;
 }
 
 interface DriverInfo {
@@ -43,52 +49,6 @@ const VEHICLE_ICONS: Record<VehicleKey, React.ElementType> = {
   auto: CarTaxiFront,
   car: Car,
   xl: Truck,
-};
-
-interface PricingTier {
-  maxKm: number;
-  name: string;
-  rate: number;
-  baseFare?: number;
-}
-
-const PRICING_CONFIG: Record<VehicleKey, PricingTier[]> = {
-  car: [
-    { maxKm: 10, name: "Short Trip", rate: 18, baseFare: 50 },
-    { maxKm: 50, name: "Suburban", rate: 15, baseFare: 80 },
-    { maxKm: 100, name: "Nearby Cities", rate: 14, baseFare: 120 },
-    { maxKm: 250, name: "Medium", rate: 13, baseFare: 150 },
-    { maxKm: 500, name: "Long", rate: 12, baseFare: 200 },
-    { maxKm: 1000, name: "Very Long", rate: 11, baseFare: 300 },
-    { maxKm: Infinity, name: "Interstate", rate: 10, baseFare: 500 },
-  ],
-  bike: [
-    { maxKm: 10, name: "Quick Bike", rate: 13, baseFare: 35 },
-    { maxKm: 50, name: "Urban Bike", rate: 11, baseFare: 55 },
-    { maxKm: 100, name: "City Connect", rate: 10, baseFare: 70 },
-    { maxKm: 150, name: "Long Ride", rate: 9, baseFare: 100 },
-    { maxKm: Infinity, name: "Inter-City", rate: 8, baseFare: 120 },
-  ],
-  auto: [
-    { maxKm: 15, name: "Local Auto", rate: 12, baseFare: 25 },
-    { maxKm: Infinity, name: "Regular", rate: 10, baseFare: 40 },
-  ],
-  xl: [
-    { maxKm: 20, name: "City XL", rate: 25, baseFare: 100 },
-    { maxKm: Infinity, name: "Long XL", rate: 22, baseFare: 150 },
-  ],
-};
-
-const calculateFare = (vehicleType: VehicleKey, km: number) => {
-  const config = PRICING_CONFIG[vehicleType] || PRICING_CONFIG.car;
-  const tier = config.find(t => km <= t.maxKm) || config[config.length - 1];
-  const base = tier.baseFare || 0;
-  return {
-    total: Math.round(base + (km * tier.rate)),
-    rate: tier.rate,
-    tierName: tier.name,
-    baseFare: base
-  };
 };
 
 const FALLBACK_DRIVER: DriverInfo = {
@@ -188,15 +148,15 @@ const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop:
 
   useEffect(() => {
     if (isLoaded && pickup && drop) {
-      const directionsService = new google.maps.DirectionsService();
+      const directionsService = new window.google.maps.DirectionsService();
       directionsService.route(
         {
           origin: pickup,
           destination: drop,
-          travelMode: google.maps.TravelMode.DRIVING,
+          travelMode: window.google.maps.TravelMode.DRIVING,
         },
         (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK && result) {
+          if (status === window.google.maps.DirectionsStatus.OK && result) {
             setDirections(result);
             const distanceMeters = result.routes[0]?.legs[0]?.distance?.value;
             if (distanceMeters) {
@@ -278,7 +238,7 @@ const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop:
           <MarkerF
             position={directions.routes[0].legs[0].start_location}
             icon={{
-              path: google.maps.SymbolPath.CIRCLE,
+              path: window.google.maps.SymbolPath.CIRCLE,
               scale: 8,
               fillColor: "#f59e0b",
               fillOpacity: 1,
@@ -291,7 +251,7 @@ const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop:
           <MarkerF
             position={directions.routes[0].legs[0].end_location}
             icon={{
-              path: google.maps.SymbolPath.CIRCLE,
+              path: window.google.maps.SymbolPath.CIRCLE,
               scale: 8,
               fillColor: "#ea580c",
               fillOpacity: 1,
@@ -304,7 +264,7 @@ const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop:
 
       <div className="absolute top-4 left-4 flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-gray-200/50 shadow-sm z-10">
         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        <span className="text-[10px] font-black text-gray-700 tracking-wider">REAL MAP PREVIEW</span>
+        <span className="text-[10px] font-black text-gray-700 tracking-wider">LIVE POOL MAP</span>
       </div>
     </motion.div>
   );
@@ -343,7 +303,7 @@ const VehicleCard = ({ type, vehicleNumber, eta }: { type: VehicleKey; vehicleNu
           <Icon className="h-7 w-7 text-white" strokeWidth={2.5} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-gray-900 text-lg capitalize truncate">{type} Ride</h3>
+          <h3 className="font-bold text-gray-900 text-lg capitalize truncate">{type} Pool</h3>
           <p className="text-xs font-black text-gray-500 uppercase tracking-widest truncate bg-gray-100 rounded px-1.5 py-0.5 w-max mt-1 border border-gray-200">{vehicleNumber}</p>
         </div>
         <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600/80 bg-amber-50 rounded-md px-2 py-1 border border-amber-100 shadow-sm whitespace-nowrap">
@@ -355,46 +315,65 @@ const VehicleCard = ({ type, vehicleNumber, eta }: { type: VehicleKey; vehicleNu
   );
 };
 
-const FareDetailsCard = ({ details }: { details: { tierName: string; baseRate: number; total: number; km: string; baseFare: number } }) => (
-  <motion.div variants={fadeUp} className="p-4 rounded-2xl bg-[#0a0a0a] border border-gray-800 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] overflow-hidden relative" style={{ backgroundImage: "linear-gradient(145deg, #1f1f1f 0%, #0a0a0a 100%)" }}>
-    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-[40px] pointer-events-none" />
+const FareDetailsCard = ({
+  fareInfo,
+  passengers,
+}: {
+  fareInfo: ReturnType<typeof calculateTieredFare>;
+  passengers: number;
+}) => (
+  <motion.div variants={fadeUp} className="p-5 rounded-[1.5rem] bg-[#0a0a0a] border border-gray-800 shadow-[0_20px_40px_-15px_rgba(245,158,11,0.2)] overflow-hidden relative" style={{ backgroundImage: "linear-gradient(145deg, #1f1f1f 0%, #0a0a0a 100%)" }}>
+    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/15 rounded-full blur-[40px] pointer-events-none" />
     <div className="absolute bottom-[-10%] left-[-10%] w-24 h-24 bg-orange-500/10 rounded-full blur-[30px] pointer-events-none" />
     <div className="absolute top-[-2px] left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50 blur-[2px]" />
     
-    <div className="flex justify-between items-start relative z-10">
-      <div className="space-y-3">
-        <div>
-          <p className="text-[10px] font-black tracking-widest text-[#a8a29e] uppercase mb-1 drop-shadow-sm">Estimated Fare</p>
-          <div className="flex items-baseline gap-1">
-            <span className="text-4xl font-black text-white font-syne tracking-tight">₹{details.total}</span>
-          </div>
-        </div>
-        
-        <div className="flex flex-col gap-1.5 pt-1">
-           <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 bg-white/5 w-max px-2 py-1 rounded-md border border-white/5">
-             <span className="text-amber-500/80">BASE FARE</span>
-             <span className="text-white">₹{details.baseFare}</span>
-           </div>
-           <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 bg-white/5 w-max px-2 py-1 rounded-md border border-white/5">
-             <span className="text-amber-500/80">DISTANCE</span>
-             <span className="text-white">₹{details.baseRate} × {details.km} km</span>
-           </div>
-        </div>
+    <div className="flex flex-col gap-4 relative z-10">
+      
+      {/* HEADER SECTION */}
+      <div className="flex justify-between items-start">
+         <div className="space-y-1">
+            <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase border border-amber-500/20 w-max">
+               <Users className="w-3 h-3" />
+               {passengers} {passengers > 1 ? 'Seats' : 'Seat'} Reserved
+            </div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">{fareInfo.tripDetails.tier} Pool</p>
+         </div>
+         
+         <div className="flex flex-col items-end">
+            <span className="text-[10px] text-gray-500 font-bold tracking-widest uppercase mb-1 drop-shadow-sm">Pooled Fare</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-[16px] text-gray-400 font-bold -mt-2">₹</span>
+              <span className="text-[40px] leading-none font-black text-white font-syne tracking-tight">{fareInfo.fare.perPerson}</span>
+            </div>
+            <div className="flex flex-col items-end mt-1.5 gap-0.5">
+               <span className="text-[11px] font-bold text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                 Per seat
+               </span>
+            </div>
+         </div>
       </div>
 
-      <div className="text-right flex flex-col items-end gap-3">
-        <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1.5 rounded-xl border border-white/5 backdrop-blur-md">
-          <MapPin className="w-3.5 h-3.5 text-amber-500" />
-          <span className="text-sm font-black text-white tracking-tight">{details.km} km</span>
-        </div>
-        <div className="inline-flex items-center justify-center text-[9px] font-black tracking-widest text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-lg border border-amber-400/20 backdrop-blur-xl uppercase shadow-[0_0_15px_rgba(251,191,36,0.1)]">
-          {details.tierName}
-        </div>
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-700/50 to-transparent my-1" />
+
+      {/* METRICS SECTION */}
+      <div className="grid grid-cols-2 gap-3">
+         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 backdrop-blur-md">
+            <MapPin className="w-4 h-4 text-orange-500" strokeWidth={2} />
+            <div className="flex flex-col">
+               <span className="text-[8px] uppercase tracking-wider text-gray-500">Distance</span>
+               <span className="text-white text-xs">{fareInfo.distanceKm} km</span>
+            </div>
+         </div>
+         
+         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 backdrop-blur-md">
+            <Clock className="w-4 h-4 text-amber-500" strokeWidth={2} />
+            <div className="flex flex-col">
+               <span className="text-[8px] uppercase tracking-wider text-gray-500">Est. Time</span>
+               <span className="text-white text-xs">{fareInfo.durationMin} min</span>
+            </div>
+         </div>
       </div>
-    </div>
-    
-    <div className="absolute bottom-[-10px] right-[-10px] text-[40px] font-black text-white/[0.03] pointer-events-none select-none italic">
-      FARE CALC
+
     </div>
   </motion.div>
 );
@@ -457,18 +436,23 @@ const RideConfirmed = () => {
   const eta = useEtaCountdown(driver.etaMinutes);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
+  // Parse distance reliably
+  useEffect(() => {
+    if (ride?.distanceKm) {
+        setDistanceKm(ride.distanceKm);
+    }
+  }, [ride]);
+
   const priceDetails = useMemo(() => {
-    if (!distanceKm) return null;
-    const { total, rate, tierName, baseFare } = calculateFare(vehicleType, distanceKm);
+    // We expect distanceKm and durationMin to be provided via the UI/Map updates
+    const activeDistance = distanceKm || ride?.distanceKm || 15;
+    const activeDuration = ride?.durationMin || 30;
+    const activePassengers = ride?.passengers || 1;
     
-    return {
-      tierName,
-      baseRate: rate,
-      total,
-      km: distanceKm.toFixed(1),
-      baseFare
-    };
-  }, [distanceKm, vehicleType]);
+    const fareInfo = calculateTieredFare(activeDistance, activeDuration, vehicleType, activePassengers);
+    
+    return fareInfo;
+  }, [distanceKm, ride, vehicleType]);
 
   const handleCallDriver = useCallback(() => {
     window.location.href = `tel:${driver.phone}`;
@@ -487,7 +471,7 @@ const RideConfirmed = () => {
             <h2 className="text-2xl font-black text-gray-900 tracking-tight font-syne mb-2">Something went wrong</h2>
             <p className="text-sm font-medium text-gray-500">We couldn't load your ride details. Please go back and try again.</p>
           </div>
-          <button onClick={() => window.history.back()} className="w-full h-12 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-colors shadow-lg">Go Back</button>
+          <button onClick={() => navigate("/")} className="w-full h-12 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-colors shadow-lg">Go to Home</button>
         </motion.div>
       </div>
     );
@@ -495,6 +479,16 @@ const RideConfirmed = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
+      
+      {/* GLOBAL BACK BUTTON */}
+      <button 
+        onClick={() => window.history.back()}
+        className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-md"
+        aria-label="Go back"
+      >
+        <ChevronLeft className="w-6 h-6 ml-[-2px]" />
+      </button>
+
       {/* Background blobs */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-amber-400/20 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[30rem] h-[30rem] bg-orange-500/10 rounded-full blur-[100px] pointer-events-none" />
@@ -507,17 +501,17 @@ const RideConfirmed = () => {
           initial="hidden"
           animate="visible"
         >
-          <Header title="Your captain is on the way!" subtitle="Get ready, your ride is arriving shortly" />
+          <Header title="Your captain is on the way!" subtitle="Get ready, your pooled ride is arriving shortly" />
 
           {isLoading ? (
             <LoadingSkeleton />
           ) : (
             <>
-              {ride && <RealMap pickup={ride.pickup} drop={ride.drop} onDistanceCalculated={setDistanceKm} />}
+              {ride && <RealMap pickup={ride.pickup} drop={ride.drop} onDistanceCalculated={(d) => setDistanceKm(d)} />}
 
               {ride && <RideSummaryCard ride={ride} />}
 
-              {priceDetails && <FareDetailsCard details={priceDetails} />}
+              {priceDetails && <FareDetailsCard fareInfo={priceDetails} passengers={ride?.passengers || 1} />}
 
               <VehicleCard
                 type={vehicleType}
@@ -541,7 +535,7 @@ const RideConfirmed = () => {
                   onClick={() => {
                     navigator.share?.({
                       title: "My Xpool Ride",
-                      text: `I'm tracking my ride via Xpool! Arriving in ${eta} mins.`,
+                      text: `I'm tracking my pooled ride via Xpool! Arriving in ${eta} mins.`,
                     });
                   }}
                 >

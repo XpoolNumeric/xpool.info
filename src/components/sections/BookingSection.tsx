@@ -283,6 +283,34 @@ const BookingSection = () => {
     libraries: LIBRARIES,
   });
 
+  const locationFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (isLoaded && !locationFetchedRef.current && window.google) {
+      locationFetchedRef.current = true;
+      if (navigator.geolocation && !pickupLocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const geocoder = new window.google.maps.Geocoder();
+            const latlng = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            geocoder.geocode({ location: latlng }, (results, status) => {
+              if (status === "OK" && results && results[0]) {
+                setPickupLocation((prev) => prev || results[0].formatted_address);
+              }
+            });
+          },
+          (error) => {
+            console.error("Error getting geolocation:", error);
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+      }
+    }
+  }, [isLoaded, pickupLocation]);
+
   const [pickupPredictions, setPickupPredictions] = useState<string[]>([]);
   const [dropPredictions, setDropPredictions] = useState<string[]>([]);
   const autocompleteService = useRef<any>(null);
@@ -439,40 +467,73 @@ const BookingSection = () => {
   const handleBook = useCallback(() => {
     setLoading(true);
 
-    // Save ride details safely to localStorage
-    const rideDetails = {
-      pickup: pickupLocation,
-      drop: dropLocation,
-      rideType,
-      date: pickupDate,
-      time: pickupTime,
-      timestamp: new Date().toISOString()
-    };
-    
-    localStorage.setItem("rideSummary", JSON.stringify(rideDetails));
+    const proceedWithBooking = (distanceKm?: number, durationMin?: number) => {
+      // Save ride details safely to localStorage
+      const rideDetails = {
+        pickup: pickupLocation,
+        drop: dropLocation,
+        rideType,
+        date: pickupDate,
+        time: pickupTime,
+        timestamp: new Date().toISOString(),
+        distanceKm,
+        durationMin
+      };
+      
+      localStorage.setItem("rideSummary", JSON.stringify(rideDetails));
 
-    setTimeout(() => {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
 
-      let isLoggedAndComplete = false;
-      try {
-        const profileStr = localStorage.getItem("profile");
-        if (profileStr) {
-          const profile = JSON.parse(profileStr);
-          if (profile.fullName && profile.email && profile.city && profile.dob) {
-            isLoggedAndComplete = true;
+        let isLoggedAndComplete = false;
+        try {
+          const profileStr = localStorage.getItem("profile");
+          if (profileStr) {
+            const profile = JSON.parse(profileStr);
+            if (profile.fullName && profile.email && profile.city && profile.dob) {
+              isLoggedAndComplete = true;
+            }
           }
+        } catch (e) {
+          console.error("Error reading profile from local storage", e);
         }
-      } catch (e) {
-        console.error("Error reading profile from local storage", e);
-      }
 
-      if (isLoggedAndComplete) {
-        navigate("/vehicles");
-      } else {
-        setShowAuthDialog(true);
-      }
-    }, 700);
+        if (isLoggedAndComplete) {
+          navigate("/vehicles");
+        } else {
+          setShowAuthDialog(true);
+        }
+      }, 700);
+    };
+
+    // Calculate distance and duration if Google Maps is loaded
+    if (window.google && window.google.maps && window.google.maps.DirectionsService) {
+      const directionsService = new window.google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: pickupLocation,
+          destination: dropLocation,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === window.google.maps.DirectionsStatus.OK && result) {
+            const route = result.routes[0];
+            if (route && route.legs && route.legs.length > 0) {
+              const leg = route.legs[0];
+              const distanceKm = (leg.distance?.value || 0) / 1000;
+              const durationMin = (leg.duration?.value || 0) / 60;
+              proceedWithBooking(distanceKm, durationMin);
+              return;
+            }
+          }
+          // Fallback if calculation fails
+          proceedWithBooking(15, 30); // Default placeholder
+        }
+      );
+    } else {
+      // Fallback if google maps not loaded
+      proceedWithBooking(15, 30); // Default placeholder
+    }
   }, [navigate, pickupLocation, dropLocation, rideType, pickupDate, pickupTime]);
 
   const styleElement = useMemo(() => <style>{bookingStyles}</style>, []);

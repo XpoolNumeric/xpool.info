@@ -13,7 +13,9 @@ import {
   Receipt,
   CarTaxiFront,
   Truck,
+  ChevronLeft,
 } from "lucide-react";
+import { calculateTieredFare } from "@/utils/fareCalculator";
 
 /* ---------------- TYPES ---------------- */
 type VehicleKey = "bike" | "auto" | "car" | "xl";
@@ -21,6 +23,9 @@ type VehicleKey = "bike" | "auto" | "car" | "xl";
 interface RideSummaryData {
   pickup: string;
   drop: string;
+  distanceKm?: number;
+  durationMin?: number;
+  passengers?: number;
 }
 
 /* ---------------- CONFIG ---------------- */
@@ -31,49 +36,6 @@ const VEHICLE_ICONS: Record<VehicleKey, React.ElementType> = {
   xl: Truck,
 };
 
-interface PricingTier {
-  maxKm: number;
-  name: string;
-  rate: number;
-  baseFare?: number;
-}
-
-const PRICING_CONFIG: Record<VehicleKey, PricingTier[]> = {
-  car: [
-    { maxKm: 10, name: "Short Trip", rate: 18, baseFare: 50 },
-    { maxKm: 50, name: "Suburban", rate: 15, baseFare: 80 },
-    { maxKm: 100, name: "Nearby Cities", rate: 14, baseFare: 120 },
-    { maxKm: Infinity, name: "Interstate", rate: 10, baseFare: 500 },
-  ],
-  bike: [
-    { maxKm: 10, name: "Quick Bike", rate: 13, baseFare: 35 },
-    { maxKm: 50, name: "Urban Bike", rate: 11, baseFare: 55 },
-    { maxKm: 100, name: "City Connect", rate: 10, baseFare: 70 },
-    { maxKm: 150, name: "Long Ride", rate: 9, baseFare: 100 },
-    { maxKm: Infinity, name: "Inter-City", rate: 8, baseFare: 120 },
-  ],
-  auto: [
-    { maxKm: 15, name: "Local Auto", rate: 12, baseFare: 25 },
-    { maxKm: Infinity, name: "Regular", rate: 10, baseFare: 40 },
-  ],
-  xl: [
-    { maxKm: 20, name: "City XL", rate: 25, baseFare: 100 },
-    { maxKm: Infinity, name: "Long XL", rate: 22, baseFare: 150 },
-  ],
-};
-
-const calculateFare = (vehicleType: VehicleKey, km: number) => {
-  const config = PRICING_CONFIG[vehicleType] || PRICING_CONFIG.car;
-  const tier = config.find(t => km <= t.maxKm) || config[config.length - 1];
-  const base = tier.baseFare || 0;
-  return {
-    total: Math.round(base + (km * tier.rate)),
-    rate: tier.rate,
-    tierName: tier.name,
-    baseFare: base,
-    distanceFare: Math.round(km * tier.rate)
-  };
-};
 
 /* ---------------- ANIMATION VARIANTS ---------------- */
 const staggerContainer: Variants = {
@@ -119,7 +81,10 @@ const RideSummary = () => {
         setRide({
           pickup: parsed.pickup,
           drop: parsed.drop,
-        });
+          distanceKm: parsed.distanceKm || 8.4,
+          durationMin: parsed.durationMin || 20,
+          passengers: parsed.passengers || 1,
+        } as RideSummaryData);
       }
     } catch {}
   }, []);
@@ -144,17 +109,22 @@ const RideSummary = () => {
 
   /* ---------------- FARE CALC ---------------- */
   const fare = useMemo(() => {
-    const distanceKm = 8.4; // Simulated distance for summary
-    const { total, rate, baseFare, distanceFare } = calculateFare(vehicleType, distanceKm);
-    const platformFee = 10;
+    const distanceKm = ride?.distanceKm || 8.4;
+    const durationMin = ride?.durationMin || 20;
+    const passengers = ride?.passengers || 1;
+    
+    const fareInfo = calculateTieredFare(distanceKm, durationMin, vehicleType, passengers);
+    
     return {
-      base: baseFare,
-      distanceFare: distanceFare,
-      platformFee,
-      total: total + platformFee,
-      km: distanceKm
+      base: fareInfo.breakdown.baseFare,
+      distanceFare: fareInfo.breakdown.distanceFare + fareInfo.breakdown.timeFare,
+      platformFee: 0,
+      perPerson: fareInfo.fare.perPerson,
+      total: fareInfo.fare.total,
+      km: distanceKm,
+      passengers
     };
-  }, [vehicleType]);
+  }, [vehicleType, ride]);
 
   /* ---------------- UI HELPER COMPONENTS ---------------- */
   const TimelineItem = ({ label, done, active }: { label: string; done?: boolean; active?: boolean }) => (
@@ -180,6 +150,16 @@ const RideSummary = () => {
   /* ---------------- MAIN UI ---------------- */
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
+      
+      {/* GLOBAL BACK BUTTON */}
+      <button 
+        onClick={() => window.history.back()}
+        className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-md"
+        aria-label="Go back"
+      >
+        <ChevronLeft className="w-6 h-6 ml-[-2px]" />
+      </button>
+
       {/* Background blobs */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-amber-400/20 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[30rem] h-[30rem] bg-orange-500/10 rounded-full blur-[100px] pointer-events-none" />
@@ -281,12 +261,22 @@ const RideSummary = () => {
           <motion.div variants={fadeUp} className="p-4 rounded-2xl bg-white/60 border border-gray-200/50 shadow-sm space-y-1" style={{ backdropFilter: "blur(12px)" }}>
             <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-200/50">
               <Receipt className="w-5 h-5 text-gray-400" />
-              <h3 className="font-bold text-gray-900">Fare Estimate</h3>
+              <h3 className="font-bold text-gray-900">Pooled Fare Estimate</h3>
             </div>
-            <FareRow label="Base fare" value={fare.base} />
-            <FareRow label="Distance fare" value={fare.distanceFare} />
-            <FareRow label="Platform fee" value={fare.platformFee} />
-            <FareRow label="Estimated Total" value={fare.total} isTotal />
+            
+            {fare.passengers > 1 ? (
+               <>
+                  <FareRow label="Platform fee" value={fare.platformFee} />
+                  <FareRow label={`Price per seat (${fare.passengers} seats)`} value={fare.perPerson} isTotal />
+               </>
+            ) : (
+               <>
+                  <FareRow label="Base fare" value={fare.base} />
+                  <FareRow label="Distance fare" value={fare.distanceFare} />
+                  <FareRow label="Platform fee" value={fare.platformFee} />
+                  <FareRow label="Total Amount" value={fare.total} isTotal />
+               </>
+            )}
           </motion.div>
 
           {/* HELP ACTION */}

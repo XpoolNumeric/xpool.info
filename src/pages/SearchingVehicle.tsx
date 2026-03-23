@@ -13,6 +13,7 @@ import {
   Sparkles,
   User,
   Star,
+  ChevronLeft,
 } from "lucide-react";
 
 /* -------------------- CONSTANTS -------------------- */
@@ -411,6 +412,16 @@ const SearchingVehicle = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden pb-12" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
+      
+      {/* GLOBAL BACK BUTTON */}
+      <button 
+        onClick={() => window.history.back()}
+        className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-md"
+        aria-label="Go back"
+      >
+        <ChevronLeft className="w-6 h-6 ml-[-2px]" />
+      </button>
+
       {/* Background blobs */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-amber-400/20 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[30rem] h-[30rem] bg-orange-500/10 rounded-full blur-[100px] pointer-events-none" />
