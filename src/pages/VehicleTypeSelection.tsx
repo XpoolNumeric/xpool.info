@@ -195,7 +195,7 @@ export default function VehicleTypeSelection() {
             <div className="w-14 h-1.5 rounded-full bg-gray-300" />
          </div>
 
-         <div className="px-5 flex-1 overflow-y-auto pb-6 custom-scrollbar">
+         <div className="px-5 flex-1 overflow-y-auto pb-32 custom-scrollbar">
             {/* Header & Seat Selector */}
             <div className="flex items-center justify-between mb-6 pt-2">
                 <div>
@@ -293,8 +293,8 @@ export default function VehicleTypeSelection() {
             </motion.div>
          </div>
 
-         {/* STICKY CTA */}
-         <div className="p-4 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10">
+         {/* FIXED CTA */}
+         <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-15px_40px_rgba(0,0,0,0.12)] z-30">
             <button
                disabled={!selected}
                onClick={handleContinue}
