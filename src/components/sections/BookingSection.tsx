@@ -27,6 +27,8 @@ import {
   Timer,
   Search,
   ChevronRight,
+  LocateFixed,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -55,11 +57,19 @@ const bookingStyles = `
     border: 1.5px solid rgba(209,213,219,0.8);
     border-radius: 16px;
     background: white;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .bs-input-wrap:focus-within {
     border-color: #f59e0b;
     box-shadow: 0 0 0 4px rgba(245,158,11,0.12);
+  }
+  
+  @keyframes pulse-gentle {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+  }
+  .animate-pulse-gentle {
+    animation: pulse-gentle 2s infinite ease-in-out;
   }
 
   .bs-swap-btn {
@@ -273,6 +283,7 @@ const BookingSection = () => {
   const [pickupDate, setPickupDate] = useState("");
   const [pickupTime, setPickupTime] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   const pickupRef = useRef<HTMLDivElement>(null);
@@ -285,31 +296,51 @@ const BookingSection = () => {
 
   const locationFetchedRef = useRef(false);
 
+  const handleGetCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation || !window.google) {
+      console.warn("Geolocation or Google Maps not available");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const geocoder = new window.google.maps.Geocoder();
+        const latlng = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        geocoder.geocode({ location: latlng }, (results, status) => {
+          setIsLocating(false);
+          if (status === "OK" && results && results[0]) {
+            setPickupLocation(results[0].formatted_address);
+          }
+        });
+      },
+      (error) => {
+        setIsLocating(false);
+        console.error("Error getting geolocation:", error);
+        // Alert user if permission is denied
+        if (error.code === 1) {
+          alert("Location permission denied. Please enable location access in your browser settings.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, []);
+
   useEffect(() => {
     if (isLoaded && !locationFetchedRef.current && window.google) {
       locationFetchedRef.current = true;
-      if (navigator.geolocation && !pickupLocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const geocoder = new window.google.maps.Geocoder();
-            const latlng = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
-            geocoder.geocode({ location: latlng }, (results, status) => {
-              if (status === "OK" && results && results[0]) {
-                setPickupLocation((prev) => prev || results[0].formatted_address);
-              }
-            });
-          },
-          (error) => {
-            console.error("Error getting geolocation:", error);
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-      }
+      // Small delay to ensure maps engine is fully ready
+      const timer = setTimeout(() => {
+        if (!pickupLocation) {
+          handleGetCurrentLocation();
+        }
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [isLoaded, pickupLocation]);
+  }, [isLoaded, handleGetCurrentLocation, pickupLocation]);
 
   const [pickupPredictions, setPickupPredictions] = useState<string[]>([]);
   const [dropPredictions, setDropPredictions] = useState<string[]>([]);
@@ -635,6 +666,8 @@ const BookingSection = () => {
                       onFocus={() => setActiveBox("pickup")}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPickupLocation(e.target.value)}
                       placeholder="Where are you?"
+                      onLocate={handleGetCurrentLocation}
+                      isLocating={isLocating}
                     />
                     <SuggestionList
                       visible={activeBox === "pickup"}
@@ -788,7 +821,7 @@ export default BookingSection;
 /* ===================== Subcomponents ===================== */
 
 const LocationInput = memo(({
-  icon, label, value, active, onFocus, onChange, placeholder,
+  icon, label, value, active, onFocus, onChange, placeholder, onLocate, isLocating,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -797,8 +830,10 @@ const LocationInput = memo(({
   onFocus: () => void;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder: string;
+  onLocate?: () => void;
+  isLocating?: boolean;
 }) => (
-  <div className="bs-input-wrap flex items-center gap-3 px-4 py-3.5">
+  <div className={`bs-input-wrap flex items-center gap-3 px-4 py-3.5 transition-all duration-300 ${active ? 'border-amber-400 ring-4 ring-amber-400/10' : ''}`}>
     <span className="flex-shrink-0">{icon}</span>
     <div className="flex-1 min-w-0">
       {value && (
@@ -816,6 +851,31 @@ const LocationInput = memo(({
         autoComplete="off"
       />
     </div>
+    {onLocate && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onLocate();
+        }}
+        disabled={isLocating}
+        className="flex-shrink-0 p-2 hover:bg-amber-50 rounded-full transition-colors text-amber-500 disabled:opacity-50 disabled:cursor-not-allowed group relative"
+        title="Use current location"
+      >
+        {isLocating ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <LocateFixed className="h-4 w-4 group-hover:scale-110 transition-transform" />
+        )}
+
+        {/* Tooltip */}
+        {!isLocating && (
+          <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 font-semibold whitespace-nowrap shadow-lg">
+            Use Current Location
+            <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+          </span>
+        )}
+      </button>
+    )}
   </div>
 ));
 LocationInput.displayName = "LocationInput";
