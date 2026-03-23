@@ -246,3 +246,14 @@ function calculateMarketPrices(distanceKm: number, tierName: string) {
     // Return with consistent property names
     return { busPrice, taxiPrice, trainPrice }
 }
+
+export function formatDuration(minutes: number): string {
+    const roundedMin = Math.round(minutes);
+    const hrs = Math.floor(roundedMin / 60);
+    const mins = roundedMin % 60;
+    
+    if (hrs > 0) {
+        return `${hrs}hr ${mins}min`;
+    }
+    return `${roundedMin}min`;
+}

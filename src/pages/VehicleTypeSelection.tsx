@@ -16,7 +16,7 @@ import {
   MapPin,
   ChevronLeft,
 } from "lucide-react";
-import { calculateTieredFare } from "@/utils/fareCalculator";
+import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 
 const LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -202,7 +202,7 @@ export default function VehicleTypeSelection() {
                    <h2 className="text-2xl font-black text-gray-900 tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>Choose Pool</h2>
                    <div className="flex gap-3 text-xs font-bold text-amber-500 mt-1 uppercase tracking-wider">
                       <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {distanceKm.toFixed(1)} km</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {Math.round(durationMin)} min</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {formatDuration(durationMin)}</span>
                    </div>
                 </div>
 

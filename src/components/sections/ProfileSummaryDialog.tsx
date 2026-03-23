@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -248,6 +249,9 @@ const ProfileSummaryDialog = ({
 
             {/* HEADER */}
             <DialogHeader className="space-y-2">
+              <DialogDescription className="sr-only">
+                Provide your personal details to complete the setup
+              </DialogDescription>
               <DialogTitle className="text-center text-2xl font-bold text-[#0A0F1C]">
                 {STEP_LABELS[step]}
               </DialogTitle>

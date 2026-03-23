@@ -20,7 +20,7 @@ import {
   Users,
   ChevronLeft,
 } from "lucide-react";
-import { calculateTieredFare } from "@/utils/fareCalculator";
+import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 
 /* -------------------- TYPES -------------------- */
 const VEHICLE_TYPES = ["bike", "auto", "car", "xl"] as const;
@@ -369,7 +369,7 @@ const FareDetailsCard = ({
             <Clock className="w-4 h-4 text-amber-500" strokeWidth={2} />
             <div className="flex flex-col">
                <span className="text-[8px] uppercase tracking-wider text-gray-500">Est. Time</span>
-               <span className="text-white text-xs">{fareInfo.durationMin} min</span>
+               <span className="text-white text-xs">{formatDuration(fareInfo.durationMin)}</span>
             </div>
          </div>
       </div>

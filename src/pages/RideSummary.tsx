@@ -15,7 +15,7 @@ import {
   Truck,
   ChevronLeft,
 } from "lucide-react";
-import { calculateTieredFare } from "@/utils/fareCalculator";
+import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 
 /* ---------------- TYPES ---------------- */
 type VehicleKey = "bike" | "auto" | "car" | "xl";
@@ -184,7 +184,7 @@ const RideSummary = () => {
               <span className="font-bold text-gray-900">
                 Driver {driverStage === "assigned" ? "assigned" : "arriving"}
               </span>
-              <span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 shadow-sm">{Math.max(1, 5 - Math.floor(driverProgress / 25))} min</span>
+              <span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 shadow-sm">{formatDuration(Math.max(1, 5 - Math.floor(driverProgress / 25)))}</span>
             </div>
 
             <div className="w-full h-3 bg-amber-100/50 rounded-full overflow-hidden border border-amber-200/50 relative">

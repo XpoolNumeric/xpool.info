@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,12 +28,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProfileSummaryDialog from "./ProfileSummaryDialog";
-import {
-  APIProvider,
-  Map,
-  useMapsLibrary,
-  useMap,
-} from '@vis.gl/react-google-maps';
+import { GoogleMap, DirectionsRenderer } from "@react-google-maps/api";
 
 /* -------------------- MAP COMPONENTS -------------------- */
 
@@ -40,40 +36,43 @@ import {
  * Renders the route on the map using Google Directions Service
  */
 const Directions = ({ origin, destination }: { origin: string; destination: string }) => {
-  const map = useMap();
-  const routesLib = useMapsLibrary('routes');
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService>();
-  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer>();
-  const [routeIndex, setRouteIndex] = useState(0);
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
 
   useEffect(() => {
-    if (!routesLib || !map) return;
-    setDirectionsService(new routesLib.DirectionsService());
-    setDirectionsRenderer(new routesLib.DirectionsRenderer({
-      map,
-      suppressMarkers: false,
-      polylineOptions: {
-        strokeColor: '#f59e0b',
-        strokeWeight: 5,
-        strokeOpacity: 0.8
+    if (!origin || !destination || !window.google) return;
+
+    const directionsService = new window.google.maps.DirectionsService();
+
+    directionsService.route(
+      {
+        origin,
+        destination,
+        travelMode: google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: true,
+      },
+      (result, status) => {
+        if (status === window.google.maps.DirectionsStatus.OK && result) {
+          setDirections(result);
+        }
       }
-    }));
-  }, [routesLib, map]);
+    );
+  }, [origin, destination]);
 
-  useEffect(() => {
-    if (!directionsService || !directionsRenderer) return;
+  if (!directions) return null;
 
-    directionsService.route({
-      origin: origin,
-      destination: destination,
-      travelMode: google.maps.TravelMode.DRIVING,
-      provideRouteAlternatives: true
-    }).then(response => {
-      directionsRenderer.setDirections(response);
-    });
-  }, [directionsService, directionsRenderer, origin, destination]);
-
-  return null;
+  return (
+    <DirectionsRenderer
+      directions={directions}
+      options={{
+        suppressMarkers: false,
+        polylineOptions: {
+          strokeColor: '#f59e0b',
+          strokeWeight: 5,
+          strokeOpacity: 0.8
+        }
+      }}
+    />
+  );
 };
 
 const mapCustomStyle = [
@@ -990,17 +989,16 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
                     animate={{ opacity: 1 }}
                     className="absolute inset-0"
                   >
-                    <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string}>
-                      <Map
-                        defaultCenter={{ lat: 13.0827, lng: 80.2707 }}
-                        defaultZoom={11}
-                        gestureHandling={'none'}
-                        disableDefaultUI={true}
-                        styles={mapCustomStyle}
-                      >
-                        <Directions origin={rideData.pickup} destination={rideData.drop} />
-                      </Map>
-                    </APIProvider>
+                    <GoogleMap
+                      mapContainerStyle={{ width: "100%", height: "100%" }}
+                      options={{
+                        disableDefaultUI: true,
+                        gestureHandling: 'none',
+                        styles: mapCustomStyle,
+                      }}
+                    >
+                      <Directions origin={rideData.pickup} destination={rideData.drop} />
+                    </GoogleMap>
                     <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-white/90 to-transparent">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
@@ -1032,6 +1030,9 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
             </div>
 
             <DialogHeader className="space-y-3">
+              <DialogDescription className="sr-only">
+                Authentication process to continue booking
+              </DialogDescription>
               <div className="space-y-1">
                 <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
                   {step === "phone" ? "Welcome to Xpool" : "Verify Number"}
