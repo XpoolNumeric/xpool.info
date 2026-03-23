@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, Variants } from "framer-motion";
 import {
-  Car,
-  Bike,
   User,
   Phone,
   Star,
@@ -11,11 +9,11 @@ import {
   CheckCircle2,
   Navigation,
   Receipt,
-  CarTaxiFront,
-  Truck,
   ChevronLeft,
 } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
+import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
+import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
 
 /* ---------------- TYPES ---------------- */
 type VehicleKey = "bike" | "auto" | "car" | "xl";
@@ -30,10 +28,10 @@ interface RideSummaryData {
 
 /* ---------------- CONFIG ---------------- */
 const VEHICLE_ICONS: Record<VehicleKey, React.ElementType> = {
-  bike: Bike,
-  auto: CarTaxiFront,
-  car: Car,
-  xl: Truck,
+  bike: PiMotorcycleBold,
+  auto: AutoRickshawIcon,
+  car: PiCarProfileBold,
+  xl: PiVanBold,
 };
 
 
@@ -86,7 +84,7 @@ const RideSummary = () => {
           passengers: parsed.passengers || 1,
         } as RideSummaryData);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   /* ---------------- DRIVER MOVEMENT SIM ---------------- */
@@ -112,9 +110,9 @@ const RideSummary = () => {
     const distanceKm = ride?.distanceKm || 8.4;
     const durationMin = ride?.durationMin || 20;
     const passengers = ride?.passengers || 1;
-    
+
     const fareInfo = calculateTieredFare(distanceKm, durationMin, vehicleType, passengers);
-    
+
     return {
       base: fareInfo.breakdown.baseFare,
       distanceFare: fareInfo.breakdown.distanceFare + fareInfo.breakdown.timeFare,
@@ -150,9 +148,9 @@ const RideSummary = () => {
   /* ---------------- MAIN UI ---------------- */
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
-      
+
       {/* GLOBAL BACK BUTTON */}
-      <button 
+      <button
         onClick={() => window.history.back()}
         className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-md"
         aria-label="Go back"
@@ -166,7 +164,7 @@ const RideSummary = () => {
       <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-multiply" style={{ backgroundImage: "radial-gradient(rgba(245,158,11,0.15) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
 
       <main className="relative z-10 px-4 py-8 sm:py-12 flex justify-center min-h-screen h-full pb-24">
-        <motion.div 
+        <motion.div
           className="w-full max-w-md flex flex-col space-y-6"
           variants={staggerContainer}
           initial="hidden"
@@ -263,19 +261,19 @@ const RideSummary = () => {
               <Receipt className="w-5 h-5 text-gray-400" />
               <h3 className="font-bold text-gray-900">Pooled Fare Estimate</h3>
             </div>
-            
+
             {fare.passengers > 1 ? (
-               <>
-                  <FareRow label="Platform fee" value={fare.platformFee} />
-                  <FareRow label={`Price per seat (${fare.passengers} seats)`} value={fare.perPerson} isTotal />
-               </>
+              <>
+                <FareRow label="Platform fee" value={fare.platformFee} />
+                <FareRow label={`Price per seat (${fare.passengers} seats)`} value={fare.perPerson} isTotal />
+              </>
             ) : (
-               <>
-                  <FareRow label="Base fare" value={fare.base} />
-                  <FareRow label="Distance fare" value={fare.distanceFare} />
-                  <FareRow label="Platform fee" value={fare.platformFee} />
-                  <FareRow label="Total Amount" value={fare.total} isTotal />
-               </>
+              <>
+                <FareRow label="Base fare" value={fare.base} />
+                <FareRow label="Distance fare" value={fare.distanceFare} />
+                <FareRow label="Platform fee" value={fare.platformFee} />
+                <FareRow label="Total Amount" value={fare.total} isTotal />
+              </>
             )}
           </motion.div>
 

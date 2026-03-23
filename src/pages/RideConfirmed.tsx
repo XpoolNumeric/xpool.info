@@ -4,8 +4,6 @@ import { motion, Variants } from "framer-motion";
 import { GoogleMap, useLoadScript, DirectionsRenderer, MarkerF } from "@react-google-maps/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Car,
-  Bike,
   User,
   Phone,
   Star,
@@ -15,12 +13,12 @@ import {
   Sparkles,
   Share2,
   CheckCircle2,
-  CarTaxiFront,
-  Truck,
   Users,
   ChevronLeft,
 } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
+import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
+import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
 
 /* -------------------- TYPES -------------------- */
 const VEHICLE_TYPES = ["bike", "auto", "car", "xl"] as const;
@@ -45,10 +43,10 @@ interface DriverInfo {
 
 /* -------------------- CONSTANTS -------------------- */
 const VEHICLE_ICONS: Record<VehicleKey, React.ElementType> = {
-  bike: Bike,
-  auto: CarTaxiFront,
-  car: Car,
-  xl: Truck,
+  bike: PiMotorcycleBold,
+  auto: AutoRickshawIcon,
+  car: PiCarProfileBold,
+  xl: PiVanBold,
 };
 
 const FALLBACK_DRIVER: DriverInfo = {
@@ -160,7 +158,7 @@ const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop:
             setDirections(result);
             const distanceMeters = result.routes[0]?.legs[0]?.distance?.value;
             if (distanceMeters) {
-               onDistanceCalculated(distanceMeters / 1000);
+              onDistanceCalculated(distanceMeters / 1000);
             }
           }
         }
@@ -232,7 +230,7 @@ const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop:
             }}
           />
         )}
-        
+
         {/* Custom Markers */}
         {directions && directions.routes[0].legs[0].start_location && (
           <MarkerF
@@ -326,52 +324,52 @@ const FareDetailsCard = ({
     <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/15 rounded-full blur-[40px] pointer-events-none" />
     <div className="absolute bottom-[-10%] left-[-10%] w-24 h-24 bg-orange-500/10 rounded-full blur-[30px] pointer-events-none" />
     <div className="absolute top-[-2px] left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50 blur-[2px]" />
-    
+
     <div className="flex flex-col gap-4 relative z-10">
-      
+
       {/* HEADER SECTION */}
       <div className="flex justify-between items-start">
-         <div className="space-y-1">
-            <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase border border-amber-500/20 w-max">
-               <Users className="w-3 h-3" />
-               {passengers} {passengers > 1 ? 'Seats' : 'Seat'} Reserved
-            </div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">{fareInfo.tripDetails.tier} Pool</p>
-         </div>
-         
-         <div className="flex flex-col items-end">
-            <span className="text-[10px] text-gray-500 font-bold tracking-widest uppercase mb-1 drop-shadow-sm">Pooled Fare</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-[16px] text-gray-400 font-bold -mt-2">₹</span>
-              <span className="text-[40px] leading-none font-black text-white font-syne tracking-tight">{fareInfo.fare.perPerson}</span>
-            </div>
-            <div className="flex flex-col items-end mt-1.5 gap-0.5">
-               <span className="text-[11px] font-bold text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                 Per seat
-               </span>
-            </div>
-         </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase border border-amber-500/20 w-max">
+            <Users className="w-3 h-3" />
+            {passengers} {passengers > 1 ? 'Seats' : 'Seat'} Reserved
+          </div>
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">{fareInfo.tripDetails.tier} Pool</p>
+        </div>
+
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] text-gray-500 font-bold tracking-widest uppercase mb-1 drop-shadow-sm">Pooled Fare</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-[16px] text-gray-400 font-bold -mt-2">₹</span>
+            <span className="text-[40px] leading-none font-black text-white font-syne tracking-tight">{fareInfo.fare.perPerson}</span>
+          </div>
+          <div className="flex flex-col items-end mt-1.5 gap-0.5">
+            <span className="text-[11px] font-bold text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+              Per seat
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-700/50 to-transparent my-1" />
 
       {/* METRICS SECTION */}
       <div className="grid grid-cols-2 gap-3">
-         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 backdrop-blur-md">
-            <MapPin className="w-4 h-4 text-orange-500" strokeWidth={2} />
-            <div className="flex flex-col">
-               <span className="text-[8px] uppercase tracking-wider text-gray-500">Distance</span>
-               <span className="text-white text-xs">{fareInfo.distanceKm} km</span>
-            </div>
-         </div>
-         
-         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 backdrop-blur-md">
-            <Clock className="w-4 h-4 text-amber-500" strokeWidth={2} />
-            <div className="flex flex-col">
-               <span className="text-[8px] uppercase tracking-wider text-gray-500">Est. Time</span>
-               <span className="text-white text-xs">{formatDuration(fareInfo.durationMin)}</span>
-            </div>
-         </div>
+        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 backdrop-blur-md">
+          <MapPin className="w-4 h-4 text-orange-500" strokeWidth={2} />
+          <div className="flex flex-col">
+            <span className="text-[8px] uppercase tracking-wider text-gray-500">Distance</span>
+            <span className="text-white text-xs">{fareInfo.distanceKm} km</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 backdrop-blur-md">
+          <Clock className="w-4 h-4 text-amber-500" strokeWidth={2} />
+          <div className="flex flex-col">
+            <span className="text-[8px] uppercase tracking-wider text-gray-500">Est. Time</span>
+            <span className="text-white text-xs">{formatDuration(fareInfo.durationMin)}</span>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -439,7 +437,7 @@ const RideConfirmed = () => {
   // Parse distance reliably
   useEffect(() => {
     if (ride?.distanceKm) {
-        setDistanceKm(ride.distanceKm);
+      setDistanceKm(ride.distanceKm);
     }
   }, [ride]);
 
@@ -448,9 +446,9 @@ const RideConfirmed = () => {
     const activeDistance = distanceKm || ride?.distanceKm || 15;
     const activeDuration = ride?.durationMin || 30;
     const activePassengers = ride?.passengers || 1;
-    
+
     const fareInfo = calculateTieredFare(activeDistance, activeDuration, vehicleType, activePassengers);
-    
+
     return fareInfo;
   }, [distanceKm, ride, vehicleType]);
 
@@ -479,9 +477,9 @@ const RideConfirmed = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
-      
+
       {/* GLOBAL BACK BUTTON */}
-      <button 
+      <button
         onClick={() => window.history.back()}
         className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-md"
         aria-label="Go back"
