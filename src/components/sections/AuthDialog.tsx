@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProfileSummaryDialog from "./ProfileSummaryDialog";
-import { GoogleMap, DirectionsRenderer } from "@react-google-maps/api";
+import { GoogleMap, Polyline } from "@react-google-maps/api";
 
 /* -------------------- MAP COMPONENTS -------------------- */
 
@@ -36,40 +36,53 @@ import { GoogleMap, DirectionsRenderer } from "@react-google-maps/api";
  * Renders the route on the map using Google Directions Service
  */
 const Directions = ({ origin, destination }: { origin: string; destination: string }) => {
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [path, setPath] = useState<google.maps.LatLngLiteral[]>([]);
 
   useEffect(() => {
     if (!origin || !destination || !window.google) return;
 
-    const directionsService = new window.google.maps.DirectionsService();
-
-    directionsService.route(
-      {
-        origin,
-        destination,
-        travelMode: google.maps.TravelMode.DRIVING,
-        provideRouteAlternatives: true,
-      },
-      (result, status) => {
-        if (status === window.google.maps.DirectionsStatus.OK && result) {
-          setDirections(result);
+    // Use new Routes API (computeRoutes)
+    const fetchRoute = async () => {
+      try {
+        const response = await fetch(
+          `https://routes.googleapis.com/directions/v2:computeRoutes`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
+              "X-Goog-FieldMask": "routes.polyline.encodedPolyline",
+            },
+            body: JSON.stringify({
+              origin: { address: origin },
+              destination: { address: destination },
+              travelMode: "DRIVE",
+            }),
+          }
+        );
+        const data = await response.json();
+        const encoded = data?.routes?.[0]?.polyline?.encodedPolyline;
+        if (encoded && window.google?.maps?.geometry?.encoding) {
+          const decoded = window.google.maps.geometry.encoding.decodePath(encoded);
+          setPath(decoded.map((p: google.maps.LatLng) => ({ lat: p.lat(), lng: p.lng() })));
         }
+      } catch (err) {
+        console.error("Routes API error:", err);
       }
-    );
+    };
+
+    fetchRoute();
   }, [origin, destination]);
 
-  if (!directions) return null;
+  if (!path.length) return null;
 
   return (
-    <DirectionsRenderer
-      directions={directions}
+    <Polyline
+      path={path}
       options={{
-        suppressMarkers: false,
-        polylineOptions: {
-          strokeColor: '#f59e0b',
-          strokeWeight: 5,
-          strokeOpacity: 0.8
-        }
+        strokeColor: '#f59e0b',
+        strokeWeight: 5,
+        strokeOpacity: 0.8,
       }}
     />
   );
@@ -877,7 +890,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
         if (profile.fullName && profile.email && profile.isLoggedIn) {
           // Skip sign-in if already logged in and has profile data
           onClose();
-          navigate("/vehicles");
+          navigate("/available-rides");
         }
       }
     }
@@ -897,7 +910,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
 
       onClose();
       // If we have ride data, we can go straight to vehicle selection
-      navigate("/vehicles");
+      navigate("/available-rides");
     }
   }, [verifyOtp, phone, onClose, navigate]);
 
@@ -943,7 +956,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
       // Close auth dialog → go to vehicle selection
       setGoogleLoading(false);
       onClose();
-      navigate("/vehicles");
+      navigate("/available-rides");
     } catch (err: any) {
       console.error("Failed to fetch Google user info:", err);
       setError("Google sign-in failed. Please try again.");

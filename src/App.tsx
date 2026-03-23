@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import AvailableRides from "./pages/AvailableRides";
 import RideConfirmed from "./pages/RideConfirmed";
 import RideSummary from "./pages/RideSummary";
+import BackButton from "@/components/ui/BackButton";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,8 @@ const App = (): JSX.Element => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+
+        <BackButton />
 
         <Routes>
           {/* Marketing */}

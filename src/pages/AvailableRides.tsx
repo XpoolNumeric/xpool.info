@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, memo } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, Variants } from "framer-motion";
-import { GoogleMap, useLoadScript, DirectionsRenderer } from "@react-google-maps/api";
+import { motion, AnimatePresence, Variants, useReducedMotion } from "framer-motion";
+import { GoogleMap, useLoadScript, Polyline, MarkerF } from "@react-google-maps/api";
 import {
   Star,
   MapPin,
@@ -12,14 +12,14 @@ import {
   Users,
   Car,
   Shield,
-  ArrowRight,
   SortAsc,
   CheckCircle2,
   MessageCircle,
+  Zap,
 } from "lucide-react";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
 import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
-import { formatDuration } from "@/utils/fareCalculator";
+import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 
 /* ─────────── CONSTANTS ─────────── */
 const LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
@@ -33,7 +33,7 @@ interface DriverRide {
   driverRating: number;
   driverRides: number;
   driverPhone: string;
-  driverPhoto: string; // initials placeholder
+  driverPhoto: string;
   vehicleType: VehicleId;
   vehicleName: string;
   vehicleNumber: string;
@@ -41,6 +41,7 @@ interface DriverRide {
   departureTime: string;
   availableSeats: number;
   pricePerSeat: number;
+  savingsVsTaxiAmount: number;
   isVerified: boolean;
   features: string[];
 }
@@ -59,137 +60,209 @@ const VEHICLE_LABELS: Record<VehicleId, string> = {
   xl: "SUV / XL",
 };
 
+/* ─────────── PULSE BG (matches Hero) ─────────── */
+interface PulsePoint { x: number; y: number; size: number; delay: number; dur: number; opacity: number; }
+
+const PULSE_CONFIG: PulsePoint[] = [
+  { x: 8, y: 12, size: 200, delay: 0, dur: 3.4, opacity: 0.28 },
+  { x: 80, y: 20, size: 160, delay: 1.2, dur: 4.0, opacity: 0.22 },
+  { x: 50, y: 60, size: 240, delay: 2.0, dur: 3.8, opacity: 0.20 },
+  { x: 15, y: 80, size: 140, delay: 0.6, dur: 4.6, opacity: 0.16 },
+  { x: 90, y: 70, size: 180, delay: 1.8, dur: 3.5, opacity: 0.18 },
+];
+
+const PulseBackground = memo(() => {
+  const prefersReducedMotion = useReducedMotion();
+  if (prefersReducedMotion) return null;
+  return (
+    <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+      {PULSE_CONFIG.map((p, i) => (
+        <div
+          key={i}
+          className="pulse-blob"
+          style={{
+            position: "absolute",
+            left: `${p.x}%`, top: `${p.y}%`,
+            width: p.size, height: p.size,
+            borderRadius: "50%",
+            transform: "translate(-50%, -50%)",
+            background: `radial-gradient(circle, rgba(251,191,36,${p.opacity}) 0%, rgba(245,158,11,${p.opacity * 0.5}) 42%, transparent 70%)`,
+            filter: "blur(44px)",
+            animationDuration: `${p.dur}s`,
+            animationDelay: `${p.delay}s`,
+            willChange: "opacity",
+          }}
+        />
+      ))}
+    </div>
+  );
+});
+PulseBackground.displayName = "PulseBackground";
+
 /* ─────────── MOCK DATA ─────────── */
-function generateMockRides(distanceKm: number, passengers: number): DriverRide[] {
+function generateMockRides(distanceKm: number, durationMin: number, passengers: number): DriverRide[] {
   const now = new Date();
-  const basePriceForCar = Math.round((distanceKm * 8 + 30) / 5) * 5;
+
+  // Use the real tiered fare algorithm for each vehicle type
+  const getFareData = (vehicleType: VehicleId) => {
+    const fareResult = calculateTieredFare(distanceKm, durationMin, vehicleType, passengers);
+    return {
+      perPerson: fareResult.fare.perPerson,
+      savingsVsTaxiAmount: fareResult.savings.vsTaxiAmount
+    };
+  };
 
   const drivers: DriverRide[] = [
     {
-      id: "d1",
-      driverName: "Rahul Sharma",
-      driverRating: 4.9,
-      driverRides: 1450,
-      driverPhone: "+91 98765 43210",
-      driverPhoto: "RS",
-      vehicleType: "car",
-      vehicleName: "Maruti Swift Dzire",
-      vehicleNumber: "TN 09 AB 1234",
-      vehicleColor: "White",
+      id: "d1", driverName: "Rahul Sharma", driverRating: 4.9, driverRides: 1450,
+      driverPhone: "+91 98765 43210", driverPhoto: "RS", vehicleType: "car",
+      vehicleName: "Maruti Swift Dzire", vehicleNumber: "TN 09 AB 1234", vehicleColor: "White",
       departureTime: new Date(now.getTime() + 15 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 3,
-      pricePerSeat: basePriceForCar,
-      isVerified: true,
-      features: ["AC", "Music", "Luggage space"],
+      availableSeats: 3, pricePerSeat: getFareData("car").perPerson, savingsVsTaxiAmount: getFareData("car").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Music", "Luggage space"],
     },
     {
-      id: "d2",
-      driverName: "Priya Patel",
-      driverRating: 4.8,
-      driverRides: 890,
-      driverPhone: "+91 87654 32109",
-      driverPhoto: "PP",
-      vehicleType: "car",
-      vehicleName: "Hyundai i20",
-      vehicleNumber: "TN 22 CD 5678",
-      vehicleColor: "Silver",
+      id: "d2", driverName: "Priya Patel", driverRating: 4.8, driverRides: 890,
+      driverPhone: "+91 87654 32109", driverPhoto: "PP", vehicleType: "car",
+      vehicleName: "Hyundai i20", vehicleNumber: "TN 22 CD 5678", vehicleColor: "Silver",
       departureTime: new Date(now.getTime() + 30 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 2,
-      pricePerSeat: Math.round((basePriceForCar * 0.9) / 5) * 5,
-      isVerified: true,
-      features: ["AC", "Pet friendly"],
+      availableSeats: 2, pricePerSeat: getFareData("car").perPerson, savingsVsTaxiAmount: getFareData("car").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Pet friendly"],
     },
     {
-      id: "d3",
-      driverName: "Amit Singh",
-      driverRating: 4.7,
-      driverRides: 2100,
-      driverPhone: "+91 76543 21098",
-      driverPhoto: "AS",
-      vehicleType: "xl",
-      vehicleName: "Toyota Innova",
-      vehicleNumber: "TN 07 EF 9012",
-      vehicleColor: "Black",
+      id: "d3", driverName: "Amit Singh", driverRating: 4.7, driverRides: 2100,
+      driverPhone: "+91 76543 21098", driverPhoto: "AS", vehicleType: "xl",
+      vehicleName: "Toyota Innova", vehicleNumber: "TN 07 EF 9012", vehicleColor: "Black",
       departureTime: new Date(now.getTime() + 20 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 5,
-      pricePerSeat: Math.round((basePriceForCar * 1.2) / 5) * 5,
-      isVerified: true,
-      features: ["AC", "Luggage space", "Charger", "Water bottle"],
+      availableSeats: 5, pricePerSeat: getFareData("xl").perPerson, savingsVsTaxiAmount: getFareData("xl").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Luggage space", "Charger", "Water bottle"],
     },
     {
-      id: "d4",
-      driverName: "Kavitha R",
-      driverRating: 4.6,
-      driverRides: 560,
-      driverPhone: "+91 65432 10987",
-      driverPhoto: "KR",
-      vehicleType: "auto",
-      vehicleName: "Bajaj RE",
-      vehicleNumber: "TN 09 GH 3456",
-      vehicleColor: "Yellow/Green",
+      id: "d4", driverName: "Kavitha R", driverRating: 4.6, driverRides: 560,
+      driverPhone: "+91 65432 10987", driverPhoto: "KR", vehicleType: "auto",
+      vehicleName: "Bajaj RE", vehicleNumber: "TN 09 GH 3456", vehicleColor: "Yellow/Green",
       departureTime: new Date(now.getTime() + 10 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 2,
-      pricePerSeat: Math.round((basePriceForCar * 0.6) / 5) * 5,
-      isVerified: false,
-      features: ["Budget friendly"],
+      availableSeats: 2, pricePerSeat: getFareData("auto").perPerson, savingsVsTaxiAmount: getFareData("auto").savingsVsTaxiAmount, isVerified: false, features: ["Budget friendly"],
     },
     {
-      id: "d5",
-      driverName: "Vijay Kumar",
-      driverRating: 4.9,
-      driverRides: 3200,
-      driverPhone: "+91 54321 09876",
-      driverPhoto: "VK",
-      vehicleType: "car",
-      vehicleName: "Honda City",
-      vehicleNumber: "TN 01 IJ 7890",
-      vehicleColor: "Red",
+      id: "d5", driverName: "Vijay Kumar", driverRating: 4.9, driverRides: 3200,
+      driverPhone: "+91 54321 09876", driverPhoto: "VK", vehicleType: "car",
+      vehicleName: "Honda City", vehicleNumber: "TN 01 IJ 7890", vehicleColor: "Red",
       departureTime: new Date(now.getTime() + 45 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 3,
-      pricePerSeat: Math.round((basePriceForCar * 1.1) / 5) * 5,
-      isVerified: true,
-      features: ["AC", "Premium audio", "Leather seats", "Charger"],
+      availableSeats: 3, pricePerSeat: getFareData("car").perPerson, savingsVsTaxiAmount: getFareData("car").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Premium audio", "Leather seats", "Charger"],
     },
     {
-      id: "d6",
-      driverName: "Deepa M",
-      driverRating: 4.5,
-      driverRides: 340,
-      driverPhone: "+91 43210 98765",
-      driverPhoto: "DM",
-      vehicleType: "bike",
-      vehicleName: "Royal Enfield Classic",
-      vehicleNumber: "TN 09 KL 1122",
-      vehicleColor: "Black",
+      id: "d6", driverName: "Deepa M", driverRating: 4.5, driverRides: 340,
+      driverPhone: "+91 43210 98765", driverPhoto: "DM", vehicleType: "bike",
+      vehicleName: "Royal Enfield Classic", vehicleNumber: "TN 09 KL 1122", vehicleColor: "Black",
       departureTime: new Date(now.getTime() + 5 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 1,
-      pricePerSeat: Math.round((basePriceForCar * 0.45) / 5) * 5,
-      isVerified: false,
-      features: ["Helmet provided", "Fast"],
+      availableSeats: 1, pricePerSeat: getFareData("bike").perPerson, savingsVsTaxiAmount: getFareData("bike").savingsVsTaxiAmount, isVerified: false, features: ["Helmet provided", "Fast"],
     },
   ];
 
-  // Filter out rides with fewer seats than requested
   return drivers.filter((d) => d.availableSeats >= passengers);
 }
 
-/* ─────────── ANIMATIONS ─────────── */
+/* ─────────── ANIMATIONS (matches Hero easing) ─────────── */
 const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
 
 const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
 };
 
 const mapContainerStyle = { width: "100%", height: "100%" };
 const defaultCenter = { lat: 13.0827, lng: 80.2707 };
 
+/* ──────────── XPOOL MAP STYLES (warm light — matches Hero) ──────────── */
+const XPOOL_MAP_STYLES: google.maps.MapTypeStyle[] = [
+  // Base geometry — warm cream
+  { elementType: "geometry", stylers: [{ color: "#fdf8f0" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#fdf8f0" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#9ca3af" }] },
+  // Hide clutter
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ visibility: "off" }] },
+  // Landscape — soft warm sand
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#fef9ee" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#f5efe0" }] },
+  // Roads — warm white/cream
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#f0e8d8" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#b45309" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#ffe9b0" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#fcd34d" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#92400e" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#fff3cd" }] },
+  { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#b45309" }] },
+  // Water — soft dusty blue
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#dbeafe" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#93c5fd" }] },
+];
+
+/* ─────────── GLOBAL STYLES (matches Hero) ─────────── */
+const PageStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    @keyframes pulse-fade {
+      0%, 100% { opacity: 0; } 50% { opacity: 1; }
+    }
+    .pulse-blob {
+      animation: pulse-fade ease-in-out infinite;
+      will-change: opacity;
+    }
+
+    @keyframes shimmer-cta {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    .cta-shimmer-btn {
+      background: linear-gradient(
+        110deg,
+        #f59e0b 0%, #fbbf24 30%,
+        #fde68a 50%, #fbbf24 70%,
+        #f59e0b 100%
+      );
+      background-size: 200% auto;
+      animation: shimmer-cta 3s linear infinite;
+      color: #1a0800 !important;
+      font-weight: 700 !important;
+      border: none !important;
+      box-shadow: 0 4px 24px rgba(245,158,11,0.4), 0 1px 0 rgba(255,255,255,0.35) inset;
+    }
+    .cta-shimmer-btn:hover {
+      filter: brightness(1.07);
+      box-shadow: 0 8px 36px rgba(245,158,11,0.55), 0 1px 0 rgba(255,255,255,0.35) inset;
+    }
+
+    @keyframes border-breathe {
+      0%, 100% { border-color: rgba(245,158,11,0.18); }
+      50%       { border-color: rgba(245,158,11,0.50); }
+    }
+    .badge-breathe { animation: border-breathe 3s ease-in-out infinite; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+    .blink-dot { animation: blink 1.6s ease-in-out infinite; }
+
+    @keyframes card-breathe {
+      0%, 100% { box-shadow: 0 8px 30px rgba(245,158,11,0.12); }
+      50%       { box-shadow: 0 8px 40px rgba(245,158,11,0.28); }
+    }
+    .selected-card { animation: card-breathe 2s ease-in-out infinite; }
+
+    .rides-scrollbar::-webkit-scrollbar { width: 0px; }
+  `}</style>
+);
+
 /* ─────────── MAIN COMPONENT ─────────── */
 export default function AvailableRides() {
   const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
+
   const [selectedRide, setSelectedRide] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("price");
   const [vehicleFilter, setVehicleFilter] = useState<VehicleId | "all">("all");
@@ -200,14 +273,16 @@ export default function AvailableRides() {
   const [distanceKm, setDistanceKm] = useState(15);
   const [durationMin, setDurationMin] = useState(30);
   const [passengers, setPassengers] = useState(1);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [routePath, setRoutePath] = useState<google.maps.LatLngLiteral[]>([]);
+
+  const mapRef = useRef<google.maps.Map | null>(null);
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
     libraries: LIBRARIES,
   });
 
-  // Load ride data from localStorage
+  /* Load ride data */
   useEffect(() => {
     const summaryStr = localStorage.getItem("rideSummary");
     if (summaryStr) {
@@ -226,47 +301,62 @@ export default function AvailableRides() {
     }
   }, [navigate]);
 
-  // Fetch directions
+  /* Fetch route polyline */
   useEffect(() => {
-    if (isLoaded && pickup && drop && window.google) {
-      const directionsService = new window.google.maps.DirectionsService();
-      directionsService.route(
-        {
-          origin: pickup,
-          destination: drop,
-          travelMode: window.google.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (status === window.google.maps.DirectionsStatus.OK && result) {
-            setDirections(result);
-          }
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+    if (!apiKey || !pickup || !drop || !isLoaded) return;
+
+    fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.polyline.encodedPolyline",
+      },
+      body: JSON.stringify({
+        origin: { address: pickup },
+        destination: { address: drop },
+        travelMode: "DRIVE",
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const encoded = data?.routes?.[0]?.polyline?.encodedPolyline;
+        if (encoded && window.google?.maps?.geometry?.encoding) {
+          const decoded = window.google.maps.geometry.encoding.decodePath(encoded);
+          const path = decoded.map((p: google.maps.LatLng) => ({ lat: p.lat(), lng: p.lng() }));
+          setRoutePath(path);
         }
-      );
-    }
+      })
+      .catch((err) => console.error("Routes API error in AvailableRides:", err));
   }, [isLoaded, pickup, drop]);
 
-  // Generate rides
-  const allRides = useMemo(() => generateMockRides(distanceKm, passengers), [distanceKm, passengers]);
+  /* Auto-fit map to full route */
+  useEffect(() => {
+    if (!mapRef.current || routePath.length < 2) return;
+    const bounds = new window.google.maps.LatLngBounds();
+    routePath.forEach((pt) => bounds.extend(pt));
+    mapRef.current.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+  }, [routePath]);
 
-  // Filter & sort
+  const mapOptions = useMemo<google.maps.MapOptions>(() => ({
+    disableDefaultUI: true,
+    zoomControl: false,
+    gestureHandling: "none",
+    styles: XPOOL_MAP_STYLES,
+  }), []);
+
+  /* Rides list */
+  const allRides = useMemo(() => generateMockRides(distanceKm, durationMin, passengers), [distanceKm, durationMin, passengers]);
+
   const filteredRides = useMemo(() => {
     let rides = [...allRides];
-    if (vehicleFilter !== "all") {
-      rides = rides.filter((r) => r.vehicleType === vehicleFilter);
-    }
+    if (vehicleFilter !== "all") rides = rides.filter((r) => r.vehicleType === vehicleFilter);
     switch (sortBy) {
-      case "price":
-        rides.sort((a, b) => a.pricePerSeat - b.pricePerSeat);
-        break;
-      case "rating":
-        rides.sort((a, b) => b.driverRating - a.driverRating);
-        break;
-      case "seats":
-        rides.sort((a, b) => b.availableSeats - a.availableSeats);
-        break;
-      case "departure":
-        // already in time order from mock
-        break;
+      case "price":   rides.sort((a, b) => a.pricePerSeat - b.pricePerSeat); break;
+      case "rating":  rides.sort((a, b) => b.driverRating - a.driverRating); break;
+      case "seats":   rides.sort((a, b) => b.availableSeats - a.availableSeats); break;
+      default: break;
     }
     return rides;
   }, [allRides, vehicleFilter, sortBy]);
@@ -274,346 +364,450 @@ export default function AvailableRides() {
   const handleSelectRide = useCallback(
     (ride: DriverRide) => {
       setSelectedRide(ride.id);
-
-      // Store selected driver info for downstream pages
       const selectedDriverData = {
-        driverName: ride.driverName,
-        driverRating: ride.driverRating,
-        driverRides: ride.driverRides,
-        driverPhone: ride.driverPhone,
-        vehicleType: ride.vehicleType,
-        vehicleName: ride.vehicleName,
-        vehicleNumber: ride.vehicleNumber,
-        pricePerSeat: ride.pricePerSeat,
+        driverName: ride.driverName, driverRating: ride.driverRating,
+        driverRides: ride.driverRides, driverPhone: ride.driverPhone,
+        vehicleType: ride.vehicleType, vehicleName: ride.vehicleName,
+        vehicleNumber: ride.vehicleNumber, pricePerSeat: ride.pricePerSeat,
         departureTime: ride.departureTime,
       };
       localStorage.setItem("selectedDriver", JSON.stringify(selectedDriverData));
       localStorage.setItem("vehicleType", JSON.stringify(ride.vehicleType));
-
-      // Update rideSummary with passenger count
       const summaryStr = localStorage.getItem("rideSummary");
       if (summaryStr) {
         try {
           const summary = JSON.parse(summaryStr);
-          localStorage.setItem(
-            "rideSummary",
-            JSON.stringify({ ...summary, distanceKm, durationMin, passengers })
-          );
+          localStorage.setItem("rideSummary", JSON.stringify({ ...summary, distanceKm, durationMin, passengers }));
         } catch (e) { /* ignore */ }
       }
-
-      // Navigate after brief visual feedback
-      setTimeout(() => {
-        navigate("/ride-confirmed");
-      }, 600);
+      setTimeout(() => navigate("/ride-confirmed"), 600);
     },
     [navigate, distanceKm, durationMin, passengers]
   );
 
   return (
-    <div className="h-screen w-full relative overflow-hidden bg-gray-50" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* BACK BUTTON */}
-      <button
-        onClick={() => window.history.back()}
-        className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/90 backdrop-blur-md shadow-md border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-lg"
-        aria-label="Go back"
-      >
-        <ChevronLeft className="w-6 h-6 ml-[-2px]" />
-      </button>
+    <>
+      <PageStyles />
 
-      {/* MAP TOP SECTION */}
-      <div className="absolute top-0 left-0 right-0 h-[35vh] z-0">
-        {isLoaded ? (
-          <GoogleMap
-            mapContainerStyle={mapContainerStyle}
-            center={defaultCenter}
-            zoom={12}
-            options={{
-              disableDefaultUI: true,
-              zoomControl: false,
-              styles: [
-                { featureType: "poi", stylers: [{ visibility: "off" }] },
-                { featureType: "transit", stylers: [{ visibility: "off" }] },
-              ],
-            }}
-          >
-            {directions && (
-              <DirectionsRenderer
-                directions={directions}
-                options={{
-                  polylineOptions: { strokeColor: "#f59e0b", strokeWeight: 5 },
-                  suppressMarkers: false,
-                }}
-              />
-            )}
-          </GoogleMap>
-        ) : (
-          <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
-            <span className="text-gray-400 font-medium flex items-center gap-2">
-              <Sparkles className="w-4 h-4" /> Loading map...
-            </span>
-          </div>
-        )}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
-      </div>
-
-      {/* BOTTOM SHEET */}
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 25 }}
-        className="absolute bottom-0 left-0 right-0 h-[72vh] z-10 bg-white/95 backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-15px_60px_rgba(0,0,0,0.15)] border-t border-white flex flex-col pt-2"
+      {/* ── ROOT — Hero warm amber-cream background ── */}
+      <div
+        className="h-screen w-full relative overflow-hidden"
+        style={{
+          background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)",
+          fontFamily: "'Inter', sans-serif",
+          isolation: "isolate",
+        }}
       >
-        {/* Drag Handle */}
-        <div className="w-full flex justify-center py-3">
-          <div className="w-14 h-1.5 rounded-full bg-gray-300" />
+        {/* Pulse blobs — clipped to below the map so they don't wash it out */}
+        <div
+          aria-hidden="true"
+          className="absolute left-0 right-0 bottom-0 pointer-events-none overflow-hidden"
+          style={{ top: "38vh", zIndex: 0 }}
+        >
+          <PulseBackground />
         </div>
 
-        <div className="px-5 flex-1 overflow-y-auto pb-8 custom-scrollbar">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
-                Available Rides
-              </h2>
-              <div className="flex gap-3 text-xs font-bold text-amber-500 mt-1 uppercase tracking-wider">
-                <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {distanceKm.toFixed(1)} km</span>
-                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {formatDuration(durationMin)}</span>
-                <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {passengers} {passengers === 1 ? "seat" : "seats"}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-2.5 rounded-xl border transition-all ${showFilters ? "bg-amber-50 border-amber-300 text-amber-600" : "bg-gray-50 border-gray-200 text-gray-500 hover:border-amber-300"}`}
+        {/* Dot grid overlay — only below the map (Hero-style) */}
+        <div
+          aria-hidden="true"
+          className="absolute left-0 right-0 bottom-0 pointer-events-none"
+          style={{
+            top: "38vh",
+            zIndex: 1,
+            backgroundImage: "radial-gradient(rgba(245,158,11,0.08) 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+          }}
+        />
+
+        {/* Radial vignette — only below the map */}
+        <div
+          aria-hidden="true"
+          className="absolute left-0 right-0 bottom-0 pointer-events-none"
+          style={{
+            top: "38vh",
+            zIndex: 2,
+            background: "radial-gradient(ellipse 90% 80% at 50% 80%, rgba(255,251,235,0) 0%, rgba(255,251,235,0.5) 100%)",
+          }}
+        />
+
+
+        {/* ── LIVE ROUTE PILL (top-right, Hero eyebrow style) ── */}
+        <motion.div
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          className="absolute top-6 right-4 z-50 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-amber-300/60 bg-amber-50/80 backdrop-blur-sm text-amber-700 shadow-sm"
+          style={{ zIndex: 50 }}
+        >
+          <span className="blink-dot h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
+          <span className="text-[10px] font-semibold tracking-widest uppercase">Live Route</span>
+        </motion.div>
+
+        {/* ── MAP ── */}
+        <div className="absolute top-0 left-0 right-0 h-[38vh] z-10 overflow-hidden">
+          {isLoaded ? (
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              center={defaultCenter}
+              zoom={12}
+              options={mapOptions}
+              onLoad={(map) => {
+                mapRef.current = map;
+                if (routePath.length >= 2) {
+                  const bounds = new window.google.maps.LatLngBounds();
+                  routePath.forEach((pt) => bounds.extend(pt));
+                  map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+                }
+              }}
             >
-              <Filter className="w-5 h-5" />
-            </button>
+              {routePath.length > 0 && (
+                <>
+                  {/* Glow halo */}
+                  <Polyline path={routePath} options={{ strokeColor: "#f59e0b", strokeWeight: 14, strokeOpacity: 0.12, zIndex: 1 }} />
+                  {/* Main route */}
+                  <Polyline path={routePath} options={{ strokeColor: "#f59e0b", strokeWeight: 4, strokeOpacity: 1, zIndex: 2 }} />
+                  {/* Origin */}
+                  <MarkerF
+                    position={routePath[0]}
+                    icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#f59e0b", fillOpacity: 1, strokeWeight: 3, strokeColor: "#ffffff" }}
+                    zIndex={10}
+                  />
+                  {/* Destination */}
+                  <MarkerF
+                    position={routePath[routePath.length - 1]}
+                    icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#ea580c", fillOpacity: 1, strokeWeight: 3, strokeColor: "#ffffff" }}
+                    zIndex={10}
+                  />
+                </>
+              )}
+            </GoogleMap>
+          ) : (
+            /* Loading shimmer matches Hero amber palette */
+            <div className="w-full h-full flex items-center justify-center" style={{ background: "#fef9ee" }}>
+              <span className="flex items-center gap-2 text-amber-500 text-xs font-semibold tracking-widest uppercase">
+                <Sparkles className="w-4 h-4 animate-pulse" /> Loading map…
+              </span>
+            </div>
+          )}
+
+
+        </div>
+
+        {/* ── BOTTOM SHEET — glassmorphism over warm amber-cream ── */}
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          transition={{ type: "spring", stiffness: 250, damping: 26 }}
+          className="absolute bottom-0 left-0 right-0 z-20 flex flex-col rounded-t-[2.5rem]"
+          style={{
+            height: "68vh",
+            background: "rgba(255,253,245,0.92)",
+            backdropFilter: "blur(32px)",
+            WebkitBackdropFilter: "blur(32px)",
+            borderTop: "1.5px solid rgba(245,158,11,0.18)",
+            boxShadow: "0 -16px 60px rgba(180,83,9,0.10), 0 -1px 0 rgba(251,191,36,0.12)",
+          }}
+        >
+          {/* Drag handle */}
+          <div className="w-full flex justify-center py-3">
+            <div className="w-14 h-1.5 rounded-full bg-amber-200/80" />
           </div>
 
-          {/* Filters */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden mb-4"
-              >
-                <div className="py-3 space-y-3">
-                  {/* Sort */}
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                      <SortAsc className="w-3 h-3" /> Sort by
-                    </p>
-                    <div className="flex gap-2 flex-wrap">
-                      {([
-                        { key: "price" as SortBy, label: "Price" },
-                        { key: "rating" as SortBy, label: "Rating" },
-                        { key: "departure" as SortBy, label: "Departure" },
-                        { key: "seats" as SortBy, label: "Seats" },
-                      ]).map((s) => (
-                        <button
-                          key={s.key}
-                          onClick={() => setSortBy(s.key)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${sortBy === s.key
-                            ? "bg-amber-50 border-amber-400 text-amber-700 shadow-sm"
-                            : "bg-white border-gray-200 text-gray-500 hover:border-amber-300"}`}
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Vehicle filter */}
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                      <Car className="w-3 h-3" /> Vehicle type
-                    </p>
-                    <div className="flex gap-2 flex-wrap">
-                      <button
-                        onClick={() => setVehicleFilter("all")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${vehicleFilter === "all"
-                          ? "bg-amber-50 border-amber-400 text-amber-700 shadow-sm"
-                          : "bg-white border-gray-200 text-gray-500 hover:border-amber-300"}`}
+          <div className="px-5 flex-1 overflow-y-auto pb-8 rides-scrollbar">
+
+            {/* ── Header row ── */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="mb-3"
+            >
+              <motion.div variants={fadeUp} className="flex items-start justify-between">
+                <div>
+                  <h2
+                    className="text-2xl font-extrabold text-gray-900 tracking-tight leading-tight"
+                    style={{ fontFamily: "'Inter', sans-serif" }}
+                  >
+                    Available Rides
+                  </h2>
+
+                  {/* Route meta — Hero eyebrow style */}
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {[
+                      { icon: <MapPin className="w-3 h-3" />, label: `${distanceKm.toFixed(1)} km` },
+                      { icon: <Clock className="w-3 h-3" />, label: formatDuration(durationMin) },
+                      { icon: <Users className="w-3 h-3" />, label: `${passengers} ${passengers === 1 ? "seat" : "seats"}` },
+                    ].map(({ icon, label }, i) => (
+                      <span
+                        key={i}
+                        className="badge-breathe inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-amber-200/60 bg-white/80 backdrop-blur-sm text-amber-700 text-[10.5px] font-semibold shadow-sm"
                       >
-                        All
-                      </button>
-                      {(["bike", "auto", "car", "xl"] as VehicleId[]).map((v) => (
-                        <button
-                          key={v}
-                          onClick={() => setVehicleFilter(v)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all border ${vehicleFilter === v
-                            ? "bg-amber-50 border-amber-400 text-amber-700 shadow-sm"
-                            : "bg-white border-gray-200 text-gray-500 hover:border-amber-300"}`}
-                        >
-                          {VEHICLE_LABELS[v]}
-                        </button>
-                      ))}
-                    </div>
+                        {icon} {label}
+                      </span>
+                    ))}
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
-          {/* Results count */}
-          <p className="text-[11px] font-bold text-gray-400 mb-3">
-            {filteredRides.length} ride{filteredRides.length !== 1 ? "s" : ""} found
-          </p>
-
-          {/* Ride Cards */}
-          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3 pb-4">
-            {filteredRides.length === 0 ? (
-              <motion.div variants={fadeUp} className="text-center py-12 space-y-3">
-                <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
-                  <Car className="w-7 h-7 text-gray-400" />
-                </div>
-                <p className="text-sm font-bold text-gray-500">No rides match your filters</p>
-                <button onClick={() => setVehicleFilter("all")} className="text-xs font-bold text-amber-600 underline">
-                  Clear filters
+                {/* Filter toggle — Hero ghost-light style */}
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`mt-0.5 p-2.5 rounded-xl border transition-all duration-200 ${
+                    showFilters
+                      ? "bg-amber-100 border-amber-300 text-amber-700 shadow-sm"
+                      : "bg-white/80 border-amber-200/60 text-amber-600 hover:bg-amber-50 hover:border-amber-300"
+                  }`}
+                >
+                  <Filter className="w-4.5 h-4.5 w-5 h-5" />
                 </button>
               </motion.div>
-            ) : (
-              filteredRides.map((ride) => {
-                const Icon = VEHICLE_ICONS[ride.vehicleType];
-                const isSelected = selectedRide === ride.id;
+            </motion.div>
 
-                return (
-                  <motion.div
-                    variants={fadeUp}
-                    key={ride.id}
-                    onClick={() => !isSelected && handleSelectRide(ride)}
-                    whileHover={{ scale: 1.005, y: -1 }}
-                    whileTap={{ scale: 0.995 }}
-                    className={`relative p-4 rounded-[1.25rem] transition-all duration-300 border cursor-pointer
-                      ${isSelected
-                        ? "bg-amber-50/80 border-amber-400 shadow-[0_8px_30px_rgba(245,158,11,0.18)] ring-1 ring-amber-400"
-                        : "bg-white border-gray-200/80 hover:border-amber-300 shadow-sm hover:shadow-md"
-                      }`}
+            {/* ── Filters panel ── */}
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden mb-4"
+                >
+                  <div
+                    className="py-4 px-4 rounded-2xl border border-amber-200/60 bg-white/80 backdrop-blur-sm shadow-sm space-y-3"
+                    style={{ backdropFilter: "blur(12px)" }}
                   >
-                    {/* DRIVER ROW */}
-                    <div className="flex items-start gap-3.5">
-                      {/* Avatar */}
-                      <div className={`mt-0.5 h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-sm font-black transition-all ${isSelected
-                        ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-500/20"
-                        : "bg-gray-100 text-gray-600 border border-gray-200"
-                        }`}>
-                        {ride.driverPhoto}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className={`font-black tracking-tight text-[15px] ${isSelected ? "text-orange-600" : "text-gray-900"}`}>
-                            {ride.driverName}
-                          </h3>
-                          {ride.isVerified && (
-                            <Shield className="h-3.5 w-3.5 text-blue-500 shrink-0" fill="currentColor" />
-                          )}
-                          {isSelected && (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" fill="currentColor" stroke="white" />
-                          )}
-                        </div>
-
-                        {/* Rating + rides */}
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <div className="flex items-center gap-0.5 text-[11px] font-bold text-yellow-700">
-                            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                            {ride.driverRating}
-                          </div>
-                          <span className="text-[10px] font-bold text-gray-400">• {ride.driverRides.toLocaleString()} rides</span>
-                        </div>
-
-                        {/* Vehicle info */}
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${isSelected ? "bg-amber-100 text-amber-600" : "bg-gray-50 text-gray-500 border border-gray-200"}`}>
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-bold text-gray-700 truncate">{ride.vehicleName} • {ride.vehicleColor}</p>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{ride.vehicleNumber}</p>
-                          </div>
-                        </div>
-
-                        {/* Features */}
-                        <div className="flex gap-1 mt-2 flex-wrap">
-                          {ride.features.slice(0, 3).map((f) => (
-                            <span key={f} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-500 border border-gray-100">
-                              {f}
-                            </span>
-                          ))}
-                          {ride.features.length > 3 && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-400">
-                              +{ride.features.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Price + time + seats */}
-                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
-                        <div className="flex items-baseline gap-0.5">
-                          <span className="text-[10px] font-black text-gray-400">₹</span>
-                          <span className={`text-2xl font-black tracking-tight ${isSelected ? "text-orange-600" : "text-gray-900"}`} style={{ fontFamily: "'Syne', sans-serif" }}>
-                            {ride.pricePerSeat}
-                          </span>
-                        </div>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">per seat</span>
-
-                        <div className="flex items-center gap-1 mt-1.5 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-md px-1.5 py-0.5 border border-gray-100">
-                          <Clock className="w-3 h-3 text-amber-500" />
-                          {ride.departureTime}
-                        </div>
-
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-md px-1.5 py-0.5 border border-emerald-100">
-                          <Users className="w-3 h-3" />
-                          {ride.availableSeats} seat{ride.availableSeats !== 1 ? "s" : ""} left
-                        </div>
+                    {/* Sort */}
+                    <div>
+                      <p className="text-[10px] font-bold text-amber-700/60 uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <SortAsc className="w-3 h-3" /> Sort by
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {(["price", "rating", "departure", "seats"] as SortBy[]).map((key) => (
+                          <button
+                            key={key}
+                            onClick={() => setSortBy(key)}
+                            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border capitalize ${
+                              sortBy === key
+                                ? "bg-amber-100 border-amber-400 text-amber-800 shadow-sm"
+                                : "bg-white border-amber-200/60 text-amber-700/70 hover:border-amber-300"
+                            }`}
+                          >
+                            {key.charAt(0).toUpperCase() + key.slice(1)}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
-                    {/* Booking feedback overlay */}
-                    <AnimatePresence>
-                      {isSelected && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="absolute inset-0 rounded-[1.25rem] bg-amber-500/5 flex items-center justify-center z-20 pointer-events-none"
-                        >
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                            className="bg-white/95 backdrop-blur-md rounded-2xl px-6 py-3 shadow-xl border border-amber-200 flex items-center gap-2"
+                    {/* Vehicle */}
+                    <div>
+                      <p className="text-[10px] font-bold text-amber-700/60 uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <Car className="w-3 h-3" /> Vehicle type
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {(["all", "bike", "auto", "car", "xl"] as const).map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setVehicleFilter(v)}
+                            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold capitalize transition-all border ${
+                              vehicleFilter === v
+                                ? "bg-amber-100 border-amber-400 text-amber-800 shadow-sm"
+                                : "bg-white border-amber-200/60 text-amber-700/70 hover:border-amber-300"
+                            }`}
                           >
-                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                            <span className="font-bold text-gray-900 text-sm">Booking ride...</span>
+                            {v === "all" ? "All" : VEHICLE_LABELS[v]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Results count — Hero eyebrow micro-text style */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-px bg-amber-200/40" />
+              <p className="text-[10.5px] font-semibold text-amber-700/60 uppercase tracking-widest whitespace-nowrap">
+                {filteredRides.length} ride{filteredRides.length !== 1 ? "s" : ""} found
+              </p>
+              <div className="flex-1 h-px bg-amber-200/40" />
+            </div>
+
+            {/* ── Ride Cards ── */}
+            <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3 pb-4">
+              {filteredRides.length === 0 ? (
+                <motion.div variants={fadeUp} className="text-center py-12 space-y-3">
+                  <div className="w-16 h-16 mx-auto bg-amber-50 rounded-full border border-amber-200/60 flex items-center justify-center shadow-sm">
+                    <Car className="w-7 h-7 text-amber-400" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-500">No rides match your filters</p>
+                  <button
+                    onClick={() => setVehicleFilter("all")}
+                    className="text-xs font-bold text-amber-600 underline underline-offset-2"
+                  >
+                    Clear filters
+                  </button>
+                </motion.div>
+              ) : (
+                filteredRides.map((ride) => {
+                  const Icon = VEHICLE_ICONS[ride.vehicleType];
+                  const isSelected = selectedRide === ride.id;
+
+                  return (
+                    <motion.div
+                      variants={fadeUp}
+                      key={ride.id}
+                      onClick={() => !isSelected && handleSelectRide(ride)}
+                      whileHover={!prefersReducedMotion ? { scale: 1.008, y: -2, transition: { duration: 0.18 } } : {}}
+                      whileTap={!prefersReducedMotion ? { scale: 0.995 } : {}}
+                      className={`relative p-4 rounded-[1.4rem] transition-all duration-300 cursor-pointer border ${
+                        isSelected
+                          ? "selected-card bg-amber-50/90 border-amber-400 ring-1 ring-amber-400/60"
+                          : "badge-breathe bg-white/80 border-amber-200/60 hover:border-amber-300 shadow-sm hover:shadow-md"
+                      }`}
+                      style={{ backdropFilter: "blur(8px)" }}
+                    >
+                      {/* Driver row */}
+                      <div className="flex items-start gap-3.5">
+
+                        {/* Avatar — Hero logo-ring style */}
+                        <div
+                          className={`mt-0.5 h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-sm font-extrabold transition-all ${
+                            isSelected
+                              ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-500/20"
+                              : "bg-amber-50 text-amber-700 border border-amber-200/80"
+                          }`}
+                        >
+                          {ride.driverPhoto}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h3 className={`font-extrabold tracking-tight text-[15px] ${isSelected ? "text-amber-800" : "text-gray-900"}`}>
+                              {ride.driverName}
+                            </h3>
+                            {ride.isVerified && (
+                              <Shield className="h-3.5 w-3.5 text-blue-500 shrink-0" fill="currentColor" />
+                            )}
+                            {isSelected && (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" fill="currentColor" stroke="white" />
+                            )}
+                          </div>
+
+                          {/* Rating */}
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="inline-flex items-center gap-0.5 bg-amber-50 border border-amber-200/60 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                              {ride.driverRating}
+                            </span>
+                            <span className="text-[10px] font-semibold text-gray-400">
+                              {ride.driverRides.toLocaleString()} rides
+                            </span>
+                          </div>
+
+                          {/* Vehicle */}
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className={`h-7 w-7 rounded-lg flex items-center justify-center border ${
+                              isSelected ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-amber-50/80 border-amber-200/60 text-amber-600"
+                            }`}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-bold text-gray-700 truncate">{ride.vehicleName} · {ride.vehicleColor}</p>
+                              <p className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-widest">{ride.vehicleNumber}</p>
+                            </div>
+                          </div>
+
+                          {/* Feature chips — Hero badge style */}
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {ride.features.slice(0, 3).map((f) => (
+                              <span
+                                key={f}
+                                className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-white border border-amber-200/60 text-amber-700/80"
+                              >
+                                {f}
+                              </span>
+                            ))}
+                            {ride.features.length > 3 && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-white border border-amber-200/40 text-gray-400">
+                                +{ride.features.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Price block */}
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                          <div className="flex items-baseline gap-0.5">
+                            <span className="text-[10px] font-bold text-amber-600/60">₹</span>
+                            <span
+                              className={`text-2xl font-extrabold tracking-tight ${isSelected ? "text-amber-700" : "text-gray-900"}`}
+                              style={{ fontFamily: "'Inter', sans-serif" }}
+                            >
+                              {ride.pricePerSeat * passengers}
+                            </span>
+                          </div>
+
+                          {/* SAVINGS BADGE */}
+                          <div className="flex flex-col items-end gap-1 mb-1.5">
+                            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 border border-green-100 text-green-700 text-[9px] font-bold shadow-sm">
+                              <Zap className="w-2 h-2 fill-green-500 text-green-500" />
+                              Save ₹{ride.savingsVsTaxiAmount}
+                            </div>
+                            <span className="text-[9px] font-semibold text-amber-700/50 uppercase tracking-widest">
+                              for {passengers} {passengers === 1 ? "seat" : "seats"}
+                            </span>
+                          </div>
+
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700/80 bg-amber-50 border border-amber-200/60 rounded-full px-2 py-0.5">
+                            <Clock className="w-2.5 h-2.5" /> {ride.departureTime}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 rounded-full px-2 py-0.5 mt-1">
+                            <Users className="w-2.5 h-2.5" /> {ride.availableSeats} left
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Booking feedback overlay */}
+                      <AnimatePresence>
+                        {isSelected && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="absolute inset-0 rounded-[1.4rem] bg-amber-500/5 flex items-center justify-center z-20 pointer-events-none"
+                          >
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                              className="bg-white/95 backdrop-blur-md rounded-2xl px-6 py-3 shadow-xl border border-amber-200 flex items-center gap-2"
+                            >
+                              <Zap className="w-4 h-4 text-amber-500" />
+                              <span className="font-bold text-gray-900 text-sm">Booking ride…</span>
+                            </motion.div>
                           </motion.div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                );
-              })
-            )}
-          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })
+              )}
+            </motion.div>
 
-          {/* Bottom hint */}
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            className="flex items-center justify-center gap-2 text-[11px] font-medium text-gray-400 pb-4 pt-2"
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            You can message drivers after booking
-          </motion.div>
-        </div>
-      </motion.div>
-
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 0px; }
-      `}</style>
-    </div>
+            {/* Bottom hint — Hero sub-copy style */}
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              animate="visible"
+              className="flex items-center justify-center gap-2 text-[11px] font-medium text-amber-600/50 pb-4 pt-2"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              Message drivers after booking
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
+    </>
   );
 }

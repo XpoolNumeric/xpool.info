@@ -542,35 +542,40 @@ const BookingSection = () => {
       }, 700);
     };
 
-    // Calculate distance and duration if Google Maps is loaded
-    if (window.google && window.google.maps && window.google.maps.DirectionsService) {
-      const directionsService = new window.google.maps.DirectionsService();
-      directionsService.route(
-        {
-          origin: pickupLocation,
-          destination: dropLocation,
-          travelMode: window.google.maps.TravelMode.DRIVING,
+    // Calculate distance and duration using new Routes API
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+    if (apiKey && pickupLocation && dropLocation) {
+      fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
         },
-        (result, status) => {
-          if (status === window.google.maps.DirectionsStatus.OK && result) {
-            const route = result.routes[0];
-            if (route && route.legs && route.legs.length > 0) {
-              const leg = route.legs[0];
-              const distanceKm = (leg.distance?.value || 0) / 1000;
-              const durationMin = (leg.duration?.value || 0) / 60;
-              proceedWithBooking(distanceKm, durationMin);
-              return;
-            }
+        body: JSON.stringify({
+          origin: { address: pickupLocation },
+          destination: { address: dropLocation },
+          travelMode: "DRIVE",
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          const route = data?.routes?.[0];
+          if (route) {
+            const distanceKm = (route.distanceMeters || 0) / 1000;
+            const durationSec = parseInt(route.duration?.replace("s", "") || "0", 10);
+            const durationMin = durationSec / 60;
+            proceedWithBooking(distanceKm || 15, durationMin || 30);
+          } else {
+            proceedWithBooking(15, 30);
           }
-          // Fallback if calculation fails
-          proceedWithBooking(15, 30); // Default placeholder
-        }
-      );
+        })
+        .catch(() => proceedWithBooking(15, 30));
     } else {
-      // Fallback if google maps not loaded
-      proceedWithBooking(15, 30); // Default placeholder
+      proceedWithBooking(15, 30);
     }
   }, [navigate, pickupLocation, dropLocation, rideType, pickupDate, pickupTime, passengers]);
+
 
   const styleElement = useMemo(() => <style>{bookingStyles}</style>, []);
 

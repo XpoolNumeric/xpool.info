@@ -167,26 +167,6 @@ export default function Profile() {
         {/* Dot grid overlay */}
         <div className="profile-dot-grid absolute inset-0 pointer-events-none" />
 
-        {/* Back button */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center gap-3 mb-8 cursor-pointer relative z-10"
-          onClick={() => navigate(-1)}
-        >
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm hover:shadow transition-all"
-            style={{
-              background: "rgba(255,255,255,0.8)",
-              border: "1.5px solid rgba(245,158,11,0.18)",
-              color: T.orange,
-            }}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </div>
-          <span className="text-sm font-semibold" style={{ color: T.muted }}>Back</span>
-        </motion.div>
 
         <motion.div
           variants={staggerContainer}

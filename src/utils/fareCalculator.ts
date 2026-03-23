@@ -95,8 +95,8 @@ export function calculateTieredFare(distanceKm: number, durationMin: number, veh
         if (passengers === 4) perPersonFare = 850
     }
 
-    // Calculate total fare based on perPersonFare and effective passengers
-    const adjustedTotalFare = perPersonFare * effectivePassengers
+    // Calculate total fare based on perPersonFare and seats booked by customer
+    const adjustedTotalFare = perPersonFare * passengers
 
     // Commission (15%)
     const commission = perPersonFare * 0.15

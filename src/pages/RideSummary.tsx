@@ -10,6 +10,8 @@ import {
   Navigation,
   Receipt,
   ChevronLeft,
+  Sparkles,
+  Users,
 } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
@@ -153,14 +155,12 @@ const RideSummary = () => {
     const passengers = ride?.passengers || 1;
 
     const fareInfo = calculateTieredFare(distanceKm, durationMin, vehicleType, passengers);
-
     return {
-      base: fareInfo.breakdown.baseFare,
-      distanceFare: fareInfo.breakdown.distanceFare + fareInfo.breakdown.timeFare,
-      platformFee: 0,
       perPerson: fareInfo.fare.perPerson,
       total: fareInfo.fare.total,
-      km: distanceKm,
+      tier: fareInfo.tripDetails.tier,
+      savings: fareInfo.savings,
+      costBreakdown: fareInfo.costBreakdown,
       passengers
     };
   }, [vehicleType, ride]);
@@ -190,14 +190,6 @@ const RideSummary = () => {
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
 
-      {/* GLOBAL BACK BUTTON */}
-      <button
-        onClick={() => window.history.back()}
-        className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-md"
-        aria-label="Go back"
-      >
-        <ChevronLeft className="w-6 h-6 ml-[-2px]" />
-      </button>
 
       {/* Background blobs */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-amber-400/20 rounded-full blur-[80px] pointer-events-none" />
@@ -296,26 +288,83 @@ const RideSummary = () => {
             <TimelineItem label="Dropoff point reached" />
           </motion.div>
 
-          {/* FARE BREAKDOWN */}
-          <motion.div variants={fadeUp} className="p-4 rounded-2xl bg-white/60 border border-gray-200/50 shadow-sm space-y-1" style={{ backdropFilter: "blur(12px)" }}>
-            <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-200/50">
-              <Receipt className="w-5 h-5 text-gray-400" />
-              <h3 className="font-bold text-gray-900">Pooled Fare Estimate</h3>
+          {/* FARE BREAKDOWN - Professional Style */}
+          <motion.div variants={fadeUp} className="p-5 rounded-[1.6rem] bg-white/60 border border-gray-200/50 shadow-sm space-y-4" style={{ backdropFilter: "blur(12px)" }}>
+            <div className="flex items-center justify-between items-center mb-1 pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-amber-500" />
+                <h3 className="font-extrabold text-gray-900 tracking-tight">Fare Breakdown</h3>
+              </div>
+              <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded border border-amber-100 uppercase tracking-widest leading-none">
+                {fare.tier}
+              </span>
             </div>
 
-            {fare.passengers > 1 ? (
-              <>
-                <FareRow label="Platform fee" value={fare.platformFee} />
-                <FareRow label={`Price per seat (${fare.passengers} seats)`} value={fare.perPerson} isTotal />
-              </>
-            ) : (
-              <>
-                <FareRow label="Base fare" value={fare.base} />
-                <FareRow label="Distance fare" value={fare.distanceFare} />
-                <FareRow label="Platform fee" value={fare.platformFee} />
-                <FareRow label="Total Amount" value={fare.total} isTotal />
-              </>
-            )}
+            <div className="space-y-4">
+              <div className="flex justify-between items-start pt-1">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-black tracking-widest uppercase border border-amber-200/50 w-max shadow-sm">
+                    <Users className="w-3 h-3" />
+                    {fare.passengers} {fare.passengers === 1 ? 'seat' : 'seats'}
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none ml-0.5">Your Contribution</span>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-baseline justify-end gap-1">
+                    <span className="text-[14px] text-gray-400 font-bold -mt-1">₹</span>
+                    <span className="text-3xl font-black text-gray-900 font-syne tracking-tight leading-none">{fare.total}</span>
+                  </div>
+                  <div className="mt-1.5 flex justify-end">
+                    <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-50 border border-gray-100 text-[9px] font-extrabold text-gray-500">
+                      ₹{fare.perPerson} <span className="text-gray-400 font-bold">/ seat</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px w-full bg-gray-100/60" />
+
+              {/* SAVINGS BADGES */}
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <div className="p-2.5 rounded-xl bg-green-50/80 border border-green-100 flex flex-col items-center text-center">
+                  <span className="text-[8px] font-bold text-green-700/60 uppercase tracking-widest mb-1">vs Taxi</span>
+                  <span className="text-xs font-black text-green-700">Save ₹{fare.savings.vsTaxiAmount}</span>
+                  <span className="text-[9px] font-bold text-green-600/70">{fare.savings.vsTaxi}% cheaper</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-100 flex flex-col items-center text-center">
+                  <span className="text-[8px] font-bold text-blue-700/60 uppercase tracking-widest mb-1">vs Bus</span>
+                  <span className="text-xs font-black text-blue-700">Save ₹{fare.savings.vsBusAmount}</span>
+                  <span className="text-[9px] font-bold text-blue-600/70">{fare.savings.vsBus}% cheaper</span>
+                </div>
+              </div>
+
+              {/* COST TRANSPARENCY */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/40 border border-amber-100 space-y-2.5 mt-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Pricing Transparency</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-semibold text-amber-800/60">Estimated Fuel Cost</span>
+                  <span className="text-[11px] font-bold text-amber-900">₹{fare.costBreakdown.estimatedFuelCost}</span>
+                </div>
+                
+                {fare.costBreakdown.estimatedToll > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-semibold text-amber-800/60">Estimated Tolls</span>
+                    <span className="text-[11px] font-bold text-amber-900">₹{fare.costBreakdown.estimatedToll}</span>
+                  </div>
+                )}
+
+                <div className="h-px w-full bg-amber-200/30" />
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-bold text-amber-900/40 uppercase tracking-widest">Total Pooled Fare</span>
+                  <span className="text-sm font-black text-amber-900 font-syne">₹{fare.total}</span>
+                </div>
+              </div>
+            </div>
           </motion.div>
 
           {/* HELP ACTION */}

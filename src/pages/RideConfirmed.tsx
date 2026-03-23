@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, Variants } from "framer-motion";
-import { GoogleMap, useLoadScript, DirectionsRenderer, MarkerF } from "@react-google-maps/api";
+import { GoogleMap, useLoadScript, Polyline, MarkerF } from "@react-google-maps/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   User,
@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Users,
   ChevronLeft,
+  Zap,
 } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
@@ -57,6 +58,33 @@ const FALLBACK_DRIVER: DriverInfo = {
   vehicleNumber: "TN 09 AB 1234",
   etaMinutes: 5,
 };
+
+/* ──────────── XPOOL MAP STYLES (warm light — matches Hero) ──────────── */
+const XPOOL_MAP_STYLES: google.maps.MapTypeStyle[] = [
+  // Base geometry — warm cream
+  { elementType: "geometry", stylers: [{ color: "#fdf8f0" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#fdf8f0" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#9ca3af" }] },
+  // Hide clutter
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ visibility: "off" }] },
+  // Landscape — soft warm sand
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#fef9ee" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#f5efe0" }] },
+  // Roads — warm white/cream
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#f0e8d8" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#b45309" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#ffe9b0" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#fcd34d" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#92400e" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#fff3cd" }] },
+  { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#b45309" }] },
+  // Water — soft dusty blue
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#dbeafe" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#93c5fd" }] },
+];
 
 function loadSelectedDriver(): DriverInfo {
   try {
@@ -147,7 +175,7 @@ const fadeUp: Variants = {
 const Header = ({ title, subtitle }: { title: string; subtitle: string }) => (
   <motion.header variants={fadeUp} className="text-center space-y-2">
     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100/50 border border-green-200/50 text-[10px] font-bold tracking-wider text-green-700 uppercase mb-2">
-      <Sparkles className="w-3 h-3 text-green-600" />
+      <CheckCircle2 className="w-3 h-3 text-green-600" />
       Ride Booked
     </div>
     <h1 className="text-3xl font-black text-gray-900 tracking-tight font-syne">{title}</h1>
@@ -155,135 +183,178 @@ const Header = ({ title, subtitle }: { title: string; subtitle: string }) => (
   </motion.header>
 );
 
-const RealMap = ({ pickup, drop, onDistanceCalculated }: { pickup: string; drop: string; onDistanceCalculated: (km: number) => void }) => {
+/* ────────────────────────────────────────────────────────────
+   REAL MAP — auto-fits to the full route with fitBounds
+──────────────────────────────────────────────────────────── */
+const RealMap = ({
+  pickup,
+  drop,
+  onDistanceCalculated,
+}: {
+  pickup: string;
+  drop: string;
+  onDistanceCalculated: (km: number) => void;
+}) => {
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
     libraries: LIBRARIES,
   });
 
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [routePath, setRoutePath] = useState<google.maps.LatLngLiteral[]>([]);
   const mapRef = useRef<google.maps.Map | null>(null);
 
+  /* Fetch route */
   useEffect(() => {
-    if (isLoaded && pickup && drop) {
-      const directionsService = new window.google.maps.DirectionsService();
-      directionsService.route(
-        {
-          origin: pickup,
-          destination: drop,
-          travelMode: window.google.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (status === window.google.maps.DirectionsStatus.OK && result) {
-            setDirections(result);
-            const distanceMeters = result.routes[0]?.legs[0]?.distance?.value;
-            if (distanceMeters) {
-              onDistanceCalculated(distanceMeters / 1000);
-            }
+    if (!pickup || !drop) return;
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+    if (!apiKey) return;
+
+    fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.polyline.encodedPolyline",
+      },
+      body: JSON.stringify({
+        origin: { address: pickup },
+        destination: { address: drop },
+        travelMode: "DRIVE",
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const route = data?.routes?.[0];
+        if (route) {
+          const distKm = (route.distanceMeters || 0) / 1000;
+          if (distKm) onDistanceCalculated(distKm);
+
+          const encoded = route.polyline?.encodedPolyline;
+          if (encoded && window.google?.maps?.geometry?.encoding) {
+            const decoded = window.google.maps.geometry.encoding.decodePath(encoded);
+            const path = decoded.map((p: google.maps.LatLng) => ({
+              lat: p.lat(),
+              lng: p.lng(),
+            }));
+            setRoutePath(path);
           }
         }
-      );
-    }
-  }, [isLoaded, pickup, drop, onDistanceCalculated]);
+      })
+      .catch((err) => console.error("Routes API error:", err));
+  }, [pickup, drop, onDistanceCalculated]);
 
-  const mapOptions = useMemo(() => ({
-    disableDefaultUI: true,
-    zoomControl: false,
-    mapTypeControl: false,
-    scaleControl: false,
-    streetViewControl: false,
-    rotateControl: false,
-    fullscreenControl: false,
-    styles: [
-      {
-        featureType: "all",
-        elementType: "labels.text.fill",
-        stylers: [{ color: "#7c93a3" }, { lightness: "-10" }]
-      },
-      {
-        featureType: "administrative.locality",
-        elementType: "labels.text.fill",
-        stylers: [{ color: "#57534e" }]
-      },
-      {
-        featureType: "landscape",
-        elementType: "geometry",
-        stylers: [{ color: "#f5f5f5" }]
-      },
-      {
-        featureType: "poi",
-        elementType: "geometry",
-        stylers: [{ color: "#eeeeee" }]
-      },
-      {
-        featureType: "road",
-        elementType: "geometry",
-        stylers: [{ color: "#ffffff" }]
-      },
-      {
-        featureType: "water",
-        elementType: "geometry",
-        stylers: [{ color: "#e9e9e9" }]
-      }
-    ]
-  }), []);
+  /* Auto-fit bounds whenever routePath or map becomes available */
+  useEffect(() => {
+    if (!mapRef.current || routePath.length < 2) return;
+    const bounds = new window.google.maps.LatLngBounds();
+    routePath.forEach((pt) => bounds.extend(pt));
+    mapRef.current.fitBounds(bounds, { top: 52, right: 48, bottom: 52, left: 48 });
+  }, [routePath]);
 
-  if (!isLoaded) return <Skeleton className="h-64 w-full rounded-3xl" />;
+  const mapOptions = useMemo<google.maps.MapOptions>(
+    () => ({
+      disableDefaultUI: true,
+      zoomControl: false,
+      gestureHandling: "none",
+      styles: XPOOL_MAP_STYLES,
+    }),
+    []
+  );
+
+  if (!isLoaded) {
+    return (
+      <div className="relative h-52 w-full rounded-3xl overflow-hidden border border-amber-200/60 shadow-[0_8px_32px_rgba(180,83,9,0.08)]" style={{ background: "#fef9ee" }}>
+        <Skeleton className="h-full w-full rounded-3xl bg-amber-100/60" />
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-amber-500">
+          <Sparkles className="w-4 h-4 animate-pulse" />
+          <span className="text-xs font-bold tracking-widest uppercase">Loading map…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <motion.div variants={fadeUp} className="relative h-64 w-full rounded-3xl overflow-hidden border border-amber-900/10 shadow-lg bg-slate-100">
+    <motion.div
+      variants={fadeUp}
+      className="relative w-full rounded-3xl overflow-hidden border border-amber-200/60 shadow-[0_8px_32px_rgba(180,83,9,0.10)]"
+      style={{ height: "220px" }}
+    >
       <GoogleMap
         mapContainerStyle={{ width: "100%", height: "100%" }}
         options={mapOptions}
-        onLoad={(map) => { mapRef.current = map; }}
+        /* Start centered on Chennai — fitBounds will correct this once route loads */
+        center={{ lat: 13.0827, lng: 80.2707 }}
+        zoom={12}
+        onLoad={(map) => {
+          mapRef.current = map;
+          /* If route already loaded before map mounted, fit immediately */
+          if (routePath.length >= 2) {
+            const bounds = new window.google.maps.LatLngBounds();
+            routePath.forEach((pt) => bounds.extend(pt));
+            map.fitBounds(bounds, { top: 52, right: 48, bottom: 52, left: 48 });
+          }
+        }}
       >
-        {directions && (
-          <DirectionsRenderer
-            directions={directions}
-            options={{
-              suppressMarkers: true,
-              polylineOptions: {
+        {routePath.length > 0 && (
+          <>
+            {/* Glow halo polyline */}
+            <Polyline
+              path={routePath}
+              options={{
                 strokeColor: "#f59e0b",
-                strokeWeight: 6,
-                strokeOpacity: 0.8,
-              },
-            }}
-          />
-        )}
-
-        {/* Custom Markers */}
-        {directions && directions.routes[0].legs[0].start_location && (
-          <MarkerF
-            position={directions.routes[0].legs[0].start_location}
-            icon={{
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: "#f59e0b",
-              fillOpacity: 1,
-              strokeWeight: 4,
-              strokeColor: "#ffffff",
-            }}
-          />
-        )}
-        {directions && directions.routes[0].legs[0].end_location && (
-          <MarkerF
-            position={directions.routes[0].legs[0].end_location}
-            icon={{
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: "#ea580c",
-              fillOpacity: 1,
-              strokeWeight: 4,
-              strokeColor: "#ffffff",
-            }}
-          />
+                strokeWeight: 14,
+                strokeOpacity: 0.12,
+                zIndex: 1,
+              }}
+            />
+            {/* Main amber route */}
+            <Polyline
+              path={routePath}
+              options={{
+                strokeColor: "#f59e0b",
+                strokeWeight: 4,
+                strokeOpacity: 1,
+                zIndex: 2,
+              }}
+            />
+            {/* Origin dot */}
+            <MarkerF
+              position={routePath[0]}
+              icon={{
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#f59e0b",
+                fillOpacity: 1,
+                strokeWeight: 3,
+                strokeColor: "#ffffff",
+              }}
+              zIndex={10}
+            />
+            {/* Destination dot */}
+            <MarkerF
+              position={routePath[routePath.length - 1]}
+              icon={{
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#ea580c",
+                fillOpacity: 1,
+                strokeWeight: 3,
+                strokeColor: "#ffffff",
+              }}
+              zIndex={10}
+            />
+          </>
         )}
       </GoogleMap>
 
-      <div className="absolute top-4 left-4 flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-gray-200/50 shadow-sm z-10">
-        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        <span className="text-[10px] font-black text-gray-700 tracking-wider">LIVE POOL MAP</span>
+      {/* LIVE badge */}
+      <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-white/80 backdrop-blur-md border border-amber-200/60 rounded-xl px-3 py-1.5 z-10 shadow-sm">
+        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+        <span className="text-[10px] font-black text-amber-700 tracking-widest uppercase">Live Pool Map</span>
       </div>
+
+      {/* Bottom gradient bleed */}
+      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-amber-50/40 to-transparent pointer-events-none" />
     </motion.div>
   );
 };
@@ -346,27 +417,48 @@ const FareDetailsCard = ({
     <div className="absolute top-[-2px] left-8 right-8 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50 blur-[2px]" />
 
     <div className="flex flex-col gap-4 relative z-10">
-
       {/* HEADER SECTION */}
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase border border-amber-500/20 w-max">
-            <Users className="w-3 h-3" />
-            {passengers} {passengers > 1 ? 'Seats' : 'Seat'} Reserved
+          <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 px-2.5 py-1 rounded-lg text-[11px] font-black tracking-widest uppercase border border-amber-500/20 w-max shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+            <Users className="w-3.5 h-3.5" />
+            {passengers} {passengers > 1 ? "Seats" : "Seat"} Reserved
           </div>
-          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2">{fareInfo.tripDetails.tier} Pool</p>
+          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mt-2">{fareInfo.tripDetails.tier} Pool</p>
         </div>
 
         <div className="flex flex-col items-end">
-          <span className="text-[10px] text-gray-500 font-bold tracking-widest uppercase mb-1 drop-shadow-sm">Pooled Fare</span>
+          <span className="text-[11px] text-gray-400 font-bold tracking-widest uppercase mb-1 drop-shadow-sm">Total Pooled Fare</span>
           <div className="flex items-baseline gap-1">
-            <span className="text-[16px] text-gray-400 font-bold -mt-2">₹</span>
-            <span className="text-[40px] leading-none font-black text-white font-syne tracking-tight">{fareInfo.fare.perPerson}</span>
+            <span className="text-[18px] text-gray-400 font-bold -mt-2">₹</span>
+            <span className="text-[48px] leading-none font-black text-white font-syne tracking-tight">{fareInfo.fare.total}</span>
           </div>
-          <div className="flex flex-col items-end mt-1.5 gap-0.5">
-            <span className="text-[11px] font-bold text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">
-              Per seat
-            </span>
+          <div className="mt-2 text-right">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] font-extrabold text-gray-300">
+               ₹{fareInfo.fare.perPerson} <span className="text-gray-500 font-bold text-[9px]">/ seat</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-700/50 to-transparent my-1" />
+
+      {/* SAVINGS BADGES - Market Comparison */}
+      <div className="grid grid-cols-2 gap-2 mt-1">
+        <div className="p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 flex flex-col items-center text-center">
+          <span className="text-[8px] font-black text-green-500/60 uppercase tracking-widest mb-1">Save vs Taxi</span>
+          <span className="text-sm font-black text-green-400">₹{fareInfo.savings.vsTaxiAmount}</span>
+          <div className="flex items-center gap-1 mt-0.5">
+             <Zap className="w-2.5 h-2.5 text-green-500" />
+             <span className="text-[9px] font-bold text-green-500/70">{fareInfo.savings.vsTaxi}% Cheaper</span>
+          </div>
+        </div>
+        <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 flex flex-col items-center text-center">
+          <span className="text-[8px] font-black text-blue-500/60 uppercase tracking-widest mb-1">Save vs Bus</span>
+          <span className="text-sm font-black text-blue-400">₹{fareInfo.savings.vsBusAmount}</span>
+          <div className="flex items-center gap-1 mt-0.5">
+             <Sparkles className="w-2.5 h-2.5 text-blue-500" />
+             <span className="text-[9px] font-bold text-blue-500/70">{fareInfo.savings.vsBus}% Cheaper</span>
           </div>
         </div>
       </div>
@@ -391,7 +483,6 @@ const FareDetailsCard = ({
           </div>
         </div>
       </div>
-
     </div>
   </motion.div>
 );
@@ -454,7 +545,6 @@ const RideConfirmed = () => {
   const eta = useEtaCountdown(driver.etaMinutes);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
-  // Parse distance reliably
   useEffect(() => {
     if (ride?.distanceKm) {
       setDistanceKm(ride.distanceKm);
@@ -462,14 +552,10 @@ const RideConfirmed = () => {
   }, [ride]);
 
   const priceDetails = useMemo(() => {
-    // We expect distanceKm and durationMin to be provided via the UI/Map updates
     const activeDistance = distanceKm || ride?.distanceKm || 15;
     const activeDuration = ride?.durationMin || 30;
     const activePassengers = ride?.passengers || 1;
-
-    const fareInfo = calculateTieredFare(activeDistance, activeDuration, vehicleType, activePassengers);
-
-    return fareInfo;
+    return calculateTieredFare(activeDistance, activeDuration, vehicleType, activePassengers);
   }, [distanceKm, ride, vehicleType]);
 
   const handleCallDriver = useCallback(() => {
@@ -498,14 +584,6 @@ const RideConfirmed = () => {
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
 
-      {/* GLOBAL BACK BUTTON */}
-      <button
-        onClick={() => window.history.back()}
-        className="absolute top-6 left-4 z-50 w-10 h-10 rounded-full bg-white/60 backdrop-blur-md shadow-sm border border-gray-200/50 flex items-center justify-center text-gray-700 hover:bg-white transition-all active:scale-95 hover:shadow-md"
-        aria-label="Go back"
-      >
-        <ChevronLeft className="w-6 h-6 ml-[-2px]" />
-      </button>
 
       {/* Background blobs */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-amber-400/20 rounded-full blur-[80px] pointer-events-none" />
@@ -525,7 +603,13 @@ const RideConfirmed = () => {
             <LoadingSkeleton />
           ) : (
             <>
-              {ride && <RealMap pickup={ride.pickup} drop={ride.drop} onDistanceCalculated={(d) => setDistanceKm(d)} />}
+              {ride && (
+                <RealMap
+                  pickup={ride.pickup}
+                  drop={ride.drop}
+                  onDistanceCalculated={(d) => setDistanceKm(d)}
+                />
+              )}
 
               {ride && <RideSummaryCard ride={ride} />}
 

@@ -186,7 +186,7 @@ const ProfileSummaryDialog = ({
       setTimeout(() => {
         setLoading(false);
         onClose();
-        navigate("/vehicles");
+        navigate("/available-rides");
       }, 700);
     }, 900);
   }, [profile, navigate, onClose]);
