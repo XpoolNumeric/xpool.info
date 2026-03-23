@@ -29,6 +29,9 @@ import {
   ChevronRight,
   LocateFixed,
   Loader2,
+  Minus,
+  Plus,
+  Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -284,6 +287,7 @@ const BookingSection = () => {
   const [pickupTime, setPickupTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [passengers, setPassengers] = useState(1);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   const pickupRef = useRef<HTMLDivElement>(null);
@@ -508,7 +512,8 @@ const BookingSection = () => {
         time: pickupTime,
         timestamp: new Date().toISOString(),
         distanceKm,
-        durationMin
+        durationMin,
+        passengers
       };
       
       localStorage.setItem("rideSummary", JSON.stringify(rideDetails));
@@ -530,7 +535,7 @@ const BookingSection = () => {
         }
 
         if (isLoggedAndComplete) {
-          navigate("/vehicles");
+          navigate("/available-rides");
         } else {
           setShowAuthDialog(true);
         }
@@ -565,7 +570,7 @@ const BookingSection = () => {
       // Fallback if google maps not loaded
       proceedWithBooking(15, 30); // Default placeholder
     }
-  }, [navigate, pickupLocation, dropLocation, rideType, pickupDate, pickupTime]);
+  }, [navigate, pickupLocation, dropLocation, rideType, pickupDate, pickupTime, passengers]);
 
   const styleElement = useMemo(() => <style>{bookingStyles}</style>, []);
 
@@ -720,6 +725,32 @@ const BookingSection = () => {
                   </div>
                 </div>
 
+                {/* Seat Selector */}
+                <div className="flex items-center justify-between mt-4 p-3 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4.5 w-4.5 text-amber-500" />
+                    <span className="text-sm font-bold text-gray-700"
+                      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+                      Seats needed
+                    </span>
+                  </div>
+                  <div className="flex items-center bg-white rounded-full p-1 border border-gray-200/50 shadow-inner">
+                    <button
+                      onClick={() => setPassengers(Math.max(1, passengers - 1))}
+                      className="w-8 h-8 rounded-full bg-white text-gray-700 shadow-sm border border-gray-200 flex items-center justify-center active:scale-95 transition-transform hover:bg-gray-50"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-8 text-center font-bold text-gray-900">{passengers}</span>
+                    <button
+                      onClick={() => setPassengers(Math.min(6, passengers + 1))}
+                      className="w-8 h-8 rounded-full bg-amber-500 text-white shadow-sm shadow-amber-500/30 border border-amber-600 flex items-center justify-center active:scale-95 transition-transform"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
                 {/* Validation message */}
                 <AnimatePresence>
                   {pickupLocation && dropLocation && pickupLocation === dropLocation && (
@@ -786,7 +817,7 @@ const BookingSection = () => {
                   ) : (
                     <>
                       <Search className="h-5 w-5" />
-                      Book Ride
+                      Search Available Rides
                       <ChevronRight className="h-5 w-5 ml-1 opacity-70" />
                     </>
                   )}

@@ -10,13 +10,12 @@ import Index from "./pages/Index";
 import Features from "./pages/Features";
 import HowItWorks from "./pages/HowItWorks";
 import Contact from "./pages/Contact";
-import Download from "./pages/Download"; // ✅ ADD THIS
+import Download from "./pages/Download";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
-// Ride flow
-import VehicleTypeSelection from "./pages/VehicleTypeSelection";
-import SearchingVehicle from "./pages/SearchingVehicle";
+// Ride flow (BlaBlaCar-style)
+import AvailableRides from "./pages/AvailableRides";
 import RideConfirmed from "./pages/RideConfirmed";
 import RideSummary from "./pages/RideSummary";
 
@@ -35,12 +34,11 @@ const App = (): JSX.Element => {
           <Route path="/features" element={<Features />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/download" element={<Download />} /> {/* ✅ NEW */}
+          <Route path="/download" element={<Download />} />
           <Route path="/profile" element={<Profile />} />
 
-          {/* Ride flow */}
-          <Route path="/vehicles" element={<VehicleTypeSelection />} />
-          <Route path="/searching" element={<SearchingVehicle />} />
+          {/* Ride flow — BlaBlaCar style */}
+          <Route path="/available-rides" element={<AvailableRides />} />
           <Route path="/ride-confirmed" element={<RideConfirmed />} />
           <Route path="/ride-summary" element={<RideSummary />} />
 

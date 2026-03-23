@@ -58,6 +58,26 @@ const FALLBACK_DRIVER: DriverInfo = {
   etaMinutes: 5,
 };
 
+function loadSelectedDriver(): DriverInfo {
+  try {
+    const saved = localStorage.getItem("selectedDriver");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        name: parsed.driverName || FALLBACK_DRIVER.name,
+        rating: parsed.driverRating || FALLBACK_DRIVER.rating,
+        totalRides: parsed.driverRides || FALLBACK_DRIVER.totalRides,
+        phone: parsed.driverPhone || FALLBACK_DRIVER.phone,
+        vehicleNumber: parsed.vehicleNumber || FALLBACK_DRIVER.vehicleNumber,
+        etaMinutes: 5,
+      };
+    }
+  } catch (e) {
+    console.error("Error loading selectedDriver", e);
+  }
+  return FALLBACK_DRIVER;
+}
+
 const LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
 
 /* -------------------- CUSTOM HOOKS -------------------- */
@@ -430,7 +450,7 @@ const RideConfirmed = () => {
   const navigate = useNavigate();
   const [vehicleType, vehicleLoading] = useVehicleType();
   const [ride, rideLoading, rideError] = useRideSummary();
-  const [driver] = useState<DriverInfo>(FALLBACK_DRIVER);
+  const [driver] = useState<DriverInfo>(() => loadSelectedDriver());
   const eta = useEtaCountdown(driver.etaMinutes);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
@@ -499,7 +519,7 @@ const RideConfirmed = () => {
           initial="hidden"
           animate="visible"
         >
-          <Header title="Your captain is on the way!" subtitle="Get ready, your pooled ride is arriving shortly" />
+          <Header title={`${driver.name} is on the way!`} subtitle="Your chosen driver is heading to the pickup" />
 
           {isLoading ? (
             <LoadingSkeleton />

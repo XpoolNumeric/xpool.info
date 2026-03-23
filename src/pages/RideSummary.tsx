@@ -51,9 +51,34 @@ const fadeUp: Variants = {
 
 /* ---------------- COMPONENT ---------------- */
 
+interface SelectedDriver {
+  driverName: string;
+  driverRating: number;
+  driverRides: number;
+  driverPhone: string;
+  vehicleType: VehicleKey;
+  vehicleName: string;
+  vehicleNumber: string;
+  pricePerSeat: number;
+  departureTime: string;
+}
+
+const DEFAULT_DRIVER: SelectedDriver = {
+  driverName: "Ramesh K.",
+  driverRating: 4.8,
+  driverRides: 1200,
+  driverPhone: "+91 98765 43210",
+  vehicleType: "car",
+  vehicleName: "Car",
+  vehicleNumber: "TN 09 AB 1234",
+  pricePerSeat: 0,
+  departureTime: "",
+};
+
 const RideSummary = () => {
   const [vehicleType, setVehicleType] = useState<VehicleKey>("car");
   const [ride, setRide] = useState<RideSummaryData | null>(null);
+  const [selectedDriver, setSelectedDriver] = useState<SelectedDriver>(DEFAULT_DRIVER);
   const [driverStage, setDriverStage] = useState<"assigned" | "arriving">("assigned");
   const [driverProgress, setDriverProgress] = useState(0);
 
@@ -83,6 +108,22 @@ const RideSummary = () => {
           durationMin: parsed.durationMin || 20,
           passengers: parsed.passengers || 1,
         } as RideSummaryData);
+      }
+
+      const savedDriver = localStorage.getItem("selectedDriver");
+      if (savedDriver) {
+        const parsed = JSON.parse(savedDriver);
+        setSelectedDriver({
+          driverName: parsed.driverName || DEFAULT_DRIVER.driverName,
+          driverRating: parsed.driverRating || DEFAULT_DRIVER.driverRating,
+          driverRides: parsed.driverRides || DEFAULT_DRIVER.driverRides,
+          driverPhone: parsed.driverPhone || DEFAULT_DRIVER.driverPhone,
+          vehicleType: parsed.vehicleType || DEFAULT_DRIVER.vehicleType,
+          vehicleName: parsed.vehicleName || DEFAULT_DRIVER.vehicleName,
+          vehicleNumber: parsed.vehicleNumber || DEFAULT_DRIVER.vehicleNumber,
+          pricePerSeat: parsed.pricePerSeat || 0,
+          departureTime: parsed.departureTime || "",
+        });
       }
     } catch { }
   }, []);
@@ -221,13 +262,13 @@ const RideSummary = () => {
           {/* DRIVER INFO COMPACT */}
           <motion.div variants={fadeUp} className="flex gap-4">
             <div className="flex-1 p-3 rounded-2xl bg-white/60 border border-gray-200/50 shadow-sm flex items-center gap-3" style={{ backdropFilter: "blur(12px)" }}>
-              <div className="h-10 w-10 bh-10 w-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
                 <User className="h-5 w-5 text-gray-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-gray-900 text-sm truncate">Ramesh K.</h4>
+                <h4 className="font-bold text-gray-900 text-sm truncate">{selectedDriver.driverName}</h4>
                 <div className="flex items-center gap-1 mt-0.5 text-[10px] font-bold text-yellow-700 bg-yellow-100/50 w-max px-1.5 py-0.5 rounded">
-                  <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" /> 4.8
+                  <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" /> {selectedDriver.driverRating}
                 </div>
               </div>
             </div>
@@ -237,8 +278,8 @@ const RideSummary = () => {
                 <VehicleIcon className="h-5 w-5 text-white" strokeWidth={2.5} />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-gray-900 text-sm truncate capitalize">{vehicleType}</h4>
-                <p className="text-[10px] font-black text-gray-500 tracking-widest mt-0.5">TN 09 AB 1234</p>
+                <h4 className="font-bold text-gray-900 text-sm truncate">{selectedDriver.vehicleName}</h4>
+                <p className="text-[10px] font-black text-gray-500 tracking-widest mt-0.5">{selectedDriver.vehicleNumber}</p>
               </div>
             </div>
           </motion.div>
