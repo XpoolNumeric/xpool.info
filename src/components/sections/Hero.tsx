@@ -6,6 +6,7 @@ import {
   Zap,
   MapPin,
   ChevronDown,
+  LogIn,
 } from "lucide-react";
 import {
   motion,
@@ -16,6 +17,8 @@ import {
   animate,
 } from "framer-motion";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
+import { useAuthContext } from "@/contexts/AuthContext";
+import AuthDialog from "@/components/sections/AuthDialog";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -586,6 +589,8 @@ const BadgeCarousel: FC = () => {
 const Hero: FC = () => {
   const prefersReducedMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const { user } = useAuthContext();
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640);
@@ -734,7 +739,7 @@ const Hero: FC = () => {
           {/* CTAs */}
           <motion.div
             variants={!prefersReducedMotion ? fadeUp : {}}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-14 w-full"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14 w-full"
           >
             <motion.div
               whileHover={!prefersReducedMotion ? { scale: 1.04 } : {}}
@@ -751,6 +756,25 @@ const Hero: FC = () => {
                 <ArrowRight size={18} strokeWidth={2.5} />
               </Button>
             </motion.div>
+
+            {!user && (
+              <motion.div
+                whileHover={!prefersReducedMotion ? { scale: 1.04 } : {}}
+                whileTap={!prefersReducedMotion ? { scale: 0.97 } : {}}
+              >
+                <Button
+                  onClick={() => setShowAuth(true)}
+                  size="lg"
+                  variant="outline"
+                  className="btn-ghost-light px-9 py-6 text-base rounded-2xl gap-2 font-bold"
+                  style={{ fontFamily: "'Inter', sans-serif" }}
+                  aria-label="Login securely"
+                >
+                  <LogIn size={18} strokeWidth={2.5} />
+                  Login
+                </Button>
+              </motion.div>
+            )}
           </motion.div>
 
           {/* Badges — carousel on mobile, static grid on desktop */}
@@ -783,6 +807,8 @@ const Hero: FC = () => {
           </div>
         )}
       </section>
+
+      <AuthDialog open={showAuth} onClose={() => setShowAuth(false)} />
     </>
   );
 };
