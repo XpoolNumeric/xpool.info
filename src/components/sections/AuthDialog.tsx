@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import {
   Dialog,
   DialogContent,
@@ -11,10 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import {
   Phone,
-  Mail,
   Loader2,
   ArrowLeft,
   Lock,
@@ -30,14 +27,46 @@ const PHONE_REGEX = /^[6-9]\d{9}$/;
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
 
-// ---------- Vonage Credentials Integration ----------
-// Note: As per the provided Supabase Dashboard configuration,
-// Vonage is configured as the SMS provider in Supabase Auth.
-// Credentials should ideally stay in the Supabase Dashboard backend for security:
-// - Vonage API Key: e367374d
-// - Vonage API Secret: 1LuT8773TFAaRrJS
-// - Vonage From: xpoolnumeric5009
-// The client simply calls supabase.auth.signInWithOtp() and Supabase handles the rest.
+// ---------- Supabase Auth Integration ----------
+// Phone OTP: Vonage is configured as SMS provider in Supabase Dashboard.
+// Google OAuth: Google provider is configured in Supabase Dashboard.
+// Both methods create proper auth.users entries in Supabase Auth.
+
+// ---------- Helper: Sync user session to localStorage ----------
+const syncSessionToLocalStorage = (user: any) => {
+  const meta = user.user_metadata || {};
+  const storedProfile = localStorage.getItem("profile");
+  let profile = storedProfile
+    ? JSON.parse(storedProfile)
+    : { fullName: "", email: "", city: "", dob: "", phone: "" };
+
+  profile.fullName = meta.full_name || meta.name || meta.display_name || profile.fullName || "";
+  profile.email = user.email || meta.email || profile.email || "";
+  profile.picture = meta.avatar_url || meta.picture || profile.picture || "";
+  profile.phone = user.phone || profile.phone || "";
+  profile.isLoggedIn = true;
+
+  localStorage.setItem("profile", JSON.stringify(profile));
+  window.dispatchEvent(new Event("storage"));
+  return profile;
+};
+
+// ---------- Helper: Sync profile to Supabase profiles table (optional) ----------
+const syncProfileToSupabase = async (userId: string, profile: any) => {
+  try {
+    await supabase.from('profiles').upsert({
+      id: userId,
+      phone: profile.phone || '',
+      full_name: profile.fullName || '',
+      email: profile.email || '',
+      city: profile.city || '',
+      dob: profile.dob || '',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+  } catch {
+    // profiles table may not exist — gracefully skip
+  }
+};
 
 // ---------- Types ----------
 interface AuthDialogProps {
@@ -46,14 +75,6 @@ interface AuthDialogProps {
 }
 
 type Step = "phone" | "otp";
-
-interface GoogleUserInfo {
-  name?: string;
-  email?: string;
-  picture?: string;
-  given_name?: string;
-  family_name?: string;
-}
 
 // ---------- Inline Styles (Hero-matching) ----------
 const AuthStyles = memo(() => (
@@ -607,67 +628,16 @@ const OtpStep = ({
   );
 };
 
-// ---------- Google Login Button (inside provider) ----------
-const GoogleLoginButton = ({
-  onSuccess,
-  loading: externalLoading,
+// ---------- Google Login Button (Direct Supabase OAuth) ----------
+const GoogleLoginSection = ({
+  onGoogleClick,
+  loading,
 }: {
-  onSuccess: (tokenResponse: any) => void;
+  onGoogleClick: () => void;
   loading: boolean;
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const login = useGoogleLogin({
-    onSuccess: (tokenResponse) => {
-      console.log('Google login successful — token received', tokenResponse);
-      setIsLoading(true);
-      onSuccess(tokenResponse);
-    },
-    onError: (error) => {
-      console.error("Google Login Failed", error);
-      setIsLoading(false);
-    },
-  });
-
-  const showLoading = isLoading || externalLoading;
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.35 } }}
-    >
-      <Button
-        variant="outline"
-        onClick={() => login()}
-        disabled={showLoading}
-        className="auth-google-btn w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-base"
-        style={{ fontFamily: "'Inter', sans-serif" }}
-      >
-        {showLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
-        ) : (
-          <span className="auth-google-icon-box h-9 w-9 flex items-center justify-center rounded-xl shrink-0">
-            <GoogleIcon />
-          </span>
-        )}
-        <span className="font-semibold">
-          {showLoading ? "Signing in..." : "Continue with Google"}
-        </span>
-      </Button>
-    </motion.div>
-  );
-};
-
-// ---------- Social Login Wrapper ----------
-const SocialLogin = ({
-  onGoogleSuccess,
-  googleLoading,
-}: {
-  onGoogleSuccess: (tokenResponse: any) => void;
-  googleLoading: boolean;
-}) => {
-  return (
-    <GoogleOAuthProvider clientId="933710679999-idbqpvaq2a9e0mbi0qc6vuu4nifjej96.apps.googleusercontent.com">
+    <>
       {/* Decorative divider */}
       <div className="auth-divider my-6 flex items-center justify-center">
         <span
@@ -678,8 +648,30 @@ const SocialLogin = ({
         </span>
       </div>
 
-      <GoogleLoginButton onSuccess={onGoogleSuccess} loading={googleLoading} />
-    </GoogleOAuthProvider>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.35 } }}
+      >
+        <Button
+          variant="outline"
+          onClick={onGoogleClick}
+          disabled={loading}
+          className="auth-google-btn w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-base"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          {loading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
+          ) : (
+            <span className="auth-google-icon-box h-9 w-9 flex items-center justify-center rounded-xl shrink-0">
+              <GoogleIcon />
+            </span>
+          )}
+          <span className="font-semibold">
+            {loading ? "Redirecting..." : "Continue with Google"}
+          </span>
+        </Button>
+      </motion.div>
+    </>
   );
 };
 
@@ -698,18 +690,42 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
 
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleAuthPhone, setGoogleAuthPhone] = useState("");
+
+  // ---------- Supabase Auth State Listener (central sync for ALL auth methods) ----------
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const user = session.user;
+
+        // Sync Supabase auth user data → localStorage
+        const profile = syncSessionToLocalStorage(user);
+
+        // Sync to public.profiles table (if it exists)
+        await syncProfileToSupabase(user.id, profile);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ---------- Auto-Login Check ----------
   useEffect(() => {
     if (open) {
-      const storedProfile = localStorage.getItem("profile");
-      const savedRide = localStorage.getItem("rideSummary");
+      // Check if already authenticated with Supabase
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          syncSessionToLocalStorage(session.user);
+          onClose();
+          navigate("/available-rides");
+          return;
+        }
+      });
 
+      // Fallback: check localStorage
+      const storedProfile = localStorage.getItem("profile");
       if (storedProfile) {
         const profile = JSON.parse(storedProfile);
         if (profile.fullName && profile.email && profile.isLoggedIn) {
-          // Skip sign-in if already logged in and has profile data
           onClose();
           navigate("/available-rides");
         }
@@ -717,73 +733,67 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
     }
   }, [open, onClose, navigate]);
 
-  // ---------- Phone OTP Verify → Profile ----------
+  // ---------- Phone OTP Verify → Sync to Supabase ----------
   const handleVerify = useCallback(async () => {
     const success = await verifyOtp();
     if (success) {
-      // Mark as logged in
-      const storedProfile = localStorage.getItem("profile");
-      const profile = storedProfile ? JSON.parse(storedProfile) : { fullName: "", email: "", city: "", dob: "", phone: "" };
-      profile.phone = profile.phone || phone;
-      profile.isLoggedIn = true;
-      localStorage.setItem("profile", JSON.stringify(profile));
-      window.dispatchEvent(new Event("storage"));
+      try {
+        // Get the user created by verifyOtp (Supabase session is now active)
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+          // Sync session to localStorage
+          const profile = syncSessionToLocalStorage(user);
+          profile.phone = profile.phone || phone;
+          localStorage.setItem("profile", JSON.stringify(profile));
+
+          // Update auth.users metadata (Display name, Email in Supabase Dashboard)
+          await supabase.auth.updateUser({
+            data: {
+              display_name: profile.fullName || '',
+              full_name: profile.fullName || '',
+              phone: phone,
+            }
+          });
+
+          // Sync to profiles table
+          await syncProfileToSupabase(user.id, { ...profile, phone });
+        }
+      } catch (err) {
+        console.error('Post-OTP sync error (non-blocking):', err);
+      }
 
       onClose();
-      // If we have ride data, we can go straight to vehicle selection
       navigate("/available-rides");
     }
   }, [verifyOtp, phone, onClose, navigate]);
 
-  // ---------- Google Auth → Fetch user info → Profile ----------
-  const handleGoogleSuccess = useCallback(async (tokenResponse: any) => {
+  // ---------- Google Auth → Supabase OAuth (creates auth.users entry) ----------
+  const handleGoogleClick = useCallback(async () => {
     setGoogleLoading(true);
     setError(null);
 
     try {
-      // Fetch user info from Google
-      const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/available-rides',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
       });
 
-      if (!response.ok) {
-        throw new Error(`Google API returned ${response.status}`);
-      }
-
-      const userInfo: GoogleUserInfo = await response.json();
-      console.log("Google user info fetched:", userInfo);
-
-      // Build profile from Google data
-      const storedProfile = localStorage.getItem("profile");
-      let profile = storedProfile
-        ? JSON.parse(storedProfile)
-        : { fullName: "", email: "", city: "", dob: "", phone: "" };
-
-      // Merge Google data into profile
-      profile.fullName = userInfo.name || userInfo.given_name || profile.fullName;
-      profile.email = userInfo.email || profile.email;
-      profile.picture = userInfo.picture || profile.picture || "";
-      profile.isLoggedIn = true;
-
-      // Save updated profile to localStorage
-      localStorage.setItem("profile", JSON.stringify(profile));
-      // Dispatch storage event so navbar updates instantly
-      window.dispatchEvent(new Event("storage"));
-
-      // Store the phone from existing profile (or empty) for ProfileSummaryDialog
-      setGoogleAuthPhone(profile.phone || "");
-
-      // Close auth dialog → open profile dialog
-      // Close auth dialog → go to vehicle selection
-      setGoogleLoading(false);
-      onClose();
-      navigate("/available-rides");
+      if (oauthError) throw oauthError;
+      // Supabase redirects to Google → back to /available-rides
+      // onAuthStateChange listener above handles the sync automatically
     } catch (err: any) {
-      console.error("Failed to fetch Google user info:", err);
-      setError("Google sign-in failed. Please try again.");
+      console.error('Supabase Google OAuth error:', err);
+      setError('Google sign-in failed. Please try again.');
       setGoogleLoading(false);
     }
-  }, [onClose, setError]);
+  }, [setError]);
 
   const handleResend = useCallback(() => {
     sendOtp();
@@ -798,9 +808,6 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
   const handleCloseProfile = useCallback(() => {
     setShowProfileDialog(false);
   }, []);
-
-  // Determine the phone to pass to ProfileSummaryDialog
-  const profilePhone = phone || googleAuthPhone;
 
   return (
     <>
@@ -861,9 +868,9 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
 
             <div id="recaptcha-container" className="my-2 flex justify-center"></div>
 
-            <SocialLogin
-              onGoogleSuccess={handleGoogleSuccess}
-              googleLoading={googleLoading}
+            <GoogleLoginSection
+              onGoogleClick={handleGoogleClick}
+              loading={googleLoading}
             />
 
             <motion.p
@@ -883,7 +890,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
 
       <ProfileSummaryDialog
         open={showProfileDialog}
-        phone={profilePhone}
+        phone={phone}
         onClose={handleCloseProfile}
       />
     </>

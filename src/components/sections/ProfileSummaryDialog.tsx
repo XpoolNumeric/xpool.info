@@ -157,26 +157,47 @@ const ProfileSummaryDialog = ({
     setLoading(true);
     
     try {
-      // 1. Try to save to Supabase
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({ 
-          phone: profile.phone,
-          full_name: profile.fullName,
-          email: profile.email,
-          city: profile.city,
-          dob: profile.dob,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'phone' });
+      // Get the currently authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (error) {
-        console.error("Failed to save to Supabase:", error);
+      if (user) {
+        // 1. Update auth.users metadata (Display name + Email in Supabase Dashboard)
+        const { error: authUpdateError } = await supabase.auth.updateUser({
+          email: profile.email,
+          data: {
+            display_name: profile.fullName,
+            full_name: profile.fullName,
+          }
+        });
+        
+        if (authUpdateError) {
+          console.error("Failed to update Supabase Auth User data:", authUpdateError);
+        }
+
+        // 2. Upsert into public.profiles table (keyed by user UUID)
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({ 
+            id: user.id,
+            phone: profile.phone,
+            full_name: profile.fullName,
+            email: profile.email,
+            city: profile.city,
+            dob: profile.dob,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' });
+
+        if (error) {
+          console.error("Failed to save to Supabase public.profiles:", error);
+        }
+      } else {
+        console.warn("No authenticated user found — data only saved locally.");
       }
     } catch (err) {
       console.error("Error connecting to Supabase:", err);
     }
 
-    // 2. Always fallback/sync with local storage
+    // 3. Always fallback/sync with local storage
     const stored = JSON.parse(localStorage.getItem("profile") || "{}");
     localStorage.setItem("profile", JSON.stringify({ ...stored, ...profile, isLoggedIn: true }));
     window.dispatchEvent(new Event("storage"));
