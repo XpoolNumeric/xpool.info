@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+import { supabase } from "@/lib/supabase/client";
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import {
   Dialog,
@@ -22,179 +21,23 @@ import {
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
-  Sparkles,
-  MapPin,
-  Navigation,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProfileSummaryDialog from "./ProfileSummaryDialog";
-import { GoogleMap, Polyline } from "@react-google-maps/api";
-
-/* -------------------- MAP COMPONENTS -------------------- */
-
-/**
- * Renders the route on the map using Google Directions Service
- */
-const Directions = ({ origin, destination }: { origin: string; destination: string }) => {
-  const [path, setPath] = useState<google.maps.LatLngLiteral[]>([]);
-
-  useEffect(() => {
-    if (!origin || !destination || !window.google) return;
-
-    // Use new Routes API (computeRoutes)
-    const fetchRoute = async () => {
-      try {
-        const response = await fetch(
-          `https://routes.googleapis.com/directions/v2:computeRoutes`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Goog-Api-Key": import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
-              "X-Goog-FieldMask": "routes.polyline.encodedPolyline",
-            },
-            body: JSON.stringify({
-              origin: { address: origin },
-              destination: { address: destination },
-              travelMode: "DRIVE",
-            }),
-          }
-        );
-        const data = await response.json();
-        const encoded = data?.routes?.[0]?.polyline?.encodedPolyline;
-        if (encoded && window.google?.maps?.geometry?.encoding) {
-          const decoded = window.google.maps.geometry.encoding.decodePath(encoded);
-          setPath(decoded.map((p: google.maps.LatLng) => ({ lat: p.lat(), lng: p.lng() })));
-        }
-      } catch (err) {
-        console.error("Routes API error:", err);
-      }
-    };
-
-    fetchRoute();
-  }, [origin, destination]);
-
-  if (!path.length) return null;
-
-  return (
-    <Polyline
-      path={path}
-      options={{
-        strokeColor: '#f59e0b',
-        strokeWeight: 5,
-        strokeOpacity: 0.8,
-      }}
-    />
-  );
-};
-
-const mapCustomStyle = [
-  {
-    "elementType": "geometry",
-    "stylers": [{ "color": "#f5f5f5" }]
-  },
-  {
-    "elementType": "labels.icon",
-    "stylers": [{ "visibility": "off" }]
-  },
-  {
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#616161" }]
-  },
-  {
-    "elementType": "labels.text.stroke",
-    "stylers": [{ "color": "#f5f5f5" }]
-  },
-  {
-    "featureType": "administrative.land_parcel",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#bdbdbd" }]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#eeeeee" }]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#757575" }]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#e5e5e5" }]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#9e9e9e" }]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#757575" }]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#dadada" }]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#616161" }]
-  },
-  {
-    "featureType": "road.local",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#9e9e9e" }]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#e5e5e5" }]
-  },
-  {
-    "featureType": "transit.station",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#eeeeee" }]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#c9c9c9" }]
-  },
-  {
-    "featureType": "water",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#9e9e9e" }]
-  }
-];
 
 // ---------- Constants ----------
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
 
-// ---------- Firebase Setup ----------
-const firebaseConfig = {
-  apiKey: "AIzaSyDk4g-4ooXJ4UO2n1zBl1Rskf2S0uaioV8",
-  authDomain: "xpool-89403.firebaseapp.com",
-  projectId: "xpool-89403",
-  storageBucket: "xpool-89403.firebasestorage.app",
-  messagingSenderId: "1086162216296",
-  appId: "1:1086162216296:web:8eda7e98cf853c85de22dd",
-  measurementId: "G-GQZS3LDQVX"
-};
-
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// ---------- Vonage Credentials Integration ----------
+// Note: As per the provided Supabase Dashboard configuration,
+// Vonage is configured as the SMS provider in Supabase Auth.
+// Credentials should ideally stay in the Supabase Dashboard backend for security:
+// - Vonage API Key: e367374d
+// - Vonage API Secret: 1LuT8773TFAaRrJS
+// - Vonage From: xpoolnumeric5009
+// The client simply calls supabase.auth.signInWithOtp() and Supabase handles the rest.
 
 // ---------- Types ----------
 interface AuthDialogProps {
@@ -426,7 +269,6 @@ function useAuth(initialStep: Step = "phone") {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   useEffect(() => {
     if (resendTimer <= 0) return;
@@ -438,22 +280,6 @@ function useAuth(initialStep: Step = "phone") {
 
   const isValidPhone = PHONE_REGEX.test(phone);
 
-  const setupRecaptcha = () => {
-    if (!(window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-        'callback': () => { /* reCAPTCHA solved */ },
-        'expired-callback': () => {
-          setError("reCAPTCHA expired. Please try again.");
-          if ((window as any).recaptchaVerifier) {
-            (window as any).recaptchaVerifier.clear();
-            (window as any).recaptchaVerifier = null;
-          }
-        }
-      });
-    }
-  };
-
   const sendOtp = useCallback(async () => {
     if (!isValidPhone) {
       setError("Please enter a valid 10-digit Indian mobile number.");
@@ -462,21 +288,18 @@ function useAuth(initialStep: Step = "phone") {
     setLoading(true);
     setError(null);
     try {
-      setupRecaptcha();
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const appVerifier = (window as any).recaptchaVerifier;
       const phoneNumber = `+91${phone}`;
-      const result = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-      setConfirmationResult(result);
+      const { error: signInError } = await supabase.auth.signInWithOtp({
+        phone: phoneNumber,
+      });
+
+      if (signInError) throw signInError;
+
       setStep("otp");
       setResendTimer(RESEND_COOLDOWN);
     } catch (err: any) {
       console.error("Error sending OTP:", err);
       setError(err.message || "Failed to send OTP. Please try again.");
-      if ((window as any).recaptchaVerifier) {
-        (window as any).recaptchaVerifier.clear();
-        (window as any).recaptchaVerifier = null;
-      }
     } finally {
       setLoading(false);
     }
@@ -487,14 +310,18 @@ function useAuth(initialStep: Step = "phone") {
       setError(`OTP must be ${OTP_LENGTH} digits.`);
       return false;
     }
-    if (!confirmationResult) {
-      setError("Session expired. Please request OTP again.");
-      return false;
-    }
     setLoading(true);
     setError(null);
     try {
-      await confirmationResult.confirm(otp);
+      const phoneNumber = `+91${phone}`;
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone: phoneNumber,
+        token: otp,
+        type: 'sms',
+      });
+
+      if (verifyError) throw verifyError;
+
       return true;
     } catch (err: any) {
       console.error("Error verifying OTP:", err);
@@ -503,7 +330,7 @@ function useAuth(initialStep: Step = "phone") {
     } finally {
       setLoading(false);
     }
-  }, [otp, confirmationResult]);
+  }, [phone, otp]);
 
   const reset = useCallback(() => {
     setStep("phone");
@@ -512,7 +339,6 @@ function useAuth(initialStep: Step = "phone") {
     setLoading(false);
     setError(null);
     setResendTimer(0);
-    setConfirmationResult(null);
   }, []);
 
   return {
@@ -873,17 +699,12 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleAuthPhone, setGoogleAuthPhone] = useState("");
-  const [rideData, setRideData] = useState<any>(null);
 
   // ---------- Auto-Login Check ----------
   useEffect(() => {
     if (open) {
       const storedProfile = localStorage.getItem("profile");
       const savedRide = localStorage.getItem("rideSummary");
-
-      if (savedRide) {
-        setRideData(JSON.parse(savedRide));
-      }
 
       if (storedProfile) {
         const profile = JSON.parse(storedProfile);
@@ -992,55 +813,6 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
           <TrustBar />
 
           <div className="p-6 md:p-8 space-y-6 relative z-10">
-            {/* Visual Header / Map */}
-            <div className="relative h-48 rounded-2xl overflow-hidden bg-amber-50/50 border border-amber-500/10 shadow-inner group">
-              <AnimatePresence mode="wait">
-                {rideData?.pickup && rideData?.drop ? (
-                  <motion.div
-                    key="map"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="absolute inset-0"
-                  >
-                    <GoogleMap
-                      mapContainerStyle={{ width: "100%", height: "100%" }}
-                      options={{
-                        disableDefaultUI: true,
-                        gestureHandling: 'none',
-                        styles: mapCustomStyle,
-                      }}
-                    >
-                      <Directions origin={rideData.pickup} destination={rideData.drop} />
-                    </GoogleMap>
-                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-white/90 to-transparent">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
-                          <MapPin className="h-3 w-3 text-amber-500" />
-                          <span className="truncate">{rideData.pickup}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-900">
-                          <Navigation className="h-3 w-3 text-orange-600" />
-                          <span className="truncate">{rideData.drop}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="placeholder"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center"
-                  >
-                    <div className="h-16 w-16 bg-amber-100/50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Sparkles className="h-8 w-8 text-amber-500" />
-                    </div>
-                    <p className="text-sm font-bold text-gray-800">Your Journey Awaits</p>
-                    <p className="text-[10px] font-medium text-gray-500 mt-1 uppercase tracking-widest">Connect to continue</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
 
             <DialogHeader className="space-y-3">
               <DialogDescription className="sr-only">

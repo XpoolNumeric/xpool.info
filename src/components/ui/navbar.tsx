@@ -28,7 +28,8 @@ const NAV_ITEMS = [
   { label: "Home", to: "/", icon: "●", badge: false },
   { label: "How it Works", to: "/how-it-works", icon: "◆", badge: false },
   { label: "Features", to: "/features", icon: "▲", badge: false },
-  { label: "Download", to: "/download", icon: "⬇", badge: true },
+  { label: "Verify Docs", to: "/verify", icon: "✓", badge: true },
+  { label: "Download", to: "/download", icon: "⬇", badge: false },
   { label: "Contact", to: "/contact", icon: "◉", badge: false },
 ];
 

@@ -13,6 +13,7 @@ import Contact from "./pages/Contact";
 import Download from "./pages/Download";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import DocumentVerification from "./pages/DocumentVerification";
 
 // Ride flow (BlaBlaCar-style)
 import AvailableRides from "./pages/AvailableRides";
@@ -39,6 +40,7 @@ const App = (): JSX.Element => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/download" element={<Download />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/verify" element={<DocumentVerification />} />
 
           {/* Ride flow — BlaBlaCar style */}
           <Route path="/available-rides" element={<AvailableRides />} />
