@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
+import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import {
   Dialog,
   DialogContent,
@@ -20,36 +21,18 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import ProfileSummaryDialog from "./ProfileSummaryDialog";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 // ---------- Constants ----------
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
+const GOOGLE_CLIENT_ID = '933710679999-idbqpvaq2a9e0mbi0qc6vuu4nifjej96.apps.googleusercontent.com';
 
 // ---------- Supabase Auth Integration ----------
 // Phone OTP: Vonage is configured as SMS provider in Supabase Dashboard.
 // Google OAuth: Google provider is configured in Supabase Dashboard.
 // Both methods create proper auth.users entries in Supabase Auth.
-
-// ---------- Helper: Sync user session to localStorage ----------
-const syncSessionToLocalStorage = (user: any) => {
-  const meta = user.user_metadata || {};
-  const storedProfile = localStorage.getItem("profile");
-  let profile = storedProfile
-    ? JSON.parse(storedProfile)
-    : { fullName: "", email: "", city: "", dob: "", phone: "" };
-
-  profile.fullName = meta.full_name || meta.name || meta.display_name || profile.fullName || "";
-  profile.email = user.email || meta.email || profile.email || "";
-  profile.picture = meta.avatar_url || meta.picture || profile.picture || "";
-  profile.phone = user.phone || profile.phone || "";
-  profile.isLoggedIn = true;
-
-  localStorage.setItem("profile", JSON.stringify(profile));
-  window.dispatchEvent(new Event("storage"));
-  return profile;
-};
 
 // ---------- Helper: Sync profile to Supabase profiles table (optional) ----------
 const syncProfileToSupabase = async (userId: string, profile: any) => {
@@ -74,7 +57,7 @@ interface AuthDialogProps {
   onClose: () => void;
 }
 
-type Step = "phone" | "otp";
+type Step = "phone" | "otp" | "link-phone" | "link-otp";
 
 // ---------- Inline Styles (Hero-matching) ----------
 const AuthStyles = memo(() => (
@@ -188,6 +171,9 @@ const AuthStyles = memo(() => (
 
     .auth-divider {
       position: relative;
+      width: 100%;
+      height: 1px;
+      margin: 2rem 0;
     }
     .auth-divider::before {
       content: '';
@@ -196,7 +182,21 @@ const AuthStyles = memo(() => (
       right: 0;
       top: 50%;
       height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.2), transparent);
+      background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.25), transparent);
+    }
+    .auth-divider-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 0 1rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: #b45309;
+      background-color: #fef9e7; /* Match dialog background precisely */
+      z-index: 10;
     }
 
     .auth-step-badge {
@@ -269,8 +269,8 @@ AuthStyles.displayName = "AuthStyles";
 // ---------- Animation Variants ----------
 const fadeSlide = {
   initial: { opacity: 0, y: 16, scale: 0.98 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
-  exit: { opacity: 0, y: -12, scale: 0.98, transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: "easeOut" } },
+  exit: { opacity: 0, y: -12, scale: 0.98, transition: { duration: 0.25, ease: "easeOut" } },
 };
 
 const staggerContainer = {
@@ -279,7 +279,7 @@ const staggerContainer = {
 
 const staggerChild = {
   initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
 };
 
 // ---------- Custom Hook (auth logic) ----------
@@ -353,6 +353,52 @@ function useAuth(initialStep: Step = "phone") {
     }
   }, [phone, otp]);
 
+  const sendLinkOtp = useCallback(async () => {
+    if (!isValidPhone) {
+      setError("Please enter a valid 10-digit Indian mobile number.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const phoneNumber = `+91${phone}`;
+      const { error: updateError } = await supabase.auth.updateUser({ phone: phoneNumber });
+      if (updateError) throw updateError;
+      setStep("link-otp");
+      setResendTimer(RESEND_COOLDOWN);
+    } catch (err: any) {
+      console.error("Error sending link OTP:", err);
+      setError(err.message || "Failed to send link OTP. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [isValidPhone, phone]);
+
+  const verifyLinkOtp = useCallback(async () => {
+    if (otp.length !== OTP_LENGTH) {
+      setError(`OTP must be ${OTP_LENGTH} digits.`);
+      return false;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const phoneNumber = `+91${phone}`;
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        phone: phoneNumber,
+        token: otp,
+        type: 'phone_change',
+      });
+      if (verifyError) throw verifyError;
+      return true;
+    } catch (err: any) {
+      console.error("Error verifying link OTP:", err);
+      setError("Invalid OTP. Please try again.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [phone, otp]);
+
   const reset = useCallback(() => {
     setStep("phone");
     setPhone("");
@@ -369,6 +415,7 @@ function useAuth(initialStep: Step = "phone") {
     loading, error, setError,
     resendTimer, isValidPhone,
     sendOtp, verifyOtp, reset,
+    sendLinkOtp, verifyLinkOtp,
   };
 }
 
@@ -628,56 +675,91 @@ const OtpStep = ({
   );
 };
 
-// ---------- Google Login Button (Direct Supabase OAuth) ----------
-const GoogleLoginSection = ({
-  onGoogleClick,
+// ---------- Google Login via ID Token (popup — shows "Xpool", not Supabase URL) ----------
+// Inner component that must live inside GoogleOAuthProvider
+const GoogleLoginInner = ({
+  onGoogleIdToken,
   loading,
 }: {
-  onGoogleClick: () => void;
+  onGoogleIdToken: (idToken: string) => void;
   loading: boolean;
 }) => {
   return (
     <>
       {/* Decorative divider */}
-      <div className="auth-divider my-6 flex items-center justify-center">
-        <span
-          className="relative z-10 px-4 text-xs font-semibold uppercase tracking-widest text-amber-600/60 bg-amber-50/80"
-          style={{ fontFamily: "'Inter', sans-serif" }}
-        >
-          or
-        </span>
+      <div className="auth-divider">
+        <span className="auth-divider-label">or</span>
       </div>
 
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.35 } }}
+        className="w-full relative"
       >
-        <Button
-          variant="outline"
-          onClick={onGoogleClick}
-          disabled={loading}
-          className="auth-google-btn w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-base"
-          style={{ fontFamily: "'Inter', sans-serif" }}
-        >
-          {loading ? (
+        {loading ? (
+          <Button
+            variant="outline"
+            disabled
+            className="auth-google-btn w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-base"
+            style={{ fontFamily: "'Inter', sans-serif" }}
+          >
             <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
-          ) : (
-            <span className="auth-google-icon-box h-9 w-9 flex items-center justify-center rounded-xl shrink-0">
-              <GoogleIcon />
-            </span>
-          )}
-          <span className="font-semibold">
-            {loading ? "Redirecting..." : "Continue with Google"}
-          </span>
-        </Button>
+            <span className="font-semibold">Signing in...</span>
+          </Button>
+        ) : (
+          <div className="relative w-full group">
+            {/* Custom styled button visible to user */}
+            <Button
+              variant="outline"
+              className="auth-google-btn w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-base group-hover:bg-white/90 group-hover:border-amber-500/30 transition-all duration-300"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              <span className="auth-google-icon-box h-9 w-9 flex items-center justify-center rounded-xl shrink-0">
+                <GoogleIcon />
+              </span>
+              <span className="font-semibold">Continue with Google</span>
+            </Button>
+            
+            {/* Invisible Google Login overlay that actually handles the sign-in */}
+            <div 
+              className="absolute inset-x-0 inset-y-0 opacity-0 overflow-hidden rounded-2xl cursor-pointer flex justify-center items-center" 
+              style={{ zIndex: 20 }}
+            >
+              <div className="w-full transform scale-[1.5]"> {/* Scale up to ensure full button coverage */}
+                <GoogleLogin
+                  onSuccess={(credentialResponse: CredentialResponse) => {
+                    if (credentialResponse.credential) {
+                      onGoogleIdToken(credentialResponse.credential);
+                    }
+                  }}
+                  onError={() => console.error('Google Login Failed')}
+                  size="large"
+                  width="360"
+                  text="continue_with"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     </>
   );
 };
 
+// Wrapper that provides GoogleOAuthProvider context
+const GoogleLoginSection = (props: {
+  onGoogleIdToken: (idToken: string) => void;
+  loading: boolean;
+}) => (
+  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+    <GoogleLoginInner {...props} />
+  </GoogleOAuthProvider>
+);
+
 // ---------- Main Component ----------
 const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
   const navigate = useNavigate();
+  const { user } = useAuthContext();
 
   const {
     step, setStep,
@@ -686,128 +768,100 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
     loading, error, setError,
     resendTimer, isValidPhone,
     sendOtp, verifyOtp, reset,
+    sendLinkOtp, verifyLinkOtp,
   } = useAuth();
 
-  const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-
-  // ---------- Supabase Auth State Listener (central sync for ALL auth methods) ----------
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const user = session.user;
-
-        // Sync Supabase auth user data → localStorage
-        const profile = syncSessionToLocalStorage(user);
-
-        // Sync to public.profiles table (if it exists)
-        await syncProfileToSupabase(user.id, profile);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   // ---------- Auto-Login Check ----------
   useEffect(() => {
-    if (open) {
-      // Check if already authenticated with Supabase
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          syncSessionToLocalStorage(session.user);
-          onClose();
-          navigate("/available-rides");
-          return;
-        }
-      });
-
-      // Fallback: check localStorage
-      const storedProfile = localStorage.getItem("profile");
-      if (storedProfile) {
-        const profile = JSON.parse(storedProfile);
-        if (profile.fullName && profile.email && profile.isLoggedIn) {
-          onClose();
-          navigate("/available-rides");
-        }
-      }
+    if (open && user && user.phone) {
+      onClose();
+      navigate("/available-rides");
     }
-  }, [open, onClose, navigate]);
+  }, [open, user, onClose, navigate]);
 
   // ---------- Phone OTP Verify → Sync to Supabase ----------
   const handleVerify = useCallback(async () => {
     const success = await verifyOtp();
     if (success) {
       try {
-        // Get the user created by verifyOtp (Supabase session is now active)
         const { data: { user } } = await supabase.auth.getUser();
-
         if (user) {
-          // Sync session to localStorage
-          const profile = syncSessionToLocalStorage(user);
-          profile.phone = profile.phone || phone;
-          localStorage.setItem("profile", JSON.stringify(profile));
-
-          // Update auth.users metadata (Display name, Email in Supabase Dashboard)
           await supabase.auth.updateUser({
-            data: {
-              display_name: profile.fullName || '',
-              full_name: profile.fullName || '',
-              phone: phone,
-            }
+            data: { phone: phone }
           });
-
-          // Sync to profiles table
-          await syncProfileToSupabase(user.id, { ...profile, phone });
+          await syncProfileToSupabase(user.id, { phone });
         }
       } catch (err) {
         console.error('Post-OTP sync error (non-blocking):', err);
       }
-
       onClose();
       navigate("/available-rides");
     }
   }, [verifyOtp, phone, onClose, navigate]);
 
-  // ---------- Google Auth → Supabase OAuth (creates auth.users entry) ----------
-  const handleGoogleClick = useCallback(async () => {
+  // ---------- Phone Link OTP Verify ----------
+  const handleVerifyLink = useCallback(async () => {
+    const success = await verifyLinkOtp();
+    if (success) {
+       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await syncProfileToSupabase(user.id, { email: user.email, fullName: user.user_metadata?.full_name, phone });
+        }
+      } catch (err) {
+        console.error('Post-Link sync error:', err);
+      }
+      onClose();
+      navigate("/available-rides");
+    }
+  }, [verifyLinkOtp, phone, onClose, navigate]);
+
+  // ---------- Google Auth → ID Token → Supabase (popup, shows "Xpool" not Supabase URL) ----------
+  const handleGoogleIdToken = useCallback(async (idToken: string) => {
     setGoogleLoading(true);
     setError(null);
 
     try {
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      const { data, error: signInError } = await supabase.auth.signInWithIdToken({
         provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/available-rides',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
+        token: idToken,
       });
 
-      if (oauthError) throw oauthError;
-      // Supabase redirects to Google → back to /available-rides
-      // onAuthStateChange listener above handles the sync automatically
+      if (signInError) throw signInError;
+
+      if (data.user) {
+        if (!data.user.phone) {
+          // Instruct user to link phone!
+          setGoogleLoading(false);
+          setStep("link-phone");
+          return;
+        } else {
+          await syncProfileToSupabase(data.user.id, { email: data.user.email, fullName: data.user.user_metadata?.full_name });
+        }
+      }
+
+      setGoogleLoading(false);
+      onClose();
+      navigate('/available-rides');
     } catch (err: any) {
-      console.error('Supabase Google OAuth error:', err);
+      console.error('Supabase Google ID Token error:', err);
       setError('Google sign-in failed. Please try again.');
       setGoogleLoading(false);
     }
-  }, [setError]);
+  }, [setError, onClose, navigate, setStep]);
 
   const handleResend = useCallback(() => {
-    sendOtp();
-  }, [sendOtp]);
+    if (step === "link-otp") sendLinkOtp();
+    else sendOtp();
+  }, [step, sendOtp, sendLinkOtp]);
 
   const handleCloseAuth = useCallback(() => {
     reset();
     setGoogleLoading(false);
     onClose();
   }, [reset, onClose]);
-
-  const handleCloseProfile = useCallback(() => {
-    setShowProfileDialog(false);
-  }, []);
 
   return (
     <>
@@ -827,25 +881,27 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
               </DialogDescription>
               <div className="space-y-1">
                 <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
-                  {step === "phone" ? "Welcome to Xpool" : "Verify Number"}
+                  {step === "phone" ? "Welcome to Xpool" : step === "link-phone" ? "Link Phone Number" : "Verify Number"}
                 </DialogTitle>
                 <p className="text-sm font-medium text-gray-500 leading-relaxed">
                   {step === "phone"
                     ? "Verify your account to enjoy seamless rides across India."
+                    : step === "link-phone" 
+                    ? "Please provide your phone number to complete account setup."
                     : `Enter the OTP sent to +91 ${phone} to proceed.`}
                 </p>
               </div>
             </DialogHeader>
 
             <AnimatePresence mode="wait">
-              {step === "phone" ? (
+              {(step === "phone" || step === "link-phone") ? (
                 <motion.div key="phone" {...fadeSlide}>
                   <PhoneStep
                     phone={phone}
                     setPhone={setPhone}
                     isValidPhone={isValidPhone}
                     loading={loading}
-                    onSendOtp={sendOtp}
+                    onSendOtp={step === "link-phone" ? sendLinkOtp : sendOtp}
                     error={error}
                   />
                 </motion.div>
@@ -856,8 +912,8 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
                     otp={otp}
                     setOtp={setOtp}
                     loading={loading}
-                    onVerify={handleVerify}
-                    onBack={() => setStep("phone")}
+                    onVerify={step === "link-otp" ? handleVerifyLink : handleVerify}
+                    onBack={() => setStep(step === "link-otp" ? "link-phone" : "phone")}
                     onResend={handleResend}
                     resendTimer={resendTimer}
                     error={error}
@@ -866,12 +922,16 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
               )}
             </AnimatePresence>
 
-            <div id="recaptcha-container" className="my-2 flex justify-center"></div>
+            {(step === "phone" || step === "otp") && (
+              <>
+                <div id="recaptcha-container" className="my-2 flex justify-center"></div>
 
-            <GoogleLoginSection
-              onGoogleClick={handleGoogleClick}
-              loading={googleLoading}
-            />
+                <GoogleLoginSection
+                  onGoogleIdToken={handleGoogleIdToken}
+                  loading={googleLoading}
+                />
+              </>
+            )}
 
             <motion.p
               initial={{ opacity: 0 }}
@@ -887,12 +947,6 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
           </div>
         </DialogContent>
       </Dialog>
-
-      <ProfileSummaryDialog
-        open={showProfileDialog}
-        phone={phone}
-        onClose={handleCloseProfile}
-      />
     </>
   );
 };

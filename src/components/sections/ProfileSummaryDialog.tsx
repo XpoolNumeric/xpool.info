@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
+import { useAuthContext } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,8 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowLeft,
-  Sparkles
+  Sparkles,
+  Lock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -40,7 +42,7 @@ interface ProfileData {
   phone: string;
 }
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 const EMPTY_PROFILE: ProfileData = {
   fullName: "",
@@ -65,9 +67,10 @@ const STEP_LABELS: Record<Step, string> = {
   1: "Verify Phone",
   2: "Your Details",
   3: "Review",
+  4: "Verify OTP",
 };
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 // Premium Styling Tokens
 const T = {
@@ -77,9 +80,11 @@ const T = {
   ivory: "#FFF8ED",
 };
 
-const fadeSlide = {
+import { Variants } from "framer-motion";
+
+const fadeSlide: Variants = {
   initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
   exit: { opacity: 0, y: -8, transition: { duration: 0.2 } }
 };
 
@@ -90,30 +95,37 @@ const ProfileSummaryDialog = ({
   onBack,
 }: ProfileSummaryDialogProps) => {
   const navigate = useNavigate();
+  const { profile: contextProfile, refreshProfile } = useAuthContext();
 
   const [step, setStep] = useState<Step>(1);
   const [profile, setProfile] = useState<ProfileData>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [touched, setTouched] = useState<Set<keyof ProfileData>>(new Set());
-  const [focusedField, setFocusedField] = useState<keyof ProfileData | null>(null);
+  const [focusedField, setFocusedField] = useState<keyof ProfileData | string | null>(null);
+  const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setStep(1);
     setSaved(false);
+    setOtp("");
+    setOtpError(null);
     setTouched(new Set());
 
-    try {
-      const storedProfile = localStorage.getItem("profile");
-      const base = storedProfile
-        ? { ...EMPTY_PROFILE, ...JSON.parse(storedProfile) }
-        : EMPTY_PROFILE;
-      setProfile({ ...base, phone: phone || base.phone });
-    } catch {
+    if (contextProfile) {
+      setProfile({
+        fullName: contextProfile.full_name || "",
+        email: contextProfile.email || "",
+        city: contextProfile.city || "",
+        dob: contextProfile.dob || "",
+        phone: contextProfile.phone || phone || "",
+      });
+    } else {
       setProfile({ ...EMPTY_PROFILE, phone: phone || "" });
     }
-  }, [open, phone]);
+  }, [open, contextProfile, phone]);
 
   const errors = useMemo<Partial<Record<keyof ProfileData, string>>>(() => ({
     fullName: validators.fullName(profile.fullName) ?? undefined,
@@ -153,64 +165,86 @@ const ProfileSummaryDialog = ({
     setStep((s) => (s + 1) as Step);
   }, [step, isStep1Valid, isStep2Valid]);
 
+  const commitProfileToDB = async (userId: string) => {
+      // 1. Update auth.users metadata
+      await supabase.auth.updateUser({
+        email: profile.email,
+        data: { display_name: profile.fullName, full_name: profile.fullName }
+      });
+      // 2. Upsert into public.profiles table
+      await supabase.from('profiles').upsert({ 
+          id: userId, phone: profile.phone, full_name: profile.fullName, 
+          email: profile.email, city: profile.city, dob: profile.dob, 
+          updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+  };
+
   const handleSave = useCallback(async () => {
     setLoading(true);
-    
     try {
-      // Get the currently authenticated user
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
 
-      if (user) {
-        // 1. Update auth.users metadata (Display name + Email in Supabase Dashboard)
-        const { error: authUpdateError } = await supabase.auth.updateUser({
-          email: profile.email,
-          data: {
-            display_name: profile.fullName,
-            full_name: profile.fullName,
-          }
-        });
-        
-        if (authUpdateError) {
-          console.error("Failed to update Supabase Auth User data:", authUpdateError);
+      // Check if phone changed
+      const currentPhone = contextProfile?.phone || "";
+      if (profile.phone !== currentPhone && profile.phone) {
+        // Send OTP for new phone
+        const { error: updateError } = await supabase.auth.updateUser({ phone: `+91${profile.phone}` });
+        if (updateError) {
+          console.error("Phone update error:", updateError);
+          setLoading(false);
+          // Show error to user via toast or custom error logic later
+          return;
         }
-
-        // 2. Upsert into public.profiles table (keyed by user UUID)
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({ 
-            id: user.id,
-            phone: profile.phone,
-            full_name: profile.fullName,
-            email: profile.email,
-            city: profile.city,
-            dob: profile.dob,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'id' });
-
-        if (error) {
-          console.error("Failed to save to Supabase public.profiles:", error);
-        }
-      } else {
-        console.warn("No authenticated user found — data only saved locally.");
+        setStep(4); // Display OTP input step
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error("Error connecting to Supabase:", err);
-    }
 
-    // 3. Always fallback/sync with local storage
-    const stored = JSON.parse(localStorage.getItem("profile") || "{}");
-    localStorage.setItem("profile", JSON.stringify({ ...stored, ...profile, isLoggedIn: true }));
-    window.dispatchEvent(new Event("storage"));
-
-    setTimeout(() => {
+      // If no phone change, commit directly
+      await commitProfileToDB(user.id);
+      await refreshProfile();
+      
       setSaved(true);
       setTimeout(() => {
         setLoading(false);
         onClose();
-        navigate("/available-rides");
       }, 700);
-    }, 900);
-  }, [profile, navigate, onClose]);
+
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      setLoading(false);
+    }
+  }, [profile, contextProfile, refreshProfile, onClose]);
+
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) { setOtpError("OTP must be 6 digits"); return; }
+    setLoading(true);
+    setOtpError(null);
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone: `+91${profile.phone}`,
+        token: otp,
+        type: 'phone_change'
+      });
+      if (verifyError) throw verifyError;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+         await commitProfileToDB(user.id);
+         await refreshProfile();
+      }
+
+      setSaved(true);
+      setTimeout(() => {
+        setLoading(false);
+        onClose();
+      }, 700);
+    } catch (err) {
+      setOtpError("Invalid OTP. Please try again.");
+      setLoading(false);
+    }
+  };
 
   const update = (key: keyof ProfileData, value: string) => {
     if (key === 'phone') {
@@ -469,6 +503,34 @@ const ProfileSummaryDialog = ({
                     <p className="text-[11px] text-center font-medium text-amber-900/50 uppercase tracking-widest">
                       You can edit this later in your profile
                     </p>
+                  </div>
+                )}
+                {/* ---- STEP 4: Verify OTP ---- */}
+                {step === 4 && (
+                  <div className="space-y-6">
+                    <div className="text-center font-bold text-amber-900 mb-4 bg-amber-500/10 p-4 rounded-xl text-sm border border-amber-500/20">
+                      An OTP has been sent to +91 {profile.phone}. Please enter it to verify the change.
+                    </div>
+                    <InputBlock
+                      icon={<Lock className="h-4 w-4" />}
+                      label="6-digit OTP"
+                      value={otp}
+                      type="text"
+                      errorMsg={otpError || undefined}
+                      isFocused={focusedField === "otp"}
+                      autoFocus
+                      onFocus={() => setFocusedField("otp")}
+                      onBlur={() => setFocusedField(null)}
+                      onChange={(v) => { setOtp(v.replace(/\D/g, "").slice(0, 6)); setOtpError(null); }}
+                    />
+                    <ActionButton 
+                      onClick={handleVerifyOtp} 
+                      disabled={loading || saved || otp.length !== 6}
+                      loading={loading}
+                      saved={saved}
+                      label="Verify & Save"
+                      savedLabel="Profile Updated!"
+                    />
                   </div>
                 )}
               </motion.div>

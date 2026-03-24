@@ -7,6 +7,8 @@ import {
   Sparkles, Zap, Shield,
 } from "lucide-react";
 import Navbar from "@/components/ui/navbar";
+import { useAuthContext } from "@/contexts/AuthContext";
+import ProfileSummaryDialog from "@/components/sections/ProfileSummaryDialog";
 
 /* ─────────────────────────────────────────────────────────
    Design Tokens
@@ -49,49 +51,28 @@ const staggerContainer = {
 ───────────────────────────────────────────────────────── */
 export default function Profile() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<{
-    fullName: string;
-    email: string;
-    phone: string;
-    city: string;
-    dob: string;
-    picture: string;
-    isLoggedIn: boolean;
-  } | null>(null);
+  const { user, profile, isLoading, logout } = useAuthContext();
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("profile");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const isActive = parsed.isLoggedIn || parsed.fullName || parsed.email || parsed.phone;
-        if (!isActive) {
-          navigate("/");
-        } else {
-          setProfile(parsed);
-        }
-      } catch (e) {
-        navigate("/");
-      }
-    } else {
+    if (!isLoading && !user) {
       navigate("/");
     }
-  }, [navigate]);
+  }, [isLoading, user, navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("profile");
-    window.dispatchEvent(new Event("storage"));
+  const handleLogout = async () => {
+    await logout();
     navigate("/");
   };
 
   const initials = useMemo(() => {
-    if (!profile?.fullName) return "?";
-    const parts = profile.fullName.trim().split(" ").filter(Boolean);
+    if (!profile?.full_name) return "?";
+    const parts = profile.full_name.trim().split(" ").filter(Boolean);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return parts[0][0].toUpperCase();
-  }, [profile?.fullName]);
+  }, [profile?.full_name]);
 
-  if (!profile) return null;
+  if (isLoading || !profile) return null;
 
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
@@ -192,10 +173,10 @@ export default function Profile() {
                 {/* Avatar */}
                 <div className="mb-6 relative">
                   <div className="profile-avatar-ring">
-                    {profile.picture ? (
+                    {profile.avatar_url ? (
                       <img
-                        src={profile.picture}
-                        alt={profile.fullName}
+                        src={profile.avatar_url}
+                        alt={profile.full_name || "Profile"}
                         className="w-28 h-28 rounded-full object-cover bg-white"
                         referrerPolicy="no-referrer"
                       />
@@ -228,7 +209,7 @@ export default function Profile() {
                 {/* Name & Badge */}
                 <div className="text-center mb-6">
                   <h1 className="text-2xl font-extrabold mb-1 flex items-center justify-center gap-2" style={{ color: T.navy }}>
-                    {profile.fullName || "Awesome User"}
+                    {profile.full_name || "Awesome User"}
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
                   </h1>
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase"
@@ -303,17 +284,31 @@ export default function Profile() {
           <motion.div variants={fadeSlide} className="flex flex-col gap-6">
             <div className="profile-card rounded-[28px] p-8 flex-1">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-bold" style={{ color: T.navy }}>Personal Information</h3>
-                <div
-                  className="h-10 w-10 rounded-2xl flex items-center justify-center"
-                  style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(245,158,11,0.1)" }}
-                >
-                  <User className="w-5 h-5" style={{ color: T.orange }} />
+                <div className="flex items-center gap-4">
+                  <div
+                    className="h-10 w-10 rounded-2xl flex items-center justify-center"
+                    style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(245,158,11,0.1)" }}
+                  >
+                    <User className="w-5 h-5" style={{ color: T.orange }} />
+                  </div>
+                  <h3 className="text-lg font-bold" style={{ color: T.navy }}>Personal Information</h3>
                 </div>
+                
+                <button
+                  onClick={() => setIsEditOpen(true)}
+                  className="px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-1.5"
+                  style={{ 
+                    background: "rgba(251,191,36,0.1)", 
+                    color: T.orangeDeep,
+                    border: "1px solid rgba(245,158,11,0.2)"
+                  }}
+                >
+                  Edit Profile
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InfoItem icon={<User />} label="Full Name" value={profile.fullName || "Not provided"} />
+                <InfoItem icon={<User />} label="Full Name" value={profile.full_name || "Not provided"} />
                 <InfoItem icon={<Phone />} label="Phone Number" value={profile.phone ? `+91 ${profile.phone}` : "Not provided"} />
                 <InfoItem icon={<Mail />} label="Email Address" value={profile.email || "Not linked"} />
                 <InfoItem icon={<MapPin />} label="City" value={profile.city || "Not selected"} />
@@ -362,6 +357,12 @@ export default function Profile() {
           </motion.div>
         </motion.div>
       </main>
+
+      {/* Edit Profile Dialog */}
+      <ProfileSummaryDialog 
+        open={isEditOpen} 
+        onClose={() => setIsEditOpen(false)} 
+      />
     </div>
   );
 }

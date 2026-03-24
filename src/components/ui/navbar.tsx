@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Phone, Download, Menu, X, Sparkles, ChevronRight, LogOut, User } from "lucide-react";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 /* ─────────────────────────────────────────────────────────
    Design Tokens
@@ -186,36 +187,17 @@ interface LogoProps {
 }
 
 const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => {
+  const { profile } = useAuthContext();
   const [firstName, setFirstName] = useState("");
 
   useEffect(() => {
-    const updateName = () => {
-      const storedProfile = localStorage.getItem("profile");
-      if (storedProfile) {
-        try {
-          const profile = JSON.parse(storedProfile);
-          if (profile.fullName) {
-            const first = profile.fullName.trim().split(" ")[0];
-            setFirstName(first.charAt(0).toUpperCase() + first.slice(1).toLowerCase());
-          } else {
-            setFirstName("");
-          }
-        } catch (e) {
-          setFirstName("");
-        }
-      } else {
-        setFirstName("");
-      }
-    };
-
-    updateName();
-    window.addEventListener("storage", updateName);
-    const interval = setInterval(updateName, 2000);
-    return () => {
-      window.removeEventListener("storage", updateName);
-      clearInterval(interval);
-    };
-  }, []);
+    if (profile?.full_name) {
+      const first = profile.full_name.trim().split(" ")[0];
+      setFirstName(first.charAt(0).toUpperCase() + first.slice(1).toLowerCase());
+    } else {
+      setFirstName("");
+    }
+  }, [profile]);
 
   return (
     <Link
@@ -400,8 +382,8 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
 ───────────────────────────────────────────────────────── */
 const ProfileButton = ({ profile, fullWidth = false }: { profile: any, fullWidth?: boolean }) => {
   const [hovered, setHovered] = useState(false);
-  const picture = profile?.picture;
-  const initial = profile?.fullName?.charAt(0)?.toUpperCase() || "U";
+  const picture = profile?.avatar_url;
+  const initial = profile?.full_name?.charAt(0)?.toUpperCase() || "U";
   return (
     <Link
       to="/profile"
@@ -471,35 +453,17 @@ const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void, f
    Main Navbar
 ───────────────────────────────────────────────────────── */
 const Navbar = () => {
+  const { profile, logout } = useAuthContext();
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hideBar, setHideBar] = useState(false);
   const [mouseX, setMouseX] = useState(0.5);
-  const [profile, setProfile] = useState<any>(null);
   const lastScrollY = useRef(0);
   const location = useLocation();
 
-  useEffect(() => {
-    const updateProfile = () => {
-      const stored = localStorage.getItem("profile");
-      if (stored) {
-        try {
-          const p = JSON.parse(stored);
-          // Support older sessions where isLoggedIn wasn't set explicitly
-          const isActive = p.isLoggedIn || p.fullName || p.email || p.phone;
-          setProfile(isActive ? p : null);
-        } catch { setProfile(null); }
-      } else { setProfile(null); }
-    };
-    updateProfile();
-    window.addEventListener("storage", updateProfile);
-    return () => window.removeEventListener("storage", updateProfile);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("profile");
-    window.dispatchEvent(new Event("storage"));
-    setProfile(null);
+  const handleLogout = async () => {
+    await logout();
+    setIsOpen(false);
   };
 
   useEffect(() => {
