@@ -608,12 +608,14 @@ const SocialLogin = ({
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const productionUrl = 'https://xpool.info'; // Base production URL
+      const redirectUrl = isDev ? window.location.origin : productionUrl;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // You might need to adjust this depending on your exact setup, but
-          // standard Supabase integration uses the site URL for redirects.
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${redirectUrl}/`,
         }
       });
       if (error) throw error;
