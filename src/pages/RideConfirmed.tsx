@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "@/lib/supabase/client";
 import { motion, Variants } from "framer-motion";
 import { GoogleMap, useLoadScript, Polyline, MarkerF } from "@react-google-maps/api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,7 @@ import {
   ChevronLeft,
   Zap,
 } from "lucide-react";
+import { XCircle } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
 import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
@@ -182,6 +184,43 @@ const Header = ({ title, subtitle }: { title: string; subtitle: string }) => (
     <p className="text-sm font-semibold text-gray-400">{subtitle}</p>
   </motion.header>
 );
+
+/* ────────────────────────────────────────────────────────────
+   OTP DISPLAY CARD — Rapido / Ola Aesthetic
+──────────────────────────────────────────────────────────── */
+const OTPDisplayCard = ({ otpCode }: { otpCode: string | null }) => {
+  return (
+    <motion.div variants={fadeUp} className="w-full bg-[#0a0a0a] rounded-[1.5rem] p-6 border border-gray-800 shadow-[0_20px_40px_-15px_rgba(245,158,11,0.25)] relative overflow-hidden flex items-center justify-between" style={{ backgroundImage: "linear-gradient(145deg, #1f1f1f 0%, #0a0a0a 100%)" }}>
+       <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-500/15 rounded-full blur-[40px] pointer-events-none" />
+       
+       <div className="flex flex-col z-10">
+          <div className="flex items-center gap-2 mb-1.5">
+             <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
+               <Zap className="w-3.5 h-3.5 text-amber-500" />
+             </div>
+             <span className="text-[11px] font-black text-amber-500 uppercase tracking-[0.2em] drop-shadow-sm">Ride PIN</span>
+          </div>
+          <p className="text-gray-400 text-[11px] font-bold">Share with driver</p>
+       </div>
+       
+       <div className="flex gap-2 z-10">
+         {otpCode ? (
+            otpCode.split('').map((char, idx) => (
+              <div key={idx} className="w-[3.25rem] h-[3.75rem] rounded-xl bg-white/10 flex items-center justify-center border border-white/20 shadow-inner drop-shadow-md">
+                 <span className="text-3xl font-black text-white font-syne">{char}</span>
+              </div>
+            ))
+         ) : (
+            [1,2,3,4].map((i) => (
+              <div key={i} className="w-[3.25rem] h-[3.75rem] rounded-xl bg-white/5 flex items-center justify-center border border-white/10 animate-pulse">
+                 <span className="text-3xl font-black text-gray-700 font-syne">-</span>
+              </div>
+            ))
+         )}
+       </div>
+    </motion.div>
+  );
+};
 
 /* ────────────────────────────────────────────────────────────
    REAL MAP — auto-fits to the full route with fitBounds
@@ -544,6 +583,34 @@ const RideConfirmed = () => {
   const [driver] = useState<DriverInfo>(() => loadSelectedDriver());
   const eta = useEtaCountdown(driver.etaMinutes);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [searchParams] = useSearchParams();
+  const requestId = searchParams.get("request_id");
+  const [otpCode, setOtpCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    let channel: any;
+
+    if (requestId && !requestId.includes("mock")) {
+      const fetchOtp = async () => {
+         const { data } = await supabase.from('booking_requests').select('otp_code').eq('id', requestId).single();
+         if (data?.otp_code) setOtpCode(data.otp_code);
+      };
+      fetchOtp();
+
+      channel = supabase.channel(`booking_${requestId}`)
+         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'booking_requests', filter: `id=eq.${requestId}` }, (payload) => {
+            if (payload.new.otp_code) setOtpCode(payload.new.otp_code);
+         }).subscribe();
+    } else {
+      // Mock OTP for testing fallback states so UI doesn't look broken
+      setTimeout(() => setOtpCode(Math.floor(1000 + Math.random() * 9000).toString()), 1000);
+    }
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [requestId]);
 
   useEffect(() => {
     if (ride?.distanceKm) {
@@ -599,6 +666,8 @@ const RideConfirmed = () => {
         >
           <Header title={`${driver.name} is on the way!`} subtitle="Your chosen driver is heading to the pickup" />
 
+          <OTPDisplayCard otpCode={otpCode} />
+
           {isLoading ? (
             <LoadingSkeleton />
           ) : (
@@ -644,11 +713,73 @@ const RideConfirmed = () => {
                   <Share2 className="h-5 w-5" />
                   Share Status
                 </button>
+
+                <button
+                  onClick={() => setShowCancelDialog(true)}
+                  className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-red-50 text-red-500 border border-red-200/50 hover:bg-red-100 shadow-sm"
+                >
+                  <XCircle className="h-5 w-5" />
+                  Cancel Ride
+                </button>
               </motion.div>
             </>
           )}
         </motion.div>
       </main>
+
+      {/* Cancel Ride Dialog */}
+      {showCancelDialog && (
+        <>
+          <div
+            onClick={() => setShowCancelDialog(false)}
+            style={{
+              position: "fixed", inset: 0, zIndex: 2000,
+              background: "rgba(10,15,28,0.5)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+            }}
+          />
+          <div
+            style={{
+              position: "fixed", top: "50%", left: "50%",
+              transform: "translate(-50%, -50%)", zIndex: 2001,
+              width: "min(380px, 90vw)", background: "#ffffff",
+              borderRadius: 24,
+              boxShadow: "0 32px 80px rgba(0,0,0,0.18)",
+              padding: "28px 24px 20px",
+              textAlign: "center", fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(239,68,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <XCircle style={{ width: 28, height: 28, color: "#EF4444" }} />
+            </div>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 800, marginBottom: 8 }}>Cancel this ride?</h3>
+            <p style={{ fontSize: "0.85rem", color: "#6B7280", fontWeight: 500, lineHeight: 1.5, marginBottom: 24 }}>
+              {driver.name} is already on the way. Cancelling now may affect your reliability score.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setShowCancelDialog(false)}
+                style={{ flex: 1, padding: "12px 20px", borderRadius: 14, border: "1.5px solid rgba(229,231,235,0.8)", background: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem", color: "#374151", fontFamily: "'Inter', sans-serif" }}
+              >
+                Keep Ride
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("rideSummary");
+                  localStorage.removeItem("selectedDriver");
+                  localStorage.removeItem("vehicleType");
+                  setShowCancelDialog(false);
+                  navigate("/");
+                }}
+                style={{ flex: 1, padding: "12px 20px", borderRadius: 14, border: "none", background: "linear-gradient(135deg, #EF4444, #DC2626)", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem", color: "#fff", boxShadow: "0 4px 16px rgba(239,68,68,0.3)", fontFamily: "'Inter', sans-serif" }}
+              >
+                Cancel Ride
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

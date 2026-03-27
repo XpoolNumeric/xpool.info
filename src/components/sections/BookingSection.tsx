@@ -8,13 +8,14 @@ import React, {
 } from "react";
 import { useLoadScript } from "@react-google-maps/api";
 
-const LIBRARIES: ("places")[] = ["places"];
+const LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
 import AuthDialog from "@/components/sections/AuthDialog";
 import { useNavigate } from "react-router-dom";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import {
   MapPin,
   Navigation,
@@ -32,6 +33,11 @@ import {
   Minus,
   Plus,
   Users,
+  History,
+  TrendingUp,
+  X,
+  Sparkles,
+  Route,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -227,7 +233,7 @@ const bookingStyles = `
   }
 
   .caption-professional {
-    font-family: inherit;  /* inherit DM Sans stack from parent */
+    font-family: inherit;
     font-size: 0.7rem;
     font-weight: 500;
     letter-spacing: 0.05em;
@@ -243,6 +249,42 @@ const bookingStyles = `
     color: #f59e0b;
     text-transform: uppercase;
   }
+
+  .fare-preview-card {
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+    border: 1px solid rgba(245,158,11,0.2);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 0 0 1px rgba(245,158,11,0.05) inset;
+  }
+
+  .recent-search-chip {
+    background: rgba(255,255,255,0.95);
+    border: 1px solid rgba(245,158,11,0.15);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .recent-search-chip:hover {
+    border-color: rgba(245,158,11,0.4);
+    box-shadow: 0 4px 12px rgba(245,158,11,0.1);
+    transform: translateY(-1px);
+  }
+
+  .popular-route-card {
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(245,158,11,0.12);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+  }
+  .popular-route-card:hover {
+    border-color: rgba(245,158,11,0.35);
+    box-shadow: 0 8px 24px rgba(245,158,11,0.12);
+    transform: translateY(-2px);
+  }
+
+  @keyframes fare-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  .fare-loading { animation: fare-pulse 1.5s ease-in-out infinite; }
 `;
 
 /* ===================== Utils ===================== */
@@ -268,6 +310,43 @@ const sectionVariant = {
   visible: { transition: { staggerChildren: 0.09 } },
 };
 
+/* ===================== Recent Searches ===================== */
+interface RecentSearch {
+  pickup: string;
+  drop: string;
+  timestamp: string;
+}
+
+function getRecentSearches(): RecentSearch[] {
+  try {
+    const stored = localStorage.getItem("xpool_recent_searches");
+    return stored ? JSON.parse(stored).slice(0, 3) : [];
+  } catch { return []; }
+}
+
+function saveRecentSearch(pickup: string, drop: string) {
+  try {
+    const existing = getRecentSearches();
+    const newEntry: RecentSearch = { pickup, drop, timestamp: new Date().toISOString() };
+    // Avoid duplicates
+    const filtered = existing.filter(s => !(s.pickup === pickup && s.drop === drop));
+    const updated = [newEntry, ...filtered].slice(0, 5);
+    localStorage.setItem("xpool_recent_searches", JSON.stringify(updated));
+  } catch {}
+}
+
+function clearRecentSearches() {
+  localStorage.removeItem("xpool_recent_searches");
+}
+
+/* ===================== Popular Routes ===================== */
+const POPULAR_ROUTES = [
+  { pickup: "Chennai Central", drop: "Chennai Airport", distance: "18 km", fare: "₹85" },
+  { pickup: "T Nagar, Chennai", drop: "Mahabalipuram", distance: "58 km", fare: "₹250" },
+  { pickup: "Chennai", drop: "Pondicherry", distance: "160 km", fare: "₹380" },
+  { pickup: "Chennai", drop: "Bangalore", distance: "350 km", fare: "₹640" },
+];
+
 /* ===================== Types ===================== */
 
 interface DateTimeInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -279,6 +358,7 @@ interface DateTimeInputProps extends React.InputHTMLAttributes<HTMLInputElement>
 
 const BookingSection = () => {
   const navigate = useNavigate();
+  const { user, profile } = useAuthContext();
   const [pickupLocation, setPickupLocation] = useState("");
   const [dropLocation, setDropLocation] = useState("");
   const [activeBox, setActiveBox] = useState<"pickup" | "drop" | null>(null);
@@ -289,6 +369,11 @@ const BookingSection = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [passengers, setPassengers] = useState(1);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [fareEstimate, setFareEstimate] = useState<{ min: number; max: number; distance?: number; duration?: number } | null>(null);
+  const [fareLoading, setFareLoading] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+  const [showPopularRoutes, setShowPopularRoutes] = useState(true);
+  const fareDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pickupRef = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -464,6 +549,7 @@ const BookingSection = () => {
     const now = new Date();
     setPickupDate(now.toISOString().split("T")[0]);
     setPickupTime(now.toTimeString().slice(0, 5));
+    setRecentSearches(getRecentSearches());
   }, []);
 
   useEffect(() => {
@@ -485,6 +571,61 @@ const BookingSection = () => {
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
+  /* ── Fare estimate preview ── */
+  useEffect(() => {
+    if (!pickupLocation || !dropLocation || pickupLocation === dropLocation) {
+      setFareEstimate(null);
+      return;
+    }
+
+    if (fareDebounceRef.current) clearTimeout(fareDebounceRef.current);
+    setFareLoading(true);
+
+    fareDebounceRef.current = setTimeout(() => {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+      if (apiKey) {
+        fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
+          },
+          body: JSON.stringify({
+            origin: { address: pickupLocation },
+            destination: { address: dropLocation },
+            travelMode: "DRIVE",
+          }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            const route = data?.routes?.[0];
+            if (route) {
+              const distKm = (route.distanceMeters || 0) / 1000;
+              const durSec = parseInt(route.duration?.replace("s", "") || "0", 10);
+              const durMin = durSec / 60;
+              const bikeFare = calculateTieredFare(distKm, durMin, "bike", passengers);
+              const xlFare = calculateTieredFare(distKm, durMin, "xl", passengers);
+              setFareEstimate({
+                min: bikeFare.fare.perPerson,
+                max: xlFare.fare.perPerson,
+                distance: Math.round(distKm * 10) / 10,
+                duration: Math.round(durMin),
+              });
+            }
+            setFareLoading(false);
+          })
+          .catch(() => setFareLoading(false));
+      } else {
+        setFareLoading(false);
+      }
+    }, 800);
+
+    return () => {
+      if (fareDebounceRef.current) clearTimeout(fareDebounceRef.current);
+    };
+  }, [pickupLocation, dropLocation, passengers]);
+
   const isToday = pickupDate === new Date().toISOString().split("T")[0];
 
   const canBook =
@@ -499,11 +640,34 @@ const BookingSection = () => {
     setActiveBox(null);
   }, [pickupLocation, dropLocation]);
 
+  const handleSelectRecentSearch = useCallback((search: RecentSearch) => {
+    setPickupLocation(search.pickup);
+    setDropLocation(search.drop);
+    setActiveBox(null);
+  }, []);
+
+  const handleSelectPopularRoute = useCallback((route: typeof POPULAR_ROUTES[0]) => {
+    setPickupLocation(route.pickup);
+    setDropLocation(route.drop);
+    setActiveBox(null);
+    setShowPopularRoutes(false);
+  }, []);
+
+  const handleClearRecents = useCallback(() => {
+    clearRecentSearches();
+    setRecentSearches([]);
+  }, []);
+
   const handleBook = useCallback(() => {
     setLoading(true);
 
+    // Save to recent searches
+    if (pickupLocation && dropLocation) {
+      saveRecentSearch(pickupLocation, dropLocation);
+      setRecentSearches(getRecentSearches());
+    }
+
     const proceedWithBooking = (distanceKm?: number, durationMin?: number) => {
-      // Save ride details safely to localStorage
       const rideDetails = {
         pickup: pickupLocation,
         drop: dropLocation,
@@ -515,24 +679,12 @@ const BookingSection = () => {
         durationMin,
         passengers
       };
-      
+
       localStorage.setItem("rideSummary", JSON.stringify(rideDetails));
 
       setTimeout(() => {
         setLoading(false);
-
-        let isLoggedAndComplete = false;
-        try {
-          const profileStr = localStorage.getItem("profile");
-          if (profileStr) {
-            const profile = JSON.parse(profileStr);
-            if (profile.fullName && profile.email && profile.city && profile.dob) {
-              isLoggedAndComplete = true;
-            }
-          }
-        } catch (e) {
-          console.error("Error reading profile from local storage", e);
-        }
+        const isLoggedAndComplete = Boolean(user && profile && profile.full_name);
 
         if (isLoggedAndComplete) {
           navigate("/available-rides");
@@ -542,7 +694,12 @@ const BookingSection = () => {
       }, 700);
     };
 
-    // Calculate distance and duration using new Routes API
+    // Use cached fare estimate if available
+    if (fareEstimate?.distance && fareEstimate?.duration) {
+      proceedWithBooking(fareEstimate.distance, fareEstimate.duration);
+      return;
+    }
+
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
     if (apiKey && pickupLocation && dropLocation) {
       fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
@@ -574,7 +731,7 @@ const BookingSection = () => {
     } else {
       proceedWithBooking(15, 30);
     }
-  }, [navigate, pickupLocation, dropLocation, rideType, pickupDate, pickupTime, passengers]);
+  }, [navigate, pickupLocation, dropLocation, rideType, pickupDate, pickupTime, passengers, fareEstimate]);
 
 
   const styleElement = useMemo(() => <style>{bookingStyles}</style>, []);
@@ -828,6 +985,62 @@ const BookingSection = () => {
                   )}
                 </motion.button>
 
+                {/* Fare Estimate Preview */}
+                <AnimatePresence>
+                  {(fareEstimate || fareLoading) && pickupLocation && dropLocation && pickupLocation !== dropLocation && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] as const }}
+                      className="overflow-hidden mt-4"
+                    >
+                      <div className="fare-preview-card rounded-2xl p-4">
+                        {fareLoading ? (
+                          <div className="flex items-center justify-center gap-2 py-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+                            <span className="text-xs font-semibold text-amber-400/80 uppercase tracking-widest fare-loading">Estimating fare...</span>
+                          </div>
+                        ) : fareEstimate ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                                  <IndianRupee className="h-4 w-4 text-amber-400" />
+                                </div>
+                                <div>
+                                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Est. Fare / seat</p>
+                                  <p className="text-white font-extrabold text-xl tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
+                                    ₹{fareEstimate.min} – ₹{fareEstimate.max}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right space-y-1">
+                                {fareEstimate.distance && (
+                                  <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-400">
+                                    <Route className="h-3 w-3 text-amber-500" />
+                                    <span>{fareEstimate.distance} km</span>
+                                  </div>
+                                )}
+                                {fareEstimate.duration && (
+                                  <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-400">
+                                    <Clock className="h-3 w-3 text-amber-500" />
+                                    <span>{formatDuration(fareEstimate.duration)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-400">
+                              <Sparkles className="h-3 w-3" />
+                              <span>Save up to 65% vs taxis with Xpool</span>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Trust stats */}
                 <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
                   <span className="bs-stat">
@@ -843,6 +1056,107 @@ const BookingSection = () => {
 
               </div>
             </motion.div>
+
+            {/* Recent Searches */}
+            <AnimatePresence>
+              {recentSearches.length > 0 && (
+                <motion.div
+                  variants={fadeUp}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  className="mt-6"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-amber-500" />
+                      <span className="text-xs font-bold text-gray-600 uppercase tracking-wider"
+                        style={{ fontFamily: "'Inter', sans-serif" }}>Recent Searches</span>
+                    </div>
+                    <button
+                      onClick={handleClearRecents}
+                      className="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-wider"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {recentSearches.map((search, i) => (
+                      <motion.div
+                        key={`${search.pickup}-${search.drop}-${i}`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        onClick={() => handleSelectRecentSearch(search)}
+                        className="recent-search-chip flex items-center gap-3 rounded-2xl px-4 py-3"
+                      >
+                        <div className="h-9 w-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                          <History className="h-4 w-4 text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate"
+                            style={{ fontFamily: "'Inter', sans-serif" }}>{search.pickup.split(",")[0]}</p>
+                          <p className="text-[10px] font-medium text-gray-400 truncate flex items-center gap-1">
+                            <ChevronRight className="h-3 w-3" />
+                            {search.drop.split(",")[0]}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-amber-300 flex-shrink-0" />
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Popular Routes */}
+            <AnimatePresence>
+              {showPopularRoutes && !pickupLocation && !dropLocation && (
+                <motion.div
+                  variants={fadeUp}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-6"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="h-4 w-4 text-amber-500" />
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider"
+                      style={{ fontFamily: "'Inter', sans-serif" }}>Popular Routes</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {POPULAR_ROUTES.map((route, i) => (
+                      <motion.div
+                        key={`${route.pickup}-${route.drop}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.08 }}
+                        onClick={() => handleSelectPopularRoute(route)}
+                        className="popular-route-card rounded-2xl p-3 space-y-2"
+                      >
+                        <p className="text-[10px] font-bold text-amber-600 truncate"
+                          style={{ fontFamily: "'Inter', sans-serif" }}>
+                          {route.pickup.split(",")[0]}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <ChevronRight className="h-3 w-3 text-gray-300" />
+                          <p className="text-[10px] font-bold text-gray-700 truncate">
+                            {route.drop.split(",")[0]}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[9px] font-semibold text-gray-400">{route.distance}</span>
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                            ~{route.fare}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </div>
       </section>

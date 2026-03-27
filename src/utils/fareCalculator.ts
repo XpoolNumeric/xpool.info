@@ -17,10 +17,8 @@ export function calculateTieredFare(distanceKm: number, durationMin: number, veh
     // Vehicle multiplier
     const vehicleMultiplier: Record<string, number> = {
         'bike': 0.7,
-        'auto': 0.85,
         'car': 1.0,
         'suv': 1.3,
-        'xl': 1.3,
         'premium': 1.5
     };
     const multiplier = vehicleMultiplier[vehicleType] || 1.0;
@@ -95,8 +93,8 @@ export function calculateTieredFare(distanceKm: number, durationMin: number, veh
         if (passengers === 4) perPersonFare = 850
     }
 
-    // Calculate total fare based on perPersonFare and seats booked by customer
-    const adjustedTotalFare = perPersonFare * passengers
+    // Calculate total fare based on perPersonFare and effective passengers
+    const adjustedTotalFare = perPersonFare * effectivePassengers
 
     // Commission (15%)
     const commission = perPersonFare * 0.15

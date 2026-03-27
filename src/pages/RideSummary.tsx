@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, Variants } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   User,
   Phone,
@@ -12,6 +13,9 @@ import {
   ChevronLeft,
   Sparkles,
   Users,
+  RotateCcw,
+  XCircle,
+  Home,
 } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
@@ -78,11 +82,13 @@ const DEFAULT_DRIVER: SelectedDriver = {
 };
 
 const RideSummary = () => {
+  const navigate = useNavigate();
   const [vehicleType, setVehicleType] = useState<VehicleKey>("car");
   const [ride, setRide] = useState<RideSummaryData | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<SelectedDriver>(DEFAULT_DRIVER);
   const [driverStage, setDriverStage] = useState<"assigned" | "arriving">("assigned");
   const [driverProgress, setDriverProgress] = useState(0);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   /* ---------------- LOAD DATA SAFELY ---------------- */
   useEffect(() => {
@@ -344,12 +350,12 @@ const RideSummary = () => {
                   <Sparkles className="w-3 h-3 text-amber-500" />
                   <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Pricing Transparency</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] font-semibold text-amber-800/60">Estimated Fuel Cost</span>
                   <span className="text-[11px] font-bold text-amber-900">₹{fare.costBreakdown.estimatedFuelCost}</span>
                 </div>
-                
+
                 {fare.costBreakdown.estimatedToll > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-[11px] font-semibold text-amber-800/60">Estimated Tolls</span>
@@ -358,7 +364,7 @@ const RideSummary = () => {
                 )}
 
                 <div className="h-px w-full bg-amber-200/30" />
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] font-bold text-amber-900/40 uppercase tracking-widest">Total Pooled Fare</span>
                   <span className="text-sm font-black text-amber-900 font-syne">₹{fare.total}</span>
@@ -368,7 +374,31 @@ const RideSummary = () => {
           </motion.div>
 
           {/* HELP ACTION */}
-          <motion.div variants={fadeUp} className="pt-2">
+          <motion.div variants={fadeUp} className="pt-2 space-y-3">
+            {/* Book Again */}
+            <button
+              onClick={() => {
+                localStorage.removeItem("rideSummary");
+                localStorage.removeItem("selectedDriver");
+                localStorage.removeItem("vehicleType");
+                navigate("/");
+              }}
+              className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 bg-[length:200%_auto] hover:bg-right text-white shadow-[0_8px_30px_rgba(245,158,11,0.35)]"
+            >
+              <RotateCcw className="h-5 w-5" />
+              Book Another Ride
+            </button>
+
+            {/* Cancel Ride */}
+            <button
+              onClick={() => setShowCancelDialog(true)}
+              className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-red-50 text-red-600 border border-red-200/60 hover:bg-red-100 shadow-sm"
+            >
+              <XCircle className="h-5 w-5" />
+              Cancel Ride
+            </button>
+
+            {/* Help */}
             <button className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-white/60 text-gray-700 border border-gray-200/50 hover:bg-white/90 shadow-sm">
               <Phone className="h-5 w-5" />
               Need Help?
@@ -376,6 +406,60 @@ const RideSummary = () => {
           </motion.div>
         </motion.div>
       </main>
+
+      {/* Cancel Ride Confirmation Dialog */}
+      {showCancelDialog && (
+        <>
+          <div
+            onClick={() => setShowCancelDialog(false)}
+            style={{
+              position: "fixed", inset: 0, zIndex: 2000,
+              background: "rgba(10,15,28,0.5)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+            }}
+          />
+          <div
+            style={{
+              position: "fixed", top: "50%", left: "50%",
+              transform: "translate(-50%, -50%)", zIndex: 2001,
+              width: "min(380px, 90vw)", background: "#ffffff",
+              borderRadius: 24,
+              boxShadow: "0 32px 80px rgba(0,0,0,0.18)",
+              padding: "28px 24px 20px",
+              textAlign: "center", fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(239,68,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <XCircle style={{ width: 28, height: 28, color: "#EF4444" }} />
+            </div>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 800, marginBottom: 8 }}>Cancel this ride?</h3>
+            <p style={{ fontSize: "0.85rem", color: "#6B7280", fontWeight: 500, lineHeight: 1.5, marginBottom: 24 }}>
+              Your driver has been assigned. Are you sure you want to cancel?
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setShowCancelDialog(false)}
+                style={{ flex: 1, padding: "12px 20px", borderRadius: 14, border: "1.5px solid rgba(229,231,235,0.8)", background: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem", color: "#374151", fontFamily: "'Inter', sans-serif" }}
+              >
+                Keep Ride
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("rideSummary");
+                  localStorage.removeItem("selectedDriver");
+                  localStorage.removeItem("vehicleType");
+                  setShowCancelDialog(false);
+                  navigate("/");
+                }}
+                style={{ flex: 1, padding: "12px 20px", borderRadius: 14, border: "none", background: "linear-gradient(135deg, #EF4444, #DC2626)", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem", color: "#fff", boxShadow: "0 4px 16px rgba(239,68,68,0.3)", fontFamily: "'Inter', sans-serif" }}
+              >
+                Cancel Ride
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

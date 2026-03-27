@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProfileSummaryDialog from "./ProfileSummaryDialog";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 // ---------- Constants ----------
 const PHONE_REGEX = /^[6-9]\d{9}$/;
@@ -67,44 +67,39 @@ const AuthStyles = memo(() => (
 
     .auth-dialog-content {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(
-        170deg,
-        rgba(255, 251, 235, 0.98) 0%,
-        rgba(254, 249, 231, 0.97) 35%,
-        rgba(255, 253, 245, 0.98) 100%
-      ) !important;
-      border: 1.5px solid rgba(245, 158, 11, 0.18) !important;
+      background: linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%) !important;
+      border: 1.5px solid rgba(180, 83, 9, 0.15) !important;
       box-shadow:
-        0 32px 80px rgba(0, 0, 0, 0.12),
-        0 8px 24px rgba(245, 158, 11, 0.08),
-        0 0 0 1px rgba(245, 158, 11, 0.05),
-        inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+        0 40px 100px rgba(0, 0, 0, 0.1),
+        0 4px 20px rgba(245, 158, 11, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
     }
 
     .auth-trust-bar {
-      background: linear-gradient(90deg, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.08), rgba(251, 191, 36, 0.12));
+      background: rgba(251, 191, 36, 0.08);
       border-bottom: 1px solid rgba(245, 158, 11, 0.12);
     }
 
     .auth-input-group {
-      border: 1.5px solid rgba(245, 158, 11, 0.18);
-      background: rgba(255, 255, 255, 0.7);
+      border: 1.5px solid rgba(245, 158, 11, 0.15);
+      background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(8px);
-      transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .auth-input-group:focus-within {
-      border-color: rgba(245, 158, 11, 0.5);
-      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1), 0 4px 12px rgba(245, 158, 11, 0.08);
-      background: rgba(255, 255, 255, 0.85);
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12), 0 8px 16px rgba(245, 158, 11, 0.06);
+      background: #ffffff;
+      transform: translateY(-1px);
     }
     .auth-input-group.error {
-      border-color: rgba(239, 68, 68, 0.5);
-      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.4);
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
     }
 
     .auth-icon-box {
-      background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-      border: 1px solid rgba(245, 158, 11, 0.12);
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.1);
     }
 
     @keyframes auth-shimmer {
@@ -126,33 +121,32 @@ const AuthStyles = memo(() => (
       box-shadow: 0 4px 24px rgba(245, 158, 11, 0.35), 0 1px 0 rgba(255, 255, 255, 0.3) inset;
       transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
     }
-    .auth-cta-shimmer:hover {
-      filter: brightness(1.07);
+    .auth-cta-shimmer:hover:not(:disabled) {
+      filter: brightness(1.05);
       box-shadow: 0 8px 36px rgba(245, 158, 11, 0.5), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
-      transform: translateY(-1px);
+      transform: translateY(-2px);
     }
-    .auth-cta-shimmer:active {
+    .auth-cta-shimmer:active:not(:disabled) {
       transform: translateY(0);
     }
     .auth-cta-shimmer:disabled {
-      opacity: 0.5;
+      opacity: 0.6;
       animation: none;
-      filter: grayscale(0.3);
-      transform: none;
+      filter: grayscale(0.2);
     }
 
     .auth-google-btn {
-      border: 1.5px solid rgba(245, 158, 11, 0.18) !important;
-      background: rgba(255, 255, 255, 0.7) !important;
-      backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(180, 83, 9, 0.15) !important;
+      background: #ffffff !important;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
       font-weight: 600 !important;
       color: #374151 !important;
       transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1) !important;
     }
     .auth-google-btn:hover {
-      background: rgba(255, 255, 255, 0.9) !important;
-      border-color: rgba(245, 158, 11, 0.35) !important;
-      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.12), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+      background: #fdfdfd !important;
+      border-color: rgba(245, 158, 11, 0.3) !important;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.08) !important;
       transform: translateY(-1px);
     }
     .auth-google-btn:active {
@@ -179,8 +173,8 @@ const AuthStyles = memo(() => (
     }
 
     .auth-step-badge {
-      background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-      border: 1px solid rgba(245, 158, 11, 0.2);
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.15);
       color: #b45309;
       font-family: 'Inter', sans-serif;
     }
@@ -227,10 +221,10 @@ const AuthStyles = memo(() => (
       text-decoration-color: rgba(180, 83, 9, 0.7);
     }
 
-    /* Dot grid overlay for depth */
+    /* Dot grid overlay for depth (Matching Hero) */
     .auth-dot-grid {
-      background-image: radial-gradient(rgba(245, 158, 11, 0.06) 1px, transparent 1px);
-      background-size: 24px 24px;
+      background-image: radial-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 1px);
+      background-size: 32px 32px;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -245,20 +239,21 @@ const AuthStyles = memo(() => (
 ));
 AuthStyles.displayName = "AuthStyles";
 
-// ---------- Animation Variants ----------
+// ---------- Animation Variants (Ultrathink Premium) ----------
 const fadeSlide = {
-  initial: { opacity: 0, y: 16, scale: 0.98 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
-  exit: { opacity: 0, y: -12, scale: 0.98, transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } },
+  initial: { opacity: 0, y: 20, scale: 0.96, filter: "blur(4px)" },
+  animate: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const } },
+  exit: { opacity: 0, y: -16, scale: 0.96, filter: "blur(4px)", transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] as const } },
 };
 
 const staggerContainer = {
-  animate: { transition: { staggerChildren: 0.08 } },
+  animate: { transition: { staggerChildren: 0.1 } },
 };
 
-const staggerChild = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
+const staggerChild: Variants = {
+  initial: { opacity: 0, y: 16, filter: "blur(2px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as const } },
+  exit: { opacity: 0, y: -8, filter: "blur(2px)" }
 };
 
 // ---------- Custom Hook (auth logic) ----------
@@ -417,11 +412,11 @@ const PhoneStep = ({
       className="mt-6 space-y-5"
     >
       <motion.div variants={staggerChild}>
-        <div className={`auth-input-group flex items-center gap-3 rounded-2xl px-4 py-4 ${error ? "error" : ""}`}>
-          <div className="auth-icon-box h-10 w-10 flex items-center justify-center rounded-xl shrink-0">
-            <Phone className="h-5 w-5 text-amber-600" aria-hidden="true" />
+        <div className={`auth-input-group flex items-center gap-3 rounded-2xl px-4 py-3.5 ${error ? "error" : ""}`}>
+          <div className="auth-icon-box h-10 w-10 flex items-center justify-center rounded-[14px] shrink-0">
+            <Phone className="h-5 w-5 text-amber-500" aria-hidden="true" />
           </div>
-          <span className="text-amber-700/70 text-sm font-semibold shrink-0" style={{ fontFamily: "'Inter', sans-serif" }}>
+          <span className="text-amber-800/60 text-sm font-bold shrink-0 translate-y-[0.5px]" style={{ fontFamily: "'Inter', sans-serif" }}>
             +91
           </span>
           <Input
@@ -433,14 +428,14 @@ const PhoneStep = ({
             maxLength={10}
             onChange={handlePhoneChange}
             onKeyDown={handleKeyDown}
-            className="border-0 focus-visible:ring-0 text-lg w-full min-w-0 bg-transparent placeholder:text-gray-400"
+            className="border-0 focus-visible:ring-0 text-lg w-full min-w-0 bg-transparent placeholder:text-gray-400 font-semibold p-0 h-auto"
             style={{ fontFamily: "'Inter', sans-serif" }}
             aria-invalid={!!error}
             aria-describedby={error ? "phone-error" : undefined}
           />
           {isValidPhone && (
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="shrink-0">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
             </motion.div>
           )}
         </div>
@@ -528,16 +523,16 @@ const OtpStep = ({
 
       {/* OTP sent confirmation pill */}
       <motion.div variants={staggerChild} className="flex justify-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-green-300/60 bg-green-50/80 text-green-700 text-xs font-semibold tracking-wide">
-          <span className="auth-blink-dot h-2 w-2 rounded-full bg-green-500" />
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-50/80 text-emerald-700 text-[11px] font-bold tracking-wide uppercase">
+          <span className="auth-blink-dot h-1.5 w-1.5 rounded-full bg-emerald-500" />
           OTP sent to +91 {phone}
         </div>
       </motion.div>
 
       <motion.div variants={staggerChild}>
-        <div className={`auth-input-group flex items-center gap-3 rounded-2xl px-4 py-4 ${error ? "error" : ""}`}>
-          <div className="auth-icon-box h-10 w-10 flex items-center justify-center rounded-xl shrink-0 auth-pulse-ring">
-            <Lock className="h-5 w-5 text-amber-600" aria-hidden="true" />
+        <div className={`auth-input-group flex items-center gap-3 rounded-2xl px-4 py-3.5 ${error ? "error" : ""}`}>
+          <div className="auth-icon-box h-10 w-10 flex items-center justify-center rounded-[14px] shrink-0 auth-pulse-ring">
+            <Lock className="h-5 w-5 text-amber-500" aria-hidden="true" />
           </div>
           <Input
             ref={inputRef}
@@ -548,15 +543,10 @@ const OtpStep = ({
             maxLength={OTP_LENGTH}
             onChange={handleOtpChange}
             onKeyDown={handleKeyDown}
-            className="auth-otp-char border-0 text-center text-2xl tracking-[0.3em] focus-visible:ring-0 w-full bg-transparent"
+            className="auth-otp-char border-0 text-center text-2xl tracking-[0.34em] focus-visible:ring-0 w-full bg-transparent font-bold p-0 h-auto"
             aria-invalid={!!error}
             aria-describedby={error ? "otp-error" : undefined}
           />
-          {otp.length === OTP_LENGTH && (
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="shrink-0">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-            </motion.div>
-          )}
         </div>
       </motion.div>
 
@@ -592,14 +582,14 @@ const OtpStep = ({
         {canResend ? (
           <button
             onClick={onResend}
-            className="text-amber-700 hover:text-amber-800 font-semibold hover:underline transition-colors"
+            className="text-amber-700 hover:text-amber-950 font-bold hover:underline underline-offset-4 transition-colors"
             disabled={loading}
           >
             Resend OTP
           </button>
         ) : (
-          <span className="text-gray-500">
-            Resend OTP in <span className="font-bold text-amber-700">{resendTimer}s</span>
+          <span className="text-gray-500 font-medium">
+            Resend OTP in <span className="font-black text-amber-600 tabular-nums">{resendTimer}s</span>
           </span>
         )}
       </motion.div>
@@ -607,85 +597,88 @@ const OtpStep = ({
   );
 };
 
-// ---------- Google Login Button (inside provider) ----------
-const GoogleLoginButton = ({
-  onSuccess,
-  loading: externalLoading,
-}: {
-  onSuccess: (tokenResponse: any) => void;
-  loading: boolean;
-}) => {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const login = useGoogleLogin({
-    onSuccess: (tokenResponse) => {
-      console.log('Google login successful — token received', tokenResponse);
-      setIsLoading(true);
-      onSuccess(tokenResponse);
-    },
-    onError: (error) => {
-      console.error("Google Login Failed", error);
-      setIsLoading(false);
-    },
-  });
-
-  const showLoading = isLoading || externalLoading;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.35 } }}
-    >
-      <Button
-        variant="outline"
-        onClick={() => login()}
-        disabled={showLoading}
-        className="auth-google-btn w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-base"
-        style={{ fontFamily: "'Inter', sans-serif" }}
-      >
-        {showLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
-        ) : (
-          <span className="auth-google-icon-box h-9 w-9 flex items-center justify-center rounded-xl shrink-0">
-            <GoogleIcon />
-          </span>
-        )}
-        <span className="font-semibold">
-          {showLoading ? "Signing in..." : "Continue with Google"}
-        </span>
-      </Button>
-    </motion.div>
-  );
-};
-
-// ---------- Social Login Wrapper ----------
+// ---------- Social Login Component ----------
 const SocialLogin = ({
-  onGoogleSuccess,
   googleLoading,
+  setGoogleLoading,
 }: {
-  onGoogleSuccess: (tokenResponse: any) => void;
   googleLoading: boolean;
+  setGoogleLoading: (val: boolean) => void;
 }) => {
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // You might need to adjust this depending on your exact setup, but
+          // standard Supabase integration uses the site URL for redirects.
+          redirectTo: `${window.location.origin}/`,
+        }
+      });
+      if (error) throw error;
+      // Note: On success, it redirects out of the app to Google, so we don't clear loading.
+    } catch (err: any) {
+      console.error("Google Login Failed", err);
+      setGoogleLoading(false);
+      const errDiv = document.getElementById("google-login-error");
+      if (errDiv) {
+        errDiv.style.display = "flex";
+        setTimeout(() => { if (errDiv) errDiv.style.display = "none"; }, 5000);
+      }
+    }
+  };
+
   return (
-    <GoogleOAuthProvider clientId="933710679999-idbqpvaq2a9e0mbi0qc6vuu4nifjej96.apps.googleusercontent.com">
+    <div className="w-full">
       {/* Decorative divider */}
-      <div className="auth-divider my-6 flex items-center justify-center">
+      <div className="auth-divider my-6 flex items-center justify-center relative">
         <span
-          className="relative z-10 px-4 text-xs font-semibold uppercase tracking-widest text-amber-600/60 bg-amber-50/80"
+          className="relative z-10 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-amber-600/60 bg-[#fffdf5]/80"
           style={{ fontFamily: "'Inter', sans-serif" }}
         >
           or
         </span>
       </div>
 
-      <GoogleLoginButton onSuccess={onGoogleSuccess} loading={googleLoading} />
-    </GoogleOAuthProvider>
+      <motion.button
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.35 } }}
+        whileHover={{ scale: 1.015, translateY: -1 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={handleGoogleLogin}
+        disabled={googleLoading}
+        className="w-full h-14 flex items-center justify-center gap-3 rounded-2xl bg-white border border-gray-200/80 hover:border-amber-300 shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(245,158,11,0.08)] transition-all cursor-pointer relative overflow-hidden"
+      >
+        {googleLoading ? (
+          <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+        ) : (
+          <>
+            <GoogleIcon />
+            <span className="text-[15px] font-bold text-gray-700 tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
+              Continue with Google
+            </span>
+          </>
+        )}
+      </motion.button>
+
+      {/* Google Login Error Message */}
+      <div
+        id="google-login-error"
+        className="items-center gap-2 mt-3 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200/60 text-sm font-semibold text-red-600"
+        style={{ display: "none", fontFamily: "'Inter', sans-serif" }}
+      >
+        <AlertCircle className="h-4 w-4 shrink-0" />
+        <span>Google sign-in failed. Please try again or use phone login.</span>
+      </div>
+    </div>
   );
 };
 
 // ---------- Main Component ----------
 const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
   const navigate = useNavigate();
+  const { user, profile: contextProfile, isLoading, refreshProfile } = useAuthContext();
 
   const {
     step, setStep,
@@ -702,88 +695,48 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
 
   // ---------- Auto-Login Check ----------
   useEffect(() => {
-    if (open) {
-      const storedProfile = localStorage.getItem("profile");
-      const savedRide = localStorage.getItem("rideSummary");
+    const checkAuth = async () => {
+      if (!open || isLoading) return;
 
-      if (storedProfile) {
-        const profile = JSON.parse(storedProfile);
-        if (profile.fullName && profile.email && profile.isLoggedIn) {
-          // Skip sign-in if already logged in and has profile data
-          onClose();
-          navigate("/available-rides");
-        }
+      if (!user) {
+        return; 
       }
-    }
-  }, [open, onClose, navigate]);
+
+      // Automatically bypass auth dialog if profile is complete in Context
+      if (contextProfile && contextProfile.full_name) {
+        onClose();
+        navigate("/available-rides");
+      } else {
+        setShowProfileDialog(true);
+      }
+    };
+
+    checkAuth();
+  }, [open, onClose, navigate, user, contextProfile, isLoading]);
 
   // ---------- Phone OTP Verify → Profile ----------
   const handleVerify = useCallback(async () => {
     const success = await verifyOtp();
     if (success) {
-      // Mark as logged in
-      const storedProfile = localStorage.getItem("profile");
-      const profile = storedProfile ? JSON.parse(storedProfile) : { fullName: "", email: "", city: "", dob: "", phone: "" };
-      profile.phone = profile.phone || phone;
-      profile.isLoggedIn = true;
-      localStorage.setItem("profile", JSON.stringify(profile));
-      window.dispatchEvent(new Event("storage"));
-
-      onClose();
-      // If we have ride data, we can go straight to vehicle selection
-      navigate("/available-rides");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        if (profileData && profileData.full_name) {
+          // Already have a profile, seamlessly login 
+          onClose();
+          navigate("/available-rides");
+        } else {
+          // Open profile dialog to gather details
+          setShowProfileDialog(true);
+        }
+      } else {
+        setShowProfileDialog(true);
+      }
     }
   }, [verifyOtp, phone, onClose, navigate]);
 
-  // ---------- Google Auth → Fetch user info → Profile ----------
-  const handleGoogleSuccess = useCallback(async (tokenResponse: any) => {
-    setGoogleLoading(true);
-    setError(null);
-
-    try {
-      // Fetch user info from Google
-      const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Google API returned ${response.status}`);
-      }
-
-      const userInfo: GoogleUserInfo = await response.json();
-      console.log("Google user info fetched:", userInfo);
-
-      // Build profile from Google data
-      const storedProfile = localStorage.getItem("profile");
-      let profile = storedProfile
-        ? JSON.parse(storedProfile)
-        : { fullName: "", email: "", city: "", dob: "", phone: "" };
-
-      // Merge Google data into profile
-      profile.fullName = userInfo.name || userInfo.given_name || profile.fullName;
-      profile.email = userInfo.email || profile.email;
-      profile.picture = userInfo.picture || profile.picture || "";
-      profile.isLoggedIn = true;
-
-      // Save updated profile to localStorage
-      localStorage.setItem("profile", JSON.stringify(profile));
-      // Dispatch storage event so navbar updates instantly
-      window.dispatchEvent(new Event("storage"));
-
-      // Store the phone from existing profile (or empty) for ProfileSummaryDialog
-      setGoogleAuthPhone(profile.phone || "");
-
-      // Close auth dialog → open profile dialog
-      // Close auth dialog → go to vehicle selection
-      setGoogleLoading(false);
-      onClose();
-      navigate("/available-rides");
-    } catch (err: any) {
-      console.error("Failed to fetch Google user info:", err);
-      setError("Google sign-in failed. Please try again.");
-      setGoogleLoading(false);
-    }
-  }, [onClose, setError]);
+  // ---------- Legacy handler (Not used anymore as we redirect) ----------
+  const handleGoogleSuccess = useCallback(async () => {}, []);
 
   const handleResend = useCallback(() => {
     sendOtp();
@@ -795,9 +748,27 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
     onClose();
   }, [reset, onClose]);
 
-  const handleCloseProfile = useCallback(() => {
+  const handleCloseProfile = useCallback(async () => {
     setShowProfileDialog(false);
-  }, []);
+    onClose();
+
+    // Re-verify the updated Auth profile status entirely through context validation
+    await refreshProfile();
+    // In next render AuthContext will be updated
+    // But we use the direct Supabase check here to ensure immediate redirection without missing a beat
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+       const { data: prf } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+       if (prf && prf.full_name) {
+         navigate("/available-rides");
+       }
+    }
+  }, [onClose, navigate, refreshProfile]);
+
+  const handleBackFromProfile = useCallback(() => {
+    setShowProfileDialog(false);
+    reset(); // Return to AuthDialog phone entry
+  }, [reset]);
 
   // Determine the phone to pass to ProfileSummaryDialog
   const profilePhone = phone || googleAuthPhone;
@@ -814,15 +785,15 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
 
           <div className="p-6 md:p-8 space-y-6 relative z-10">
 
-            <DialogHeader className="space-y-3">
+            <DialogHeader className="space-y-4">
               <DialogDescription className="sr-only">
                 Authentication process to continue booking
               </DialogDescription>
-              <div className="space-y-1">
-                <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
+              <div className="space-y-2 flex flex-col items-center text-center">
+                <DialogTitle className="text-3xl font-black text-gray-900 tracking-tight leading-none" style={{ fontFamily: "'Inter', sans-serif" }}>
                   {step === "phone" ? "Welcome to Xpool" : "Verify Number"}
                 </DialogTitle>
-                <p className="text-sm font-medium text-gray-500 leading-relaxed">
+                <p className="text-sm font-medium text-gray-500 leading-relaxed max-w-[300px]">
                   {step === "phone"
                     ? "Verify your account to enjoy seamless rides across India."
                     : `Enter the OTP sent to +91 ${phone} to proceed.`}
@@ -862,8 +833,8 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
             <div id="recaptcha-container" className="my-2 flex justify-center"></div>
 
             <SocialLogin
-              onGoogleSuccess={handleGoogleSuccess}
               googleLoading={googleLoading}
+              setGoogleLoading={setGoogleLoading}
             />
 
             <motion.p
@@ -885,6 +856,7 @@ const AuthDialog = ({ open, onClose }: AuthDialogProps) => {
         open={showProfileDialog}
         phone={profilePhone}
         onClose={handleCloseProfile}
+        onBack={handleBackFromProfile}
       />
     </>
   );

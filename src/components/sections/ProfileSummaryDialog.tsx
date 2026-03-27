@@ -83,9 +83,9 @@ const T = {
 import { Variants } from "framer-motion";
 
 const fadeSlide: Variants = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-  exit: { opacity: 0, y: -8, transition: { duration: 0.2 } }
+  initial: { opacity: 0, y: 20, scale: 0.98, filter: "blur(4px)" },
+  animate: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } },
+  exit: { opacity: 0, y: -16, scale: 0.98, filter: "blur(4px)", transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
 };
 
 const ProfileSummaryDialog = ({
@@ -105,25 +105,35 @@ const ProfileSummaryDialog = ({
   const [focusedField, setFocusedField] = useState<keyof ProfileData | string | null>(null);
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setStep(1);
     setSaved(false);
     setOtp("");
     setOtpError(null);
+    setSaveError(null);
     setTouched(new Set());
 
+    let initialPhone = phone || "";
     if (contextProfile) {
+      initialPhone = contextProfile.phone || initialPhone;
       setProfile({
         fullName: contextProfile.full_name || "",
         email: contextProfile.email || "",
         city: contextProfile.city || "",
         dob: contextProfile.dob || "",
-        phone: contextProfile.phone || phone || "",
+        phone: initialPhone,
       });
     } else {
-      setProfile({ ...EMPTY_PROFILE, phone: phone || "" });
+      setProfile({ ...EMPTY_PROFILE, phone: initialPhone });
+    }
+
+    // Professional Flow: Skip to step 2 if phone is already verified/available and valid
+    if (initialPhone && /^[6-9]\d{9}$/.test(initialPhone.replace(/\D/g, ''))) {
+      setStep(2);
+    } else {
+      setStep(1);
     }
   }, [open, contextProfile, phone]);
 
@@ -146,8 +156,11 @@ const ProfileSummaryDialog = ({
 
   const goBack = useCallback(() => {
     if (step === 1) {
-      onBack?.();
-      onClose();
+      if (onBack) {
+        onBack();
+      } else {
+        onClose();
+      }
     } else {
       setStep((s) => (s - 1) as Step);
     }
@@ -171,6 +184,7 @@ const ProfileSummaryDialog = ({
         email: profile.email,
         data: { display_name: profile.fullName, full_name: profile.fullName }
       });
+
       // 2. Upsert into public.profiles table
       await supabase.from('profiles').upsert({ 
           id: userId, phone: profile.phone, full_name: profile.fullName, 
@@ -185,15 +199,20 @@ const ProfileSummaryDialog = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
-      // Check if phone changed
-      const currentPhone = contextProfile?.phone || "";
+      // Use user.phone directly instead of contextProfile to avoid sync delays after login
+      const currentPhone = (user.phone || "").replace("+91", "");
       if (profile.phone !== currentPhone && profile.phone) {
         // Send OTP for new phone
         const { error: updateError } = await supabase.auth.updateUser({ phone: `+91${profile.phone}` });
         if (updateError) {
           console.error("Phone update error:", updateError);
           setLoading(false);
-          // Show error to user via toast or custom error logic later
+          
+          if (updateError.message.toLowerCase().includes('already been registered')) {
+             setSaveError("This phone number is already linked to another account.");
+          } else {
+             setSaveError(updateError.message || "Failed to update phone number.");
+          }
           return;
         }
         setStep(4); // Display OTP input step
@@ -259,18 +278,18 @@ const ProfileSummaryDialog = ({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent 
-        className="sm:max-w-md p-0 overflow-hidden rounded-[28px] border-[1.5px] border-amber-500/10 shadow-[0_32px_80px_rgba(0,0,0,0.12),_inset_0_1px_0_rgba(255,255,255,0.6)]" 
+        className="sm:max-w-md p-0 overflow-hidden rounded-[32px] border-0 shadow-[0_32px_80px_rgba(0,0,0,0.12),_inset_0_1px_0_rgba(255,255,255,0.6)]" 
         style={{ 
-          background: "linear-gradient(170deg, rgba(255, 251, 235, 0.98) 0%, rgba(254, 249, 231, 0.97) 35%, rgba(255, 253, 245, 0.98) 100%)",
+          background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)",
           fontFamily: "'Inter', sans-serif"
         }}
       >
         {/* Pattern Overlay */}
         <div 
-          className="absolute inset-0 opacity-20 pointer-events-none"
+          className="absolute inset-0 opacity-[0.08] pointer-events-none"
           style={{
-            backgroundImage: "radial-gradient(rgba(245, 158, 11, 0.4) 1px, transparent 1px)",
-            backgroundSize: "24px 24px"
+            backgroundImage: "radial-gradient(rgba(245,158,11,0.6) 1px, transparent 1px)",
+            backgroundSize: "32px 32px"
           }}
         />
 
@@ -303,22 +322,23 @@ const ProfileSummaryDialog = ({
           <div className="p-6 space-y-6">
 
             {/* HEADER */}
-            <DialogHeader className="space-y-2">
+            <DialogHeader className="space-y-2 flex flex-col items-center">
               <DialogDescription className="sr-only">
                 Provide your personal details to complete the setup
               </DialogDescription>
-              <DialogTitle className="text-center text-2xl font-bold text-[#0A0F1C]">
+              <DialogTitle className="text-3xl font-black text-gray-900 tracking-tight leading-none" style={{ fontFamily: "'Inter', sans-serif" }}>
                 {STEP_LABELS[step]}
               </DialogTitle>
-              <p className="text-center text-sm font-medium text-amber-900/60">
+              <p className="text-center text-sm font-medium text-gray-500 leading-relaxed max-w-[280px]">
                 {step === 1 && "Confirm or update your primary phone number"}
                 {step === 2 && "Fill in your personal details to continue"}
                 {step === 3 && "Review your information before saving"}
+                {step === 4 && "Enter the verification code to secure your account."}
               </p>
             </DialogHeader>
 
             {/* STEP DOTS */}
-            <div className="flex items-center justify-center gap-2 pb-2">
+            <div className="flex items-center justify-center gap-2 pb-4">
               {([1, 2, 3] as Step[]).map((s) => (
                 <div
                   key={s}
@@ -492,13 +512,30 @@ const ProfileSummaryDialog = ({
                     </div>
 
                     <ActionButton 
-                      onClick={handleSave} 
+                      onClick={() => {
+                        setSaveError(null);
+                        handleSave();
+                      }} 
                       disabled={loading || saved}
                       loading={loading}
                       saved={saved}
                       label="Confirm & Save"
                       savedLabel="Profile Saved!"
                     />
+
+                    <AnimatePresence>
+                      {saveError && (
+                        <motion.p 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="text-sm font-semibold text-red-500 text-center flex items-center justify-center gap-1.5"
+                        >
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          {saveError}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
 
                     <p className="text-[11px] text-center font-medium text-amber-900/50 uppercase tracking-widest">
                       You can edit this later in your profile
@@ -561,8 +598,10 @@ const ActionButton = ({ onClick, disabled, loading, saved, label, savedLabel }: 
       disabled={disabled}
       className={`w-full h-14 rounded-2xl text-lg relative overflow-hidden transition-all duration-300 ${
         saved 
-          ? "bg-green-500 hover:bg-green-600 text-white shadow-[0_8px_32px_rgba(34,197,94,0.4)] border-none"
-          : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 bg-[length:200%_auto] hover:bg-right text-white font-bold border-none shadow-[0_8px_32px_rgba(245,158,11,0.35)]"
+          ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_8px_32px_rgba(16,185,129,0.4)] border-none"
+          : disabled 
+            ? "bg-amber-500/50 text-white/70 cursor-not-allowed border-none"
+            : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 bg-[length:200%_auto] hover:bg-right text-white font-bold border-none shadow-[0_8px_32px_rgba(245,158,11,0.35)] hover:shadow-[0_12px_40px_rgba(245,158,11,0.45)] hover:-translate-y-0.5"
       }`}
       style={!saved ? { textShadow: "0 1px 2px rgba(0,0,0,0.15)" } : {}}
     >
@@ -645,10 +684,11 @@ const InputBlock = ({
       `}
     >
       <div
-        className={`h-10 w-10 shrink-0 flex items-center justify-center rounded-xl transition-colors duration-300 border
+        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-[14px] transition-colors duration-300 border
           ${errorMsg ? "bg-red-500/10 text-red-500 border-red-500/20" : ""}
-          ${isValid && !errorMsg ? "bg-green-500/10 text-green-600 border-green-500/20" : ""}
-          ${!errorMsg && !isValid ? "bg-gradient-to-br from-amber-500/10 to-orange-500/10 text-amber-600 border-amber-500/20 shadow-sm" : ""}
+          ${isValid && !errorMsg ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]" : ""}
+          ${!errorMsg && !isValid ? "bg-gradient-to-br from-amber-500/10 to-orange-500/10 text-amber-600 border-amber-500/20 shadow-[0_2px_8px_rgba(245,158,11,0.06),inset_0_1px_0_rgba(255,255,255,0.5)]" : ""}
+          ${isFocused && !errorMsg ? "bg-amber-500/20 border-amber-500/40 text-amber-700 ring-2 ring-amber-500/20 ring-offset-1" : ""}
         `}
       >
         {icon}
@@ -675,7 +715,7 @@ const InputBlock = ({
           onFocus={onFocus}
           onBlur={onBlur}
           onChange={(e) => onChange?.(e.target.value)}
-          className={`border-0 focus-visible:ring-0 text-[15px] font-semibold text-[#0A0F1C] p-0 h-auto bg-transparent placeholder:text-amber-900/30 placeholder:font-medium`}
+          className={`border-0 focus-visible:ring-0 text-[16px] font-semibold text-[#0A0F1C] p-0 h-auto bg-transparent placeholder:text-amber-900/40 placeholder:font-medium`}
         />
       </div>
 

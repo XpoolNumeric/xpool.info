@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Phone, Download, Menu, X, Sparkles, ChevronRight, LogOut, User } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Phone, Download, Menu, X, Sparkles, ChevronRight, LogOut, User, AlertTriangle, Car, Home, HelpCircle, Layers, ShieldCheck, Mail } from "lucide-react";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
 import { useAuthContext } from "@/contexts/AuthContext";
 
@@ -25,14 +25,109 @@ const T = {
 /* ─────────────────────────────────────────────────────────
    Nav Items
 ───────────────────────────────────────────────────────── */
-const NAV_ITEMS = [
-  { label: "Home", to: "/", icon: "●", badge: false },
-  { label: "How it Works", to: "/how-it-works", icon: "◆", badge: false },
-  { label: "Features", to: "/features", icon: "▲", badge: false },
-  { label: "Verify Docs", to: "/verify", icon: "✓", badge: true },
-  { label: "Download", to: "/download", icon: "⬇", badge: false },
-  { label: "Contact", to: "/contact", icon: "◉", badge: false },
+const NAV_ITEMS_BASE = [
+  { label: "Home", to: "/", icon: <Home size={16} />, badge: false },
+  { label: "How it Works", to: "/how-it-works", icon: <HelpCircle size={16} />, badge: false },
+  { label: "Features", to: "/features", icon: <Layers size={16} />, badge: false },
+  { label: "Verify Docs", to: "/verify", icon: <ShieldCheck size={16} />, badge: true },
+  { label: "Download", to: "/download", icon: <Download size={16} />, badge: false },
+  { label: "Contact", to: "/contact", icon: <Mail size={16} />, badge: false },
 ];
+
+const MY_RIDES_ITEM = { label: "My Rides", to: "/ride-summary", icon: <Car size={16} />, badge: false };
+
+/* ─────────────────────────────────────────────────────────
+   Logout Confirmation Dialog
+───────────────────────────────────────────────────────── */
+const LogoutConfirmDialog = ({ open, onCancel, onConfirm }: { open: boolean; onCancel: () => void; onConfirm: () => void }) => {
+  if (!open) return null;
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onCancel}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 2000,
+          background: "rgba(10,15,28,0.5)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          animation: "fadeIn 0.2s ease-out",
+        }}
+      />
+      {/* Dialog */}
+      <div
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          zIndex: 2001,
+          width: "min(380px, 90vw)",
+          background: "#ffffff",
+          borderRadius: 24,
+          boxShadow: "0 32px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(245,158,11,0.1)",
+          padding: "28px 24px 20px",
+          textAlign: "center",
+          fontFamily: "'Inter', sans-serif",
+          animation: "scaleIn 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+        }}
+      >
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(239,68,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+          <AlertTriangle style={{ width: 28, height: 28, color: "#EF4444" }} />
+        </div>
+        <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0A0F1C", marginBottom: 8, letterSpacing: "-0.02em" }}>Sign Out?</h3>
+        <p style={{ fontSize: "0.85rem", color: "#6B7280", fontWeight: 500, lineHeight: 1.5, marginBottom: 24 }}>
+          Your active ride data will be cleared. You’ll need to log in again to book rides.
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "12px 20px",
+              borderRadius: 14,
+              border: "1.5px solid rgba(229,231,235,0.8)",
+              background: "#ffffff",
+              cursor: "pointer",
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 700,
+              fontSize: "0.9rem",
+              color: "#374151",
+              transition: "all 0.2s ease",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1,
+              padding: "12px 20px",
+              borderRadius: 14,
+              border: "none",
+              background: "linear-gradient(135deg, #EF4444, #DC2626)",
+              cursor: "pointer",
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 700,
+              fontSize: "0.9rem",
+              color: "#ffffff",
+              boxShadow: "0 4px 16px rgba(239,68,68,0.3)",
+              transition: "all 0.2s ease",
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+      `}</style>
+    </>
+  );
+};
 
 /* ─────────────────────────────────────────────────────────
    Scroll Progress Bar
@@ -454,16 +549,53 @@ const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void, f
 ───────────────────────────────────────────────────────── */
 const Navbar = () => {
   const { profile, logout } = useAuthContext();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hideBar, setHideBar] = useState(false);
   const [mouseX, setMouseX] = useState(0.5);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [hasActiveRide, setHasActiveRide] = useState(false);
   const lastScrollY = useRef(0);
   const location = useLocation();
 
-  const handleLogout = async () => {
-    await logout();
+  // Build nav items dynamically based on login status
+  const NAV_ITEMS = profile
+    ? [...NAV_ITEMS_BASE.slice(0, 3), MY_RIDES_ITEM, ...NAV_ITEMS_BASE.slice(3)]
+    : NAV_ITEMS_BASE;
+
+  // Check for active ride
+  useEffect(() => {
+    const checkRide = () => {
+      try {
+        const rideSummary = localStorage.getItem("rideSummary");
+        setHasActiveRide(!!rideSummary);
+      } catch { setHasActiveRide(false); }
+    };
+    checkRide();
+    // Re-check on navigation
+    const interval = setInterval(checkRide, 5000);
+    return () => clearInterval(interval);
+  }, [location.pathname]);
+
+  const handleLogoutRequest = () => {
+    setShowLogoutDialog(true);
     setIsOpen(false);
+  };
+
+  const handleLogoutConfirm = async () => {
+    // Clear all ride-related data
+    localStorage.removeItem("rideSummary");
+    localStorage.removeItem("selectedDriver");
+    localStorage.removeItem("vehicleType");
+    await logout();
+    setShowLogoutDialog(false);
+    setHasActiveRide(false);
+    navigate("/");
+  };
+
+  const handleLogoutCancel = () => {
+    setShowLogoutDialog(false);
   };
 
   useEffect(() => {
@@ -557,10 +689,35 @@ const Navbar = () => {
 
             {/* Desktop CTAs */}
             <div className="hidden md:flex" style={{ alignItems: "center", gap: 10 }}>
+              {/* Active Ride Indicator */}
+              {hasActiveRide && profile && (
+                <Link
+                  to="/ride-summary"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 14px",
+                    borderRadius: 999,
+                    background: "rgba(16,185,129,0.08)",
+                    border: "1.5px solid rgba(16,185,129,0.3)",
+                    color: "#059669",
+                    textDecoration: "none",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "0.78rem",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pipPulse 2s ease-in-out infinite" }} />
+                  <Car style={{ width: 14, height: 14 }} />
+                  Active Ride
+                </Link>
+              )}
               {profile ? (
                 <>
                   <ProfileButton profile={profile} />
-                  <LogoutButton onLogout={handleLogout} />
+                  <LogoutButton onLogout={handleLogoutRequest} />
                 </>
               ) : (
                 <>
@@ -751,7 +908,7 @@ const Navbar = () => {
                         ? `linear-gradient(135deg, ${T.orange}22, ${T.gold}22)`
                         : "rgba(243,244,246,0.7)",
                       border: `1px solid ${isActive ? T.orange + "33" : "rgba(229,231,235,0.6)"}`,
-                      fontSize: "0.65rem",
+                      fontSize: "0.85rem",
                       color: isActive ? T.orange : T.muted,
                       transition: "all 0.2s ease",
                       flexShrink: 0,
@@ -829,8 +986,35 @@ const Navbar = () => {
         >
           {profile ? (
             <>
+              {/* Active Ride Link in mobile */}
+              {hasActiveRide && (
+                <Link
+                  to="/ride-summary"
+                  onClick={() => setIsOpen(false)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    padding: "12px 20px",
+                    borderRadius: 14,
+                    background: "rgba(16,185,129,0.08)",
+                    border: "1.5px solid rgba(16,185,129,0.3)",
+                    color: "#059669",
+                    textDecoration: "none",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    marginBottom: 4,
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pipPulse 2s ease-in-out infinite" }} />
+                  <Car style={{ width: 16, height: 16 }} />
+                  View Active Ride
+                </Link>
+              )}
               <ProfileButton profile={profile} fullWidth />
-              <LogoutButton onLogout={() => { handleLogout(); setIsOpen(false); }} fullWidth />
+              <LogoutButton onLogout={handleLogoutRequest} fullWidth />
             </>
           ) : (
             <>
@@ -840,6 +1024,13 @@ const Navbar = () => {
           )}
         </div>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <LogoutConfirmDialog
+        open={showLogoutDialog}
+        onCancel={handleLogoutCancel}
+        onConfirm={handleLogoutConfirm}
+      />
 
       {/* ── Global Keyframes ── */}
       <style>{`

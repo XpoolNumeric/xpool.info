@@ -24,8 +24,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   isLoading: true,
-  refreshProfile: async () => {},
-  logout: async () => {},
+  refreshProfile: async () => { },
+  logout: async () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        refreshProfile(); 
+        refreshProfile();
       } else {
         setProfile(null);
       }

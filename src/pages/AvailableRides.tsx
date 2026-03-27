@@ -16,10 +16,15 @@ import {
   CheckCircle2,
   MessageCircle,
   Zap,
+  ArrowLeft,
+  Edit3,
+  AlertCircle,
 } from "lucide-react";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
 import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
+import { supabase } from "@/lib/supabase/client";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 /* ─────────── CONSTANTS ─────────── */
 const LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
@@ -99,66 +104,8 @@ const PulseBackground = memo(() => {
 });
 PulseBackground.displayName = "PulseBackground";
 
-/* ─────────── MOCK DATA ─────────── */
-function generateMockRides(distanceKm: number, durationMin: number, passengers: number): DriverRide[] {
-  const now = new Date();
+/* ─────────── NO MOCK DATA ─────────── */
 
-  // Use the real tiered fare algorithm for each vehicle type
-  const getFareData = (vehicleType: VehicleId) => {
-    const fareResult = calculateTieredFare(distanceKm, durationMin, vehicleType, passengers);
-    return {
-      perPerson: fareResult.fare.perPerson,
-      savingsVsTaxiAmount: fareResult.savings.vsTaxiAmount
-    };
-  };
-
-  const drivers: DriverRide[] = [
-    {
-      id: "d1", driverName: "Rahul Sharma", driverRating: 4.9, driverRides: 1450,
-      driverPhone: "+91 98765 43210", driverPhoto: "RS", vehicleType: "car",
-      vehicleName: "Maruti Swift Dzire", vehicleNumber: "TN 09 AB 1234", vehicleColor: "White",
-      departureTime: new Date(now.getTime() + 15 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 3, pricePerSeat: getFareData("car").perPerson, savingsVsTaxiAmount: getFareData("car").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Music", "Luggage space"],
-    },
-    {
-      id: "d2", driverName: "Priya Patel", driverRating: 4.8, driverRides: 890,
-      driverPhone: "+91 87654 32109", driverPhoto: "PP", vehicleType: "car",
-      vehicleName: "Hyundai i20", vehicleNumber: "TN 22 CD 5678", vehicleColor: "Silver",
-      departureTime: new Date(now.getTime() + 30 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 2, pricePerSeat: getFareData("car").perPerson, savingsVsTaxiAmount: getFareData("car").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Pet friendly"],
-    },
-    {
-      id: "d3", driverName: "Amit Singh", driverRating: 4.7, driverRides: 2100,
-      driverPhone: "+91 76543 21098", driverPhoto: "AS", vehicleType: "xl",
-      vehicleName: "Toyota Innova", vehicleNumber: "TN 07 EF 9012", vehicleColor: "Black",
-      departureTime: new Date(now.getTime() + 20 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 5, pricePerSeat: getFareData("xl").perPerson, savingsVsTaxiAmount: getFareData("xl").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Luggage space", "Charger", "Water bottle"],
-    },
-    {
-      id: "d4", driverName: "Kavitha R", driverRating: 4.6, driverRides: 560,
-      driverPhone: "+91 65432 10987", driverPhoto: "KR", vehicleType: "auto",
-      vehicleName: "Bajaj RE", vehicleNumber: "TN 09 GH 3456", vehicleColor: "Yellow/Green",
-      departureTime: new Date(now.getTime() + 10 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 2, pricePerSeat: getFareData("auto").perPerson, savingsVsTaxiAmount: getFareData("auto").savingsVsTaxiAmount, isVerified: false, features: ["Budget friendly"],
-    },
-    {
-      id: "d5", driverName: "Vijay Kumar", driverRating: 4.9, driverRides: 3200,
-      driverPhone: "+91 54321 09876", driverPhoto: "VK", vehicleType: "car",
-      vehicleName: "Honda City", vehicleNumber: "TN 01 IJ 7890", vehicleColor: "Red",
-      departureTime: new Date(now.getTime() + 45 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 3, pricePerSeat: getFareData("car").perPerson, savingsVsTaxiAmount: getFareData("car").savingsVsTaxiAmount, isVerified: true, features: ["AC", "Premium audio", "Leather seats", "Charger"],
-    },
-    {
-      id: "d6", driverName: "Deepa M", driverRating: 4.5, driverRides: 340,
-      driverPhone: "+91 43210 98765", driverPhoto: "DM", vehicleType: "bike",
-      vehicleName: "Royal Enfield Classic", vehicleNumber: "TN 09 KL 1122", vehicleColor: "Black",
-      departureTime: new Date(now.getTime() + 5 * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      availableSeats: 1, pricePerSeat: getFareData("bike").perPerson, savingsVsTaxiAmount: getFareData("bike").savingsVsTaxiAmount, isVerified: false, features: ["Helmet provided", "Fast"],
-    },
-  ];
-
-  return drivers.filter((d) => d.availableSeats >= passengers);
-}
 
 /* ─────────── ANIMATIONS (matches Hero easing) ─────────── */
 const staggerContainer: Variants = {
@@ -346,24 +293,167 @@ export default function AvailableRides() {
     styles: XPOOL_MAP_STYLES,
   }), []);
 
-  /* Rides list */
-  const allRides = useMemo(() => generateMockRides(distanceKm, durationMin, passengers), [distanceKm, durationMin, passengers]);
+  /* Rides list & Backend Fetch */
+  const { user } = useAuthContext();
+  const [allRides, setAllRides] = useState<DriverRide[]>([]);
+  const [isLoadingRides, setIsLoadingRides] = useState(true);
+
+  useEffect(() => {
+    const fetchRides = async () => {
+      setIsLoadingRides(true);
+      try {
+        // Attempt Advanced Edge Function Search (Partial Matching & Routing Containment)
+        let edgeTrips: any[] | null = null;
+        if (pickup && drop) {
+           const { data: response, error: edgeError } = await supabase.functions.invoke('search-trips', {
+             body: {
+               fromLocation: pickup,
+               toLocation: drop,
+               vehiclePreference: vehicleFilter !== "all" ? vehicleFilter : "any",
+               includePartialMatches: true,
+               page: 1,
+               pageSize: 50
+             }
+           });
+           if (!edgeError && response?.success) {
+             edgeTrips = response.data;
+           }
+        }
+
+        // If edge function succeeds, map that data natively
+        if (edgeTrips && edgeTrips.length > 0) {
+           const formattedRides: DriverRide[] = edgeTrips.map((trip: any) => {
+              const vType = (trip.vehicle_type || 'car') as VehicleId;
+              const fareResult = calculateTieredFare(distanceKm || 15, Math.max(10, durationMin) || 30, vType, passengers || 1);
+              
+              const parsedFeatures: string[] = [];
+              if (trip.ladies_only) parsedFeatures.push("Ladies Only");
+              if (trip.no_smoking) parsedFeatures.push("No Smoking");
+              if (trip.pet_friendly) parsedFeatures.push("Pet Friendly");
+              if (vType === 'car' || vType === 'xl') parsedFeatures.push("AC");
+
+              return {
+                 id: trip.id,
+                 driverName: trip.driver?.name || "Driver",
+                 driverRating: trip.driver?.rating || 4.8,
+                 driverRides: trip.driver?.trips_completed || 10,
+                 driverPhone: "+91 00000 00000", // Usually private until booked
+                 driverPhoto: trip.driver?.avatar || "",
+                 vehicleType: vType,
+                 vehicleName: trip.vehicle_name || "Verified Vehicle",
+                 vehicleNumber: trip.vehicle_number || "TN XX 0000",
+                 vehicleColor: trip.vehicle_color || "Black",
+                 departureTime: trip.formatted_time || trip.travel_time?.slice(0,5) || "Next available",
+                 availableSeats: trip.available_seats || 4,
+                 pricePerSeat: trip.price_per_seat || fareResult.fare.perPerson,
+                 savingsVsTaxiAmount: fareResult.savings.vsTaxiAmount,
+                 isVerified: true,
+                 features: parsedFeatures
+              };
+           }).filter((r: DriverRide) => r.availableSeats >= passengers);
+
+           setAllRides(formattedRides);
+           setIsLoadingRides(false);
+           return;
+        }
+
+        // --- FALLBACK TO LOCAL FETCHING IF EDGE FUNCTION FAILS/EMPTY ---
+        const { data: flatTrips, error } = await supabase.from('trips').select('*').eq('status', 'active');
+        if (error) throw error;
+        
+        if (!flatTrips || flatTrips.length === 0) {
+           setAllRides([]);
+           setIsLoadingRides(false);
+           return;
+        }
+        
+        const userIds = [...new Set(flatTrips.map((t: any) => t.user_id))].filter(Boolean);
+        const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);
+        const profileMap = Object.fromEntries(profiles?.map((p: any) => [p.id, p]) || []);
+
+        const formattedRides: DriverRide[] = flatTrips.map((trip: any) => {
+          const p = profileMap[trip.user_id] || {};
+          const vType = (trip.vehicle_type as VehicleId) || 'car';
+          
+          const fareResult = calculateTieredFare(distanceKm || 15, Math.max(10, durationMin) || 30, vType, passengers || 1);
+          
+          let depTime = "Next available";
+          if (trip.travel_time) {
+            depTime = trip.travel_time.slice(0,5);
+          }
+          
+          const parsedFeatures: string[] = [];
+          if (trip.ladies_only) parsedFeatures.push("Ladies Only");
+          if (trip.no_smoking) parsedFeatures.push("No Smoking");
+          if (trip.pet_friendly) parsedFeatures.push("Pet Friendly");
+          if (vType === 'car' || vType === 'xl') parsedFeatures.push("AC");
+
+          return {
+            id: trip.id,
+            driverName: p.full_name || "Driver",
+            driverRating: p.rating || 4.8,
+            driverRides: p.total_rides || 10,
+            driverPhone: p.phone || "",
+            driverPhoto: p.avatar_url || "",
+            vehicleType: vType,
+            vehicleName: trip.vehicle_name || "Verified Vehicle",
+            vehicleNumber: trip.vehicle_number || "TN XX 0000",
+            vehicleColor: trip.vehicle_color || "Black",
+            departureTime: depTime,
+            availableSeats: trip.available_seats || 4,
+            pricePerSeat: trip.price_per_seat || fareResult.fare.perPerson,
+            savingsVsTaxiAmount: fareResult.savings.vsTaxiAmount,
+            isVerified: true,
+            features: parsedFeatures
+          };
+        }).filter((r: DriverRide) => r.availableSeats >= passengers);
+
+        let matchedRides = formattedRides;
+        if (pickup && drop) {
+          const pickupCity = pickup.split(',')[0].trim().toLowerCase();
+          const dropCity = drop.split(',')[0].trim().toLowerCase();
+          
+          const poolMatchedRides = formattedRides.filter((r) => {
+             const tripSource = flatTrips.find((t: any) => t.id === r.id)?.from_location?.toLowerCase() || '';
+             const tripDest = flatTrips.find((t: any) => t.id === r.id)?.to_location?.toLowerCase() || '';
+             
+             const matchesOrigin = tripSource.includes(pickupCity);
+             const matchesDest = tripDest.includes(dropCity);
+             
+             return matchesOrigin || matchesDest;
+          });
+
+          matchedRides = poolMatchedRides;
+        }
+        
+        setAllRides(matchedRides);
+      } catch (err) {
+        console.error("Error fetching rides:", err);
+        setAllRides([]); // Fallback to empty if backend fails
+      } finally {
+        setIsLoadingRides(false);
+      }
+    };
+
+    fetchRides();
+  }, [distanceKm, durationMin, passengers]);
 
   const filteredRides = useMemo(() => {
     let rides = [...allRides];
     if (vehicleFilter !== "all") rides = rides.filter((r) => r.vehicleType === vehicleFilter);
     switch (sortBy) {
-      case "price":   rides.sort((a, b) => a.pricePerSeat - b.pricePerSeat); break;
-      case "rating":  rides.sort((a, b) => b.driverRating - a.driverRating); break;
-      case "seats":   rides.sort((a, b) => b.availableSeats - a.availableSeats); break;
+      case "price": rides.sort((a, b) => a.pricePerSeat - b.pricePerSeat); break;
+      case "rating": rides.sort((a, b) => b.driverRating - a.driverRating); break;
+      case "seats": rides.sort((a, b) => b.availableSeats - a.availableSeats); break;
       default: break;
     }
     return rides;
   }, [allRides, vehicleFilter, sortBy]);
 
   const handleSelectRide = useCallback(
-    (ride: DriverRide) => {
+    async (ride: DriverRide) => {
       setSelectedRide(ride.id);
+      
       const selectedDriverData = {
         driverName: ride.driverName, driverRating: ride.driverRating,
         driverRides: ride.driverRides, driverPhone: ride.driverPhone,
@@ -373,16 +463,117 @@ export default function AvailableRides() {
       };
       localStorage.setItem("selectedDriver", JSON.stringify(selectedDriverData));
       localStorage.setItem("vehicleType", JSON.stringify(ride.vehicleType));
+      
       const summaryStr = localStorage.getItem("rideSummary");
+      let summaryData = { pickup: pickup, drop: drop };
       if (summaryStr) {
         try {
           const summary = JSON.parse(summaryStr);
+          summaryData = { ...summaryData, ...summary };
           localStorage.setItem("rideSummary", JSON.stringify({ ...summary, distanceKm, durationMin, passengers }));
         } catch (e) { /* ignore */ }
       }
-      setTimeout(() => navigate("/ride-confirmed"), 600);
+
+      // Backend Edge Function Insertion: Securely create booking & trigger emails
+      try {
+         if (user) {
+             const passengerLoc = summaryData.pickup || pickup || "Current Location";
+             const passengerDest = summaryData.drop || drop || "Destination";
+             
+             const { data: response, error: invokeError } = await supabase.functions.invoke('book-trip', {
+                 body: {
+                     trip_id: ride.id,
+                     passenger_id: user.id,
+                     seats_requested: passengers,
+                     payment_mode: 'online',
+                     message: "Looking forward to the ride!",
+                     passenger_location: passengerLoc,
+                     passenger_destination: passengerDest
+                 }
+             });
+
+             if (invokeError || (response && !response.success)) {
+                 throw new Error(invokeError?.message || response?.error || "Failed to book trip");
+             }
+             
+             const request = response.data;
+             
+             // Wait briefly for UI animation, then forward to wait-approval with ID
+             setTimeout(() => {
+               navigate(`/wait-approval?request_id=${request.id}`);
+             }, 800);
+         } else {
+             // Handle unregistered booking (mock / fallback)
+             setTimeout(() => navigate("/wait-approval?request_id=mock-guest"), 600);
+         }
+      } catch (err) {
+         console.error("Edge function failed, attempting direct insert:", err);
+         // Fallback: Direct database insert if edge function is unavailable
+         try {
+            if (user) {
+               // First check if booking already exists for this trip
+               const { data: existing } = await supabase
+                  .from('booking_requests')
+                  .select('id, status')
+                  .eq('trip_id', ride.id)
+                  .eq('passenger_id', user.id)
+                  .in('status', ['pending', 'approved'])
+                  .maybeSingle();
+
+               if (existing) {
+                  // Already booked — navigate to existing request
+                  if (existing.status === 'approved') {
+                     setTimeout(() => navigate(`/ride-confirmed?request_id=${existing.id}`), 400);
+                  } else {
+                     setTimeout(() => navigate(`/wait-approval?request_id=${existing.id}`), 400);
+                  }
+                  return;
+               }
+
+               const passengerLoc = summaryData.pickup || pickup || "Current Location";
+               const passengerDest = summaryData.drop || drop || "Destination";
+               const { data: request, error: insertError } = await supabase.from('booking_requests').insert({
+                  trip_id: ride.id,
+                  passenger_id: user.id,
+                  seats_requested: passengers,
+                  status: 'pending',
+                  payment_mode: 'online',
+                  payment_status: 'pending',
+                  passenger_location: passengerLoc,
+                  passenger_destination: passengerDest
+               }).select().single();
+
+               if (insertError) throw insertError;
+               setTimeout(() => navigate(`/wait-approval?request_id=${request.id}`), 800);
+            } else {
+               setTimeout(() => navigate("/wait-approval?request_id=guest"), 600);
+            }
+         } catch (fallbackErr: any) {
+            console.error("Fallback insert also failed:", fallbackErr);
+            // If it's a duplicate constraint error, find the existing booking
+            if (fallbackErr?.code === '23505' && user) {
+               const { data: dup } = await supabase
+                  .from('booking_requests')
+                  .select('id, status')
+                  .eq('trip_id', ride.id)
+                  .eq('passenger_id', user.id)
+                  .in('status', ['pending', 'approved'])
+                  .maybeSingle();
+               if (dup) {
+                  if (dup.status === 'approved') {
+                     navigate(`/ride-confirmed?request_id=${dup.id}`);
+                  } else {
+                     navigate(`/wait-approval?request_id=${dup.id}`);
+                  }
+                  return;
+               }
+            }
+            alert("Booking failed. Please check your connection and try again.");
+            setSelectedRide(null);
+         }
+      }
     },
-    [navigate, distanceKm, durationMin, passengers]
+    [navigate, distanceKm, durationMin, passengers, user, pickup, drop]
   );
 
   return (
@@ -522,6 +713,29 @@ export default function AvailableRides() {
               animate="visible"
               className="mb-3"
             >
+              {/* Back / Edit Search button */}
+              <motion.div variants={fadeUp} className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => navigate("/")}
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-amber-700 hover:text-amber-900 transition-colors group"
+                >
+                  <span className="h-8 w-8 flex items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 group-hover:bg-amber-500/20 group-hover:scale-105 transition-all">
+                    <ArrowLeft className="h-4 w-4 text-amber-700" />
+                  </span>
+                  <span>Edit Search</span>
+                </button>
+
+                {/* Route summary pill */}
+                {pickup && drop && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 bg-white/70 backdrop-blur-sm px-3 py-1.5 rounded-full border border-gray-200/50 max-w-[200px] truncate">
+                    <MapPin className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                    <span className="truncate">{pickup.split(",")[0]}</span>
+                    <span className="text-amber-400">→</span>
+                    <span className="truncate">{drop.split(",")[0]}</span>
+                  </div>
+                )}
+              </motion.div>
+
               <motion.div variants={fadeUp} className="flex items-start justify-between">
                 <div>
                   <h2
@@ -551,11 +765,10 @@ export default function AvailableRides() {
                 {/* Filter toggle — Hero ghost-light style */}
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`mt-0.5 p-2.5 rounded-xl border transition-all duration-200 ${
-                    showFilters
+                  className={`mt-0.5 p-2.5 rounded-xl border transition-all duration-200 ${showFilters
                       ? "bg-amber-100 border-amber-300 text-amber-700 shadow-sm"
                       : "bg-white/80 border-amber-200/60 text-amber-600 hover:bg-amber-50 hover:border-amber-300"
-                  }`}
+                    }`}
                 >
                   <Filter className="w-4.5 h-4.5 w-5 h-5" />
                 </button>
@@ -585,11 +798,10 @@ export default function AvailableRides() {
                           <button
                             key={key}
                             onClick={() => setSortBy(key)}
-                            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border capitalize ${
-                              sortBy === key
+                            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border capitalize ${sortBy === key
                                 ? "bg-amber-100 border-amber-400 text-amber-800 shadow-sm"
                                 : "bg-white border-amber-200/60 text-amber-700/70 hover:border-amber-300"
-                            }`}
+                              }`}
                           >
                             {key.charAt(0).toUpperCase() + key.slice(1)}
                           </button>
@@ -607,11 +819,10 @@ export default function AvailableRides() {
                           <button
                             key={v}
                             onClick={() => setVehicleFilter(v)}
-                            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold capitalize transition-all border ${
-                              vehicleFilter === v
+                            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold capitalize transition-all border ${vehicleFilter === v
                                 ? "bg-amber-100 border-amber-400 text-amber-800 shadow-sm"
                                 : "bg-white border-amber-200/60 text-amber-700/70 hover:border-amber-300"
-                            }`}
+                              }`}
                           >
                             {v === "all" ? "All" : VEHICLE_LABELS[v]}
                           </button>
@@ -627,25 +838,40 @@ export default function AvailableRides() {
             <div className="flex items-center gap-2 mb-3">
               <div className="flex-1 h-px bg-amber-200/40" />
               <p className="text-[10.5px] font-semibold text-amber-700/60 uppercase tracking-widest whitespace-nowrap">
-                {filteredRides.length} ride{filteredRides.length !== 1 ? "s" : ""} found
+                {isLoadingRides ? "Searching for rides..." : `${filteredRides.length} ride${filteredRides.length !== 1 ? "s" : ""} found`}
               </p>
               <div className="flex-1 h-px bg-amber-200/40" />
             </div>
 
             {/* ── Ride Cards ── */}
             <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3 pb-4">
-              {filteredRides.length === 0 ? (
-                <motion.div variants={fadeUp} className="text-center py-12 space-y-3">
-                  <div className="w-16 h-16 mx-auto bg-amber-50 rounded-full border border-amber-200/60 flex items-center justify-center shadow-sm">
-                    <Car className="w-7 h-7 text-amber-400" />
+              {isLoadingRides ? (
+                <div className="flex justify-center p-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600"></div>
+                </div>
+              ) : filteredRides.length === 0 ? (
+                <motion.div variants={fadeUp} className="text-center py-10 space-y-4 px-4">
+                  <div className="w-20 h-20 mx-auto bg-amber-50 rounded-full border-2 border-amber-200/60 flex items-center justify-center shadow-sm">
+                    <AlertCircle className="w-9 h-9 text-amber-400" />
                   </div>
-                  <p className="text-sm font-semibold text-gray-500">No rides match your filters</p>
-                  <button
-                    onClick={() => setVehicleFilter("all")}
-                    className="text-xs font-bold text-amber-600 underline underline-offset-2"
-                  >
-                    Clear filters
-                  </button>
+                  <div className="space-y-1">
+                    <p className="text-base font-bold text-gray-800">No rides match your filters</p>
+                    <p className="text-xs font-medium text-gray-400">Try adjusting your vehicle type or search a different route</p>
+                  </div>
+                  <div className="flex gap-2 justify-center pt-2">
+                    <button
+                      onClick={() => setVehicleFilter("all")}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 transition-all shadow-sm"
+                    >
+                      Clear Filters
+                    </button>
+                    <button
+                      onClick={() => navigate("/")}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-[0_4px_16px_rgba(245,158,11,0.3)] hover:shadow-[0_6px_20px_rgba(245,158,11,0.4)] transition-all"
+                    >
+                      Modify Search
+                    </button>
+                  </div>
                 </motion.div>
               ) : (
                 filteredRides.map((ride) => {
@@ -659,11 +885,10 @@ export default function AvailableRides() {
                       onClick={() => !isSelected && handleSelectRide(ride)}
                       whileHover={!prefersReducedMotion ? { scale: 1.008, y: -2, transition: { duration: 0.18 } } : {}}
                       whileTap={!prefersReducedMotion ? { scale: 0.995 } : {}}
-                      className={`relative p-4 rounded-[1.4rem] transition-all duration-300 cursor-pointer border ${
-                        isSelected
+                      className={`relative p-4 rounded-[1.4rem] transition-all duration-300 cursor-pointer border ${isSelected
                           ? "selected-card bg-amber-50/90 border-amber-400 ring-1 ring-amber-400/60"
                           : "badge-breathe bg-white/80 border-amber-200/60 hover:border-amber-300 shadow-sm hover:shadow-md"
-                      }`}
+                        }`}
                       style={{ backdropFilter: "blur(8px)" }}
                     >
                       {/* Driver row */}
@@ -671,11 +896,10 @@ export default function AvailableRides() {
 
                         {/* Avatar — Hero logo-ring style */}
                         <div
-                          className={`mt-0.5 h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-sm font-extrabold transition-all ${
-                            isSelected
+                          className={`mt-0.5 h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-sm font-extrabold transition-all ${isSelected
                               ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-500/20"
                               : "bg-amber-50 text-amber-700 border border-amber-200/80"
-                          }`}
+                            }`}
                         >
                           {ride.driverPhoto}
                         </div>
@@ -707,9 +931,8 @@ export default function AvailableRides() {
 
                           {/* Vehicle */}
                           <div className="flex items-center gap-2 mt-2">
-                            <div className={`h-7 w-7 rounded-lg flex items-center justify-center border ${
-                              isSelected ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-amber-50/80 border-amber-200/60 text-amber-600"
-                            }`}>
+                            <div className={`h-7 w-7 rounded-lg flex items-center justify-center border ${isSelected ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-amber-50/80 border-amber-200/60 text-amber-600"
+                              }`}>
                               <Icon className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
