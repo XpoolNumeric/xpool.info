@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useMemo, cloneElement } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, cloneElement } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  User, Mail, Phone, MapPin, Calendar, Camera,
+  User, Mail, Phone, MapPin, Calendar, Camera, ImagePlus,
   ShieldCheck, ArrowLeft, LogOut, ChevronRight, CheckCircle2,
-  Sparkles, Zap, Shield,
+  Sparkles, Zap, Shield, X, Loader2, Upload,
 } from "lucide-react";
 import Navbar from "@/components/ui/navbar";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase/client";
 import ProfileSummaryDialog from "@/components/sections/ProfileSummaryDialog";
 
 /* ─────────────────────────────────────────────────────────
@@ -26,6 +27,24 @@ const T = {
   muted: "#6B7280",
   border: "rgba(229,231,235,0.55)",
 };
+
+/* ─────────────────────────────────────────────────────────
+   Default Male Avatar SVG (inline data URI)
+───────────────────────────────────────────────────────── */
+const DEFAULT_MALE_AVATAR = `data:image/svg+xml,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <rect width="128" height="128" rx="64" fill="#FEF3C7"/>
+  <circle cx="64" cy="48" r="22" fill="#F59E0B"/>
+  <path d="M64 76c-24 0-40 14-40 32v4h80v-4c0-18-16-32-40-32z" fill="#F59E0B"/>
+  <circle cx="64" cy="48" r="18" fill="#FDE68A"/>
+  <ellipse cx="64" cy="46" rx="12" ry="14" fill="#FBBF24"/>
+  <circle cx="57" cy="44" r="2" fill="#92400E"/>
+  <circle cx="71" cy="44" r="2" fill="#92400E"/>
+  <path d="M60 52c2 2 6 2 8 0" stroke="#92400E" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M64 76c-20 0-36 12-36 28v4h72v-4c0-16-16-28-36-28z" fill="#FDE68A"/>
+  <rect x="52" y="66" width="24" height="12" rx="6" fill="#FDE68A"/>
+</svg>
+`)}`;
 
 /* ─────────────────────────────────────────────────────────
    Animation variants
@@ -51,8 +70,12 @@ const staggerContainer = {
 ───────────────────────────────────────────────────────── */
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, profile, isLoading, logout } = useAuthContext();
+  const { user, profile, isLoading, logout, refreshProfile } = useAuthContext();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -65,6 +88,118 @@ export default function Profile() {
     navigate("/");
   };
 
+  /* ── Profile Photo Upload ── */
+  const handlePhotoUpload = useCallback(async (file: File) => {
+    if (!user || !file) return;
+
+    // Validate file
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      alert('Please select a valid image file (JPG, PNG, WebP, or GIF)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be smaller than 5MB');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      // Create a preview immediately
+      const reader = new FileReader();
+      reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) {
+        // If storage bucket doesn't exist, use base64 approach
+        console.warn("Storage upload failed, using base64 fallback:", uploadError);
+        
+        // Convert to base64 and store as data URL in profile
+        const base64 = await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result as string);
+          r.readAsDataURL(file);
+        });
+
+        const { error: updateError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          avatar_url: base64,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+
+        if (updateError) throw updateError;
+      } else {
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+        // Update profile with new avatar URL
+        const { error: updateError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+
+        if (updateError) throw updateError;
+      }
+
+      await refreshProfile();
+      setShowPhotoOptions(false);
+    } catch (err) {
+      console.error("Photo upload error:", err);
+      alert("Failed to upload photo. Please try again.");
+      setPhotoPreview(null);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }, [user, refreshProfile]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handlePhotoUpload(file);
+    // Reset the input so the same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemovePhoto = useCallback(async () => {
+    if (!user) return;
+    setUploadingPhoto(true);
+    try {
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        avatar_url: null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+      await refreshProfile();
+      setPhotoPreview(null);
+      setShowPhotoOptions(false);
+    } catch (err) {
+      console.error("Error removing photo:", err);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }, [user, refreshProfile]);
+
+  /* ── Profile Photo URL Resolution ── */
+  const avatarUrl = useMemo(() => {
+    if (photoPreview) return photoPreview;
+    if (profile?.avatar_url) return profile.avatar_url;
+    // Check user metadata for Google avatar
+    if (user?.user_metadata?.avatar_url) return user.user_metadata.avatar_url;
+    if (user?.user_metadata?.picture) return user.user_metadata.picture;
+    return null;
+  }, [profile?.avatar_url, user?.user_metadata, photoPreview]);
+
   const initials = useMemo(() => {
     if (!profile?.full_name) return "?";
     const parts = profile.full_name.trim().split(" ").filter(Boolean);
@@ -72,11 +207,33 @@ export default function Profile() {
     return parts[0][0].toUpperCase();
   }, [profile?.full_name]);
 
+  const memberSince = useMemo(() => {
+    if (user?.created_at) {
+      return new Date(user.created_at).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+    }
+    return new Date().toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+  }, [user?.created_at]);
+
+  const authProvider = useMemo(() => {
+    if (user?.app_metadata?.provider === 'google') return 'Google';
+    if (user?.phone) return 'Phone';
+    return 'Email';
+  }, [user]);
+
   if (isLoading || !profile) return null;
 
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #fffbeb 0%, #fef9e7 45%, #fffdf5 100%)", fontFamily: "'Inter', sans-serif" }}>
       <Navbar />
+
+      {/* Hidden file input for photo upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
 
       {/* ── Styles ── */}
       <style>{`
@@ -142,12 +299,26 @@ export default function Profile() {
           border-color: ${T.orange};
           box-shadow: 0 8px 24px ${T.orangeGlow};
         }
+        .photo-options-overlay {
+          animation: fadeIn 0.2s ease-out;
+        }
+        .photo-options-dialog {
+          animation: scaleIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+        @keyframes avatarPulse {
+          0%, 100% { box-shadow: 0 4px 24px rgba(255,149,0,0.22), 0 0 0 4px rgba(255,255,255,0.9); }
+          50% { box-shadow: 0 4px 32px rgba(255,149,0,0.35), 0 0 0 6px rgba(255,255,255,0.95); }
+        }
+        .avatar-uploading {
+          animation: avatarPulse 1.5s ease-in-out infinite;
+        }
       `}</style>
 
       <main className="pt-[100px] md:pt-[120px] pb-24 px-4 max-w-5xl mx-auto relative">
         {/* Dot grid overlay */}
         <div className="profile-dot-grid absolute inset-0 pointer-events-none" />
-
 
         <motion.div
           variants={staggerContainer}
@@ -170,40 +341,73 @@ export default function Profile() {
               <div className="profile-dot-grid absolute inset-0 pointer-events-none opacity-30" />
 
               <div className="relative z-10 flex flex-col items-center">
-                {/* Avatar */}
+                {/* Avatar with photo upload */}
                 <div className="mb-6 relative">
-                  <div className="profile-avatar-ring">
-                    {profile.avatar_url ? (
+                  <div className={`profile-avatar-ring ${uploadingPhoto ? 'avatar-uploading' : ''}`}>
+                    {avatarUrl ? (
                       <img
-                        src={profile.avatar_url}
+                        src={avatarUrl}
                         alt={profile.full_name || "Profile"}
+                        draggable="false"
+                        onContextMenu={(e) => e.preventDefault()}
                         className="w-28 h-28 rounded-full object-cover bg-white"
+                        style={{ pointerEvents: "none" }}
                         referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          // Fallback to default avatar if image fails to load
+                          (e.target as HTMLImageElement).src = DEFAULT_MALE_AVATAR;
+                        }}
                       />
                     ) : (
-                      <div
-                        className="w-28 h-28 rounded-full flex items-center justify-center text-3xl font-extrabold"
-                        style={{
-                          background: `linear-gradient(135deg, ${T.ivory}, #fff)`,
-                          color: T.orange,
-                        }}
-                      >
-                        {initials}
-                      </div>
+                      <img
+                        src={DEFAULT_MALE_AVATAR}
+                        alt="Default avatar"
+                        draggable="false"
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="w-28 h-28 rounded-full object-cover bg-amber-50"
+                        style={{ pointerEvents: "none" }}
+                      />
                     )}
                   </div>
+
+                  {/* Upload overlay when uploading */}
+                  {uploadingPhoto && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-white/80 backdrop-blur-sm rounded-full p-2">
+                        <Loader2 className="w-6 h-6 text-amber-500 animate-spin" />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Online dot */}
                   <div
                     className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-[3px] border-white"
                     style={{ background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.5)" }}
                   />
-                  {/* Camera button */}
+
+                  {/* Camera button — opens photo options */}
                   <button
-                    className="absolute bottom-1 left-1 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow border border-gray-100 hover:scale-110 transition-transform"
+                    onClick={() => setShowPhotoOptions(true)}
+                    className="absolute bottom-1 left-1 w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100 hover:scale-110 hover:bg-amber-50 transition-all cursor-pointer"
                     style={{ color: T.orange }}
+                    disabled={uploadingPhoto}
                   >
-                    <Camera className="w-3.5 h-3.5" />
+                    <Camera className="w-4 h-4" />
                   </button>
+                </div>
+
+                {/* Auth provider badge */}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full"
+                    style={{
+                      background: authProvider === 'Google' ? 'rgba(66,133,244,0.1)' : 'rgba(245,158,11,0.1)',
+                      color: authProvider === 'Google' ? '#4285F4' : T.orangeDeep,
+                      border: `1px solid ${authProvider === 'Google' ? 'rgba(66,133,244,0.2)' : 'rgba(245,158,11,0.2)'}`,
+                    }}
+                  >
+                    {authProvider === 'Google' ? '🔗 Connected via Google' : `📱 Via ${authProvider}`}
+                  </span>
                 </div>
 
                 {/* Name & Badge */}
@@ -231,7 +435,7 @@ export default function Profile() {
                 <div className="grid grid-cols-3 gap-2 w-full mb-6">
                   {[
                     { icon: Zap, label: "Rides", value: "0" },
-                    { icon: Shield, label: "Since", value: new Date().toLocaleDateString("en-IN", { month: "short", year: "2-digit" }) },
+                    { icon: Shield, label: "Since", value: memberSince },
                     { icon: Sparkles, label: "Points", value: "0" },
                   ].map((stat) => {
                     const Icon = stat.icon;
@@ -296,7 +500,7 @@ export default function Profile() {
                 
                 <button
                   onClick={() => setIsEditOpen(true)}
-                  className="px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-1.5"
+                  className="px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-1.5 hover:shadow-md hover:-translate-y-0.5"
                   style={{ 
                     background: "rgba(251,191,36,0.1)", 
                     color: T.orangeDeep,
@@ -358,10 +562,128 @@ export default function Profile() {
         </motion.div>
       </main>
 
+      {/* ══════════════════════════════════════════
+          Photo Options Dialog
+      ═══════════════════════════════════════════ */}
+      <AnimatePresence>
+        {showPhotoOptions && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="photo-options-overlay fixed inset-0 z-[2000]"
+              style={{
+                background: "rgba(10,15,28,0.5)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+              }}
+              onClick={() => setShowPhotoOptions(false)}
+            />
+            {/* Dialog */}
+            <div
+              className="photo-options-dialog fixed z-[2001]"
+              style={{
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "min(380px, 90vw)",
+                background: "#ffffff",
+                borderRadius: 28,
+                boxShadow: "0 32px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(245,158,11,0.1)",
+                padding: "32px 24px 24px",
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setShowPhotoOptions(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+
+              {/* Title */}
+              <h3 className="text-xl font-extrabold text-center mb-2" style={{ color: T.navy }}>
+                Profile Photo
+              </h3>
+              <p className="text-sm text-center text-gray-500 font-medium mb-6">
+                Choose how you want to update your photo
+              </p>
+
+              {/* Current photo preview */}
+              <div className="flex justify-center mb-6">
+                <div className="profile-avatar-ring">
+                  <img
+                    src={avatarUrl || DEFAULT_MALE_AVATAR}
+                    alt="Current profile"
+                    className="w-24 h-24 rounded-full object-cover bg-white"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_MALE_AVATAR;
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="w-full py-4 px-5 rounded-2xl font-bold text-sm flex items-center gap-4 transition-all hover:shadow-md hover:-translate-y-0.5"
+                  style={{
+                    background: `linear-gradient(135deg, ${T.orange}, ${T.gold})`,
+                    color: T.navy,
+                    border: "none",
+                    boxShadow: `0 4px 16px ${T.orangeGlow}`,
+                  }}
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Upload className="w-5 h-5" />
+                  )}
+                  <div className="text-left">
+                    <div className="font-bold">Upload Photo</div>
+                    <div className="text-[11px] font-medium opacity-70">JPG, PNG, WebP up to 5MB</div>
+                  </div>
+                </button>
+
+                {avatarUrl && avatarUrl !== DEFAULT_MALE_AVATAR && (
+                  <button
+                    onClick={handleRemovePhoto}
+                    disabled={uploadingPhoto}
+                    className="w-full py-3.5 px-5 rounded-2xl font-bold text-sm flex items-center gap-3 hover:bg-red-50 transition-all"
+                    style={{
+                      background: "transparent",
+                      color: "#EF4444",
+                      border: "1.5px solid rgba(239,68,68,0.2)",
+                    }}
+                  >
+                    <X className="w-5 h-5" />
+                    Remove Photo
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setShowPhotoOptions(false)}
+                  className="w-full py-3 rounded-2xl font-semibold text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Edit Profile Dialog */}
       <ProfileSummaryDialog 
         open={isEditOpen} 
-        onClose={() => setIsEditOpen(false)} 
+        onClose={() => {
+          setIsEditOpen(false);
+          // Refresh profile to get latest data
+          refreshProfile();
+        }} 
       />
     </div>
   );

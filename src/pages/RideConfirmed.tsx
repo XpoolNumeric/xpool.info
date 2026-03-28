@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
+import { generateRideOtp, createCashfreeOrder, verifyCashPayment } from "@/lib/supabase/edgeFunctions";
 import { motion, Variants } from "framer-motion";
 import { GoogleMap, useLoadScript, Polyline, MarkerF } from "@react-google-maps/api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -584,6 +585,51 @@ const RideConfirmed = () => {
   const eta = useEtaCountdown(driver.etaMinutes);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentDone, setPaymentDone] = useState(false);
+
+  // Helper: Create payment order via Cashfree edge function
+  const handleCreatePayment = async () => {
+    if (!requestId || paymentLoading || paymentDone) return;
+    setPaymentLoading(true);
+    try {
+      const driverData = JSON.parse(localStorage.getItem("selectedDriver") || "{}");
+      const rideData = JSON.parse(localStorage.getItem("rideSummary") || "{}");
+      const result = await createCashfreeOrder({
+        bookingRequestId: requestId,
+        amount: priceDetails.fare.total,
+        customerName: driverData.driverName || 'Passenger',
+        customerPhone: driverData.driverPhone || '',
+        customerEmail: '',
+      });
+      if (result.success && result.data?.payment_link) {
+        window.location.href = result.data.payment_link;
+      } else {
+        console.warn('Payment order failed:', result.error);
+        setPaymentDone(true); // Mark as attempted
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  // Helper: Verify cash payment via edge function
+  const handleCashPayment = async () => {
+    if (!requestId) return;
+    setPaymentLoading(true);
+    try {
+      const result = await verifyCashPayment(requestId, priceDetails.fare.total);
+      if (result.success) {
+        setPaymentDone(true);
+      }
+    } catch (err) {
+      console.error('Cash verification error:', err);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
   const [searchParams] = useSearchParams();
   const requestId = searchParams.get("request_id");
   const [otpCode, setOtpCode] = useState<string | null>(null);
@@ -593,10 +639,17 @@ const RideConfirmed = () => {
 
     if (requestId && !requestId.includes("mock")) {
       const fetchOtp = async () => {
+         // Try generating OTP via edge function first
+         const edgeResult = await generateRideOtp(requestId!);
+         if (edgeResult.success && edgeResult.data?.otp_code) {
+           setOtpCode(edgeResult.data.otp_code);
+           return;
+         }
+         // Fallback: fetch from DB
          const { data } = await supabase.from('booking_requests').select('otp_code').eq('id', requestId).single();
          if (data?.otp_code) setOtpCode(data.otp_code);
-      };
-      fetchOtp();
+       };
+       fetchOtp();
 
       channel = supabase.channel(`booking_${requestId}`)
          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'booking_requests', filter: `id=eq.${requestId}` }, (payload) => {
@@ -765,13 +818,23 @@ const RideConfirmed = () => {
                 Keep Ride
               </button>
               <button
-                onClick={() => {
-                  localStorage.removeItem("rideSummary");
-                  localStorage.removeItem("selectedDriver");
-                  localStorage.removeItem("vehicleType");
-                  setShowCancelDialog(false);
-                  navigate("/");
-                }}
+                onClick={async () => {
+                   // Cancel via edge function
+                   if (requestId && !requestId.includes('mock')) {
+                     try {
+                       const { rejectBooking } = await import("@/lib/supabase/edgeFunctions");
+                       await rejectBooking(requestId, 'Cancelled by passenger');
+                     } catch (e) {
+                       // Fallback: direct DB update  
+                       await supabase.from('booking_requests').update({ status: 'cancelled' }).eq('id', requestId);
+                     }
+                   }
+                   localStorage.removeItem("rideSummary");
+                   localStorage.removeItem("selectedDriver");
+                   localStorage.removeItem("vehicleType");
+                   setShowCancelDialog(false);
+                   navigate("/");
+                 }}
                 style={{ flex: 1, padding: "12px 20px", borderRadius: 14, border: "none", background: "linear-gradient(135deg, #EF4444, #DC2626)", cursor: "pointer", fontWeight: 700, fontSize: "0.9rem", color: "#fff", boxShadow: "0 4px 16px rgba(239,68,68,0.3)", fontFamily: "'Inter', sans-serif" }}
               >
                 Cancel Ride

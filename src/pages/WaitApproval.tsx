@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { ShieldCheck, Loader2, ArrowLeft, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { approveBooking, rejectBooking } from "@/lib/supabase/edgeFunctions";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -78,6 +79,29 @@ export default function WaitApproval() {
   const { user } = useAuthContext();
   
   const [status, setStatus] = useState<string>("pending");
+  const [cancelling, setCancelling] = useState(false);
+
+  // Cancel booking request via edge function
+  const handleCancelBooking = async () => {
+    if (!isValidUUID || cancelling) return;
+    setCancelling(true);
+    try {
+      const result = await rejectBooking(requestId!, 'Cancelled by passenger');
+      if (result.success) {
+        navigate("/available-rides?cancelled=true");
+      } else {
+        // Fallback: direct DB update
+        await supabase
+          .from('booking_requests')
+          .update({ status: 'cancelled' })
+          .eq('id', requestId);
+        navigate("/available-rides?cancelled=true");
+      }
+    } catch (err) {
+      console.error('Cancel failed:', err);
+      setCancelling(false);
+    }
+  };
 
   // Only interact with Supabase if we have a real UUID request ID
   const isValidUUID = requestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId);
@@ -212,10 +236,23 @@ export default function WaitApproval() {
              </div>
           </div>
 
-          <div className="mt-8 flex items-center justify-center gap-2 opacity-60 text-amber-900/60 font-semibold text-xs tracking-wide uppercase">
-             <ShieldCheck className="w-4 h-4" />
-             Secured by Xpool
-          </div>
+          {/* Cancel Booking Button */}
+           <button
+             onClick={handleCancelBooking}
+             disabled={cancelling}
+             className="mt-6 w-full h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-red-50 text-red-500 border border-red-200/50 hover:bg-red-100 shadow-sm disabled:opacity-50"
+           >
+             {cancelling ? (
+               <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling...</>
+             ) : (
+               'Cancel Request'
+             )}
+           </button>
+
+           <div className="mt-4 flex items-center justify-center gap-2 opacity-60 text-amber-900/60 font-semibold text-xs tracking-wide uppercase">
+              <ShieldCheck className="w-4 h-4" />
+              Secured by Xpool
+           </div>
 
         </motion.div>
       </div>

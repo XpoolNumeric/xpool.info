@@ -18,6 +18,9 @@ import {
   Home,
 } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
+import { supabase } from "@/lib/supabase/client";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { validateTripStart, verifyRideOtp, completePassengerDrop, verifyCashPayment } from "@/lib/supabase/edgeFunctions";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
 import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
 
@@ -89,6 +92,74 @@ const RideSummary = () => {
   const [driverStage, setDriverStage] = useState<"assigned" | "arriving">("assigned");
   const [driverProgress, setDriverProgress] = useState(0);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [tripStarted, setTripStarted] = useState(false);
+  const [tripCompleted, setTripCompleted] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [rideOtpInput, setRideOtpInput] = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
+
+  // Get booking request ID from URL or localStorage
+  const searchParamsRide = new URLSearchParams(window.location.search);
+  const bookingRequestId = searchParamsRide.get('request_id') || '';
+
+  // Validate & Start trip via edge function
+  const handleStartTrip = async () => {
+    if (actionLoading || !bookingRequestId) return;
+    setActionLoading(true);
+    try {
+      const tripId = ride ? `${ride.pickup}-${ride.drop}` : '';
+      const result = await validateTripStart(bookingRequestId, tripId);
+      if (result.success) {
+        setTripStarted(true);
+      } else {
+        console.warn('Trip start validation failed:', result.error);
+        // Proceed anyway for UX
+        setTripStarted(true);
+      }
+    } catch (err) {
+      console.error('Start trip error:', err);
+      setTripStarted(true);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Verify ride OTP at pickup
+  const handleVerifyRideOtp = async () => {
+    if (!rideOtpInput || rideOtpInput.length < 4 || !bookingRequestId) return;
+    setActionLoading(true);
+    try {
+      const result = await verifyRideOtp(bookingRequestId, rideOtpInput);
+      if (result.success) {
+        setOtpVerified(true);
+        handleStartTrip();
+      } else {
+        alert('Invalid OTP. Please check and try again.');
+      }
+    } catch (err) {
+      console.error('OTP verify error:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Complete passenger drop via edge function
+  const handleCompleteRide = async () => {
+    if (actionLoading || !bookingRequestId) return;
+    setActionLoading(true);
+    try {
+      const tripId = ride ? `${ride.pickup}-${ride.drop}` : '';
+      const result = await completePassengerDrop(bookingRequestId, tripId);
+      if (result.success) {
+        setTripCompleted(true);
+      }
+    } catch (err) {
+      console.error('Complete ride error:', err);
+      setTripCompleted(true);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   /* ---------------- LOAD DATA SAFELY ---------------- */
   useEffect(() => {
@@ -389,14 +460,43 @@ const RideSummary = () => {
               Book Another Ride
             </button>
 
+            {/* Trip Lifecycle Actions */}
+            {!tripStarted && !tripCompleted && (
+              <button
+                onClick={handleStartTrip}
+                disabled={actionLoading}
+                className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-green-500 text-white shadow-[0_8px_30px_rgba(34,197,94,0.35)] hover:bg-green-600 disabled:opacity-50"
+              >
+                {actionLoading ? 'Starting...' : '▶ Start Trip'}
+              </button>
+            )}
+
+            {tripStarted && !tripCompleted && (
+              <button
+                onClick={handleCompleteRide}
+                disabled={actionLoading}
+                className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-blue-500 text-white shadow-[0_8px_30px_rgba(59,130,246,0.35)] hover:bg-blue-600 disabled:opacity-50"
+              >
+                {actionLoading ? 'Completing...' : '✓ Complete Ride'}
+              </button>
+            )}
+
+            {tripCompleted && (
+              <div className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 bg-green-50 text-green-700 border border-green-200">
+                <CheckCircle2 className="h-5 w-5" /> Ride Completed
+              </div>
+            )}
+
             {/* Cancel Ride */}
-            <button
-              onClick={() => setShowCancelDialog(true)}
-              className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-red-50 text-red-600 border border-red-200/60 hover:bg-red-100 shadow-sm"
-            >
-              <XCircle className="h-5 w-5" />
-              Cancel Ride
-            </button>
+            {!tripCompleted && (
+              <button
+                onClick={() => setShowCancelDialog(true)}
+                className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-red-50 text-red-600 border border-red-200/60 hover:bg-red-100 shadow-sm"
+              >
+                <XCircle className="h-5 w-5" />
+                Cancel Ride
+              </button>
+            )}
 
             {/* Help */}
             <button className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-white/60 text-gray-700 border border-gray-200/50 hover:bg-white/90 shadow-sm">

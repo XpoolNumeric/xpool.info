@@ -16,6 +16,7 @@ import AuthDialog from "@/components/sections/AuthDialog";
 import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
+import { calculateFareRemote } from "@/lib/supabase/edgeFunctions";
 import {
   MapPin,
   Navigation,

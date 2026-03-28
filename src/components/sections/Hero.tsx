@@ -272,8 +272,9 @@ const MagneticLogo: FC<{ src: string }> = ({ src }) => {
       <motion.img
         src={src} alt="Xpool logo"
         className="logo-ring h-14 w-14 sm:h-16 sm:w-16 rounded-2xl shadow-lg object-cover select-none block"
-        style={prefersReducedMotion ? {} : { rotateX, rotateY }}
+        style={prefersReducedMotion ? { pointerEvents: "none" } : { rotateX, rotateY, pointerEvents: "none" }}
         loading="eager" draggable={false}
+        onContextMenu={(e) => e.preventDefault()}
       />
     </div>
   );

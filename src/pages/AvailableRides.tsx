@@ -25,6 +25,26 @@ import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import { supabase } from "@/lib/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { searchTrips, bookTrip, calculateFareRemote, notifyDriverBooking } from "@/lib/supabase/edgeFunctions";
+
+/* ─────────────────────────────────────────────────────────
+   Default Male Avatar SVG (inline data URI)
+───────────────────────────────────────────────────────── */
+const DEFAULT_MALE_AVATAR = `data:image/svg+xml,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <rect width="128" height="128" rx="64" fill="#FEF3C7"/>
+  <circle cx="64" cy="48" r="22" fill="#F59E0B"/>
+  <path d="M64 76c-24 0-40 14-40 32v4h80v-4c0-18-16-32-40-32z" fill="#F59E0B"/>
+  <circle cx="64" cy="48" r="18" fill="#FDE68A"/>
+  <ellipse cx="64" cy="46" rx="12" ry="14" fill="#FBBF24"/>
+  <circle cx="57" cy="44" r="2" fill="#92400E"/>
+  <circle cx="71" cy="44" r="2" fill="#92400E"/>
+  <path d="M60 52c2 2 6 2 8 0" stroke="#92400E" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M64 76c-20 0-36 12-36 28v4h72v-4c0-16-16-28-36-28z" fill="#FDE68A"/>
+  <rect x="52" y="66" width="24" height="12" rx="6" fill="#FDE68A"/>
+</svg>
+`)}`;
+
 
 /* ─────────── CONSTANTS ─────────── */
 const LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
@@ -305,18 +325,16 @@ export default function AvailableRides() {
         // Attempt Advanced Edge Function Search (Partial Matching & Routing Containment)
         let edgeTrips: any[] | null = null;
         if (pickup && drop) {
-           const { data: response, error: edgeError } = await supabase.functions.invoke('search-trips', {
-             body: {
-               fromLocation: pickup,
-               toLocation: drop,
-               vehiclePreference: vehicleFilter !== "all" ? vehicleFilter : "any",
-               includePartialMatches: true,
-               page: 1,
-               pageSize: 50
-             }
+           const edgeResult = await searchTrips({
+              fromLocation: pickup,
+              toLocation: drop,
+              vehiclePreference: vehicleFilter !== "all" ? vehicleFilter : "any",
+              includePartialMatches: true,
+              page: 1,
+              pageSize: 50
            });
-           if (!edgeError && response?.success) {
-             edgeTrips = response.data;
+           if (edgeResult.success && edgeResult.data) {
+              edgeTrips = edgeResult.data;
            }
         }
 
@@ -896,12 +914,22 @@ export default function AvailableRides() {
 
                         {/* Avatar — Hero logo-ring style */}
                         <div
-                          className={`mt-0.5 h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-sm font-extrabold transition-all ${isSelected
-                              ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-500/20"
-                              : "bg-amber-50 text-amber-700 border border-amber-200/80"
+                          className={`mt-0.5 h-12 w-12 shrink-0 rounded-full overflow-hidden flex items-center justify-center transition-all ${isSelected
+                              ? "bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-orange-500/20"
+                              : "bg-amber-50 border border-amber-200/80"
                             }`}
                         >
-                          {ride.driverPhoto}
+                          <img 
+                            src={ride.driverPhoto || DEFAULT_MALE_AVATAR} 
+                            alt={ride.driverName}
+                            draggable="false"
+                            onContextMenu={(e) => e.preventDefault()}
+                            className="w-full h-full object-cover"
+                            style={{ pointerEvents: "none" }}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = DEFAULT_MALE_AVATAR;
+                            }}
+                          />
                         </div>
 
                         {/* Info */}

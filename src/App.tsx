@@ -21,6 +21,7 @@ import AvailableRides from "./pages/AvailableRides";
 import WaitApproval from "./pages/WaitApproval";
 import RideConfirmed from "./pages/RideConfirmed";
 import RideSummary from "./pages/RideSummary";
+import AuthCallback from "./pages/AuthCallback";
 import BackButton from "@/components/ui/BackButton";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,9 @@ const App = (): JSX.Element => {
             <Route path="/download" element={<Download />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/verify" element={<DocumentVerification />} />
+
+            {/* OAuth callback — Google redirects here after sign-in */}
+            <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* Ride flow — BlaBlaCar style */}
             <Route path="/available-rides" element={<AvailableRides />} />

@@ -38,7 +38,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(user);
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      setProfile(data);
+      
+      // Extract Google profile photo from user_metadata if not already in profile
+      const googleAvatarUrl = user.user_metadata?.avatar_url 
+        || user.user_metadata?.picture 
+        || null;
+      
+      if (data && !data.avatar_url && googleAvatarUrl) {
+        // Save Google photo to profiles table
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          avatar_url: googleAvatarUrl,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+        setProfile({ ...data, avatar_url: googleAvatarUrl });
+      } else {
+        setProfile(data);
+      }
     } else {
       setProfile(null);
     }

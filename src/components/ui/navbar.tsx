@@ -79,7 +79,7 @@ const LogoutConfirmDialog = ({ open, onCancel, onConfirm }: { open: boolean; onC
         </div>
         <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0A0F1C", marginBottom: 8, letterSpacing: "-0.02em" }}>Sign Out?</h3>
         <p style={{ fontSize: "0.85rem", color: "#6B7280", fontWeight: 500, lineHeight: 1.5, marginBottom: 24 }}>
-          Your active ride data will be cleared. You’ll need to log in again to book rides.
+          Your active ride data will be cleared. You'll need to log in again to book rides.
         </p>
         <div style={{ display: "flex", gap: 10 }}>
           <button
@@ -171,7 +171,7 @@ const ActivePip = () => (
       borderRadius: "50%",
       background: `radial-gradient(circle, ${T.amber} 0%, ${T.orange} 100%)`,
       boxShadow: `0 0 8px ${T.orange}, 0 0 16px ${T.orangeGlow}`,
-      marginRight: 6,
+      marginRight: 4,
       animation: "pipPulse 2s ease-in-out infinite",
       flexShrink: 0,
     }}
@@ -179,26 +179,27 @@ const ActivePip = () => (
 );
 
 /* ─────────────────────────────────────────────────────────
-   New Badge (enhanced for better visibility)
+   New Badge
 ───────────────────────────────────────────────────────── */
 const NewBadge = () => (
   <span
     style={{
       display: "inline-flex",
       alignItems: "center",
-      padding: "2px 8px",
+      padding: "2px 6px",
       borderRadius: 999,
       background: `linear-gradient(135deg, ${T.orange}60, ${T.gold}70)`,
       border: `1px solid ${T.orange}`,
-      fontSize: "0.6rem",
+      fontSize: "0.55rem",
       fontWeight: 800,
       letterSpacing: "0.1em",
       color: T.navy,
       textTransform: "uppercase" as const,
       fontFamily: "'DM Sans', sans-serif",
-      marginLeft: 6,
+      marginLeft: 5,
       boxShadow: `0 2px 6px ${T.orange}40`,
       animation: "badgePop 3s ease-in-out infinite",
+      flexShrink: 0,
     }}
   >
     New
@@ -209,7 +210,7 @@ const NewBadge = () => (
    Desktop NavLink
 ───────────────────────────────────────────────────────── */
 interface NavLinkProps {
-  item: typeof NAV_ITEMS[0];
+  item: (typeof NAV_ITEMS_BASE)[0];
   isActive: boolean;
   onClick?: () => void;
 }
@@ -228,22 +229,24 @@ const NavLink = ({ item, isActive, onClick }: NavLinkProps) => {
         position: "relative",
         fontFamily: "'DM Sans', sans-serif",
         fontWeight: isActive ? 700 : 500,
-        fontSize: "0.875rem",
-        letterSpacing: "0.015em",
+        fontSize: "0.82rem",
+        letterSpacing: "0.01em",
         color: isActive ? T.orange : hovered ? T.navyMid : T.muted,
         textDecoration: "none",
-        padding: "6px 4px",
+        padding: "6px 2px",
         transition: "color 0.2s ease",
         display: "inline-flex",
         alignItems: "center",
-        gap: 4,
+        gap: 3,
+        whiteSpace: "nowrap" as const,
+        flexShrink: 0,
       }}
     >
       {isActive && (
         <span
           style={{
             position: "absolute",
-            inset: "0 -8px",
+            inset: "0 -6px",
             borderRadius: 8,
             background: `radial-gradient(ellipse at 50% 100%, ${T.orangeGlow} 0%, transparent 70%)`,
             pointerEvents: "none",
@@ -273,7 +276,7 @@ const NavLink = ({ item, isActive, onClick }: NavLinkProps) => {
 };
 
 /* ─────────────────────────────────────────────────────────
-   Logo (with swapped colors)
+   Logo
 ───────────────────────────────────────────────────────── */
 interface LogoProps {
   small?: boolean;
@@ -309,8 +312,8 @@ const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => {
       <div
         style={{
           position: "relative",
-          width: small ? 28 : 36,
-          height: small ? 28 : 36,
+          width: small ? 28 : 34,
+          height: small ? 28 : 34,
           borderRadius: small ? 8 : 10,
           overflow: "hidden",
           boxShadow: `0 2px 12px ${T.orange}40, 0 0 0 1px ${T.orange}20`,
@@ -320,7 +323,9 @@ const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => {
         <img
           src={xpoolLogo}
           alt="Xpool logo"
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          draggable="false"
+          onContextMenu={(e) => e.preventDefault()}
+          style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
         />
         <div
           style={{
@@ -340,14 +345,15 @@ const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => {
         style={{
           fontFamily: "'Syne', sans-serif",
           fontWeight: 800,
-          fontSize: small ? "1.15rem" : "1.4rem",
+          fontSize: small ? "1.1rem" : "1.3rem",
           letterSpacing: "-0.03em",
           lineHeight: 1,
           userSelect: "none" as const,
+          whiteSpace: "nowrap" as const,
         }}
       >
         {firstName ? (
-          <span style={{ color: mobileStyle ? T.navy : T.navy }}>Hi, {firstName}</span>
+          <span style={{ color: T.navy }}>Hi, {firstName}</span>
         ) : (
           <>
             <span style={{ color: mobileStyle ? T.navy : T.orange }}>X</span>
@@ -360,7 +366,7 @@ const Logo = ({ small = false, mobileStyle = false, onClick }: LogoProps) => {
 };
 
 /* ─────────────────────────────────────────────────────────
-   Support Button – now a clickable tel link
+   Support Button
 ───────────────────────────────────────────────────────── */
 const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
   const [hovered, setHovered] = useState(false);
@@ -373,12 +379,12 @@ const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 7,
-        padding: "9px 20px",
+        gap: 6,
+        padding: "8px 16px",
         borderRadius: 999,
         fontFamily: "'DM Sans', sans-serif",
         fontWeight: 600,
-        fontSize: "0.83rem",
+        fontSize: "0.8rem",
         letterSpacing: "0.01em",
         color: hovered ? T.orange : "#374151",
         background: hovered ? T.ivory : T.white,
@@ -389,12 +395,13 @@ const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         whiteSpace: "nowrap" as const,
         boxShadow: hovered ? `0 0 0 3px ${T.orangeGlow}` : "none",
         textDecoration: "none",
+        flexShrink: 0,
       }}
     >
       <Phone
         style={{
-          width: 14,
-          height: 14,
+          width: 13,
+          height: 13,
           color: T.orange,
           transition: "transform 0.2s ease",
           transform: hovered ? "rotate(-15deg) scale(1.1)" : "rotate(0deg) scale(1)",
@@ -407,7 +414,7 @@ const SupportButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
 };
 
 /* ─────────────────────────────────────────────────────────
-   Download Button – now a Link to /download
+   Download Button
 ───────────────────────────────────────────────────────── */
 const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
   const [hovered, setHovered] = useState(false);
@@ -421,12 +428,12 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 7,
-        padding: "9px 22px",
+        gap: 6,
+        padding: "8px 18px",
         borderRadius: 999,
         fontFamily: "'DM Sans', sans-serif",
         fontWeight: 800,
-        fontSize: "0.83rem",
+        fontSize: "0.8rem",
         letterSpacing: "0.02em",
         color: T.navy,
         background: hovered
@@ -444,6 +451,7 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
         position: "relative",
         overflow: "hidden",
         textDecoration: "none",
+        flexShrink: 0,
       }}
     >
       <span
@@ -460,8 +468,8 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
       />
       <Download
         style={{
-          width: 14,
-          height: 14,
+          width: 13,
+          height: 13,
           color: T.navy,
           flexShrink: 0,
           position: "relative",
@@ -475,7 +483,7 @@ const DownloadButton = ({ fullWidth = false }: { fullWidth?: boolean }) => {
 /* ─────────────────────────────────────────────────────────
    Profile Button
 ───────────────────────────────────────────────────────── */
-const ProfileButton = ({ profile, fullWidth = false }: { profile: any, fullWidth?: boolean }) => {
+const ProfileButton = ({ profile, fullWidth = false }: { profile: any; fullWidth?: boolean }) => {
   const [hovered, setHovered] = useState(false);
   const picture = profile?.avatar_url;
   const initial = profile?.full_name?.charAt(0)?.toUpperCase() || "U";
@@ -488,8 +496,8 @@ const ProfileButton = ({ profile, fullWidth = false }: { profile: any, fullWidth
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        padding: "4px 14px 4px 4px",
+        gap: 7,
+        padding: "4px 12px 4px 4px",
         borderRadius: 999,
         background: hovered ? T.ivory : T.white,
         border: `1.5px solid ${hovered ? T.borderHover : T.border}`,
@@ -497,13 +505,42 @@ const ProfileButton = ({ profile, fullWidth = false }: { profile: any, fullWidth
         textDecoration: "none",
         transition: "all 0.22s ease",
         width: fullWidth ? "100%" : "auto",
-        boxSizing: "border-box",
+        boxSizing: "border-box" as const,
+        flexShrink: 0,
+        whiteSpace: "nowrap" as const,
       }}
     >
-      <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, overflow: "hidden", background: `linear-gradient(135deg, ${T.orange}, ${T.gold})`, display: "flex", alignItems: "center", justifyContent: "center", color: T.white, fontWeight: "bold", fontSize: "0.85rem" }}>
-        {picture ? <img src={picture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initial}
+      <div
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          flexShrink: 0,
+          overflow: "hidden",
+          background: `linear-gradient(135deg, ${T.orange}, ${T.gold})`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: T.white,
+          fontWeight: "bold",
+          fontSize: "0.8rem",
+        }}
+      >
+        {picture ? (
+          <img 
+            src={picture} 
+            alt="Profile" 
+            draggable="false"
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} 
+          />
+        ) : (
+          initial
+        )}
       </div>
-      <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.85rem", color: T.navy }}>Profile</span>
+      <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.82rem", color: T.navy }}>
+        Profile
+      </span>
     </Link>
   );
 };
@@ -511,7 +548,7 @@ const ProfileButton = ({ profile, fullWidth = false }: { profile: any, fullWidth
 /* ─────────────────────────────────────────────────────────
    Logout Button
 ───────────────────────────────────────────────────────── */
-const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void, fullWidth?: boolean }) => {
+const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void; fullWidth?: boolean }) => {
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -522,8 +559,8 @@ const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void, f
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 6,
-        padding: "9px 16px",
+        gap: 5,
+        padding: "8px 14px",
         borderRadius: 999,
         background: hovered ? "rgba(239, 68, 68, 0.05)" : "transparent",
         border: `1.5px solid ${hovered ? "rgba(239, 68, 68, 0.4)" : "transparent"}`,
@@ -533,12 +570,14 @@ const LogoutButton = ({ onLogout, fullWidth = false }: { onLogout: () => void, f
         cursor: "pointer",
         fontFamily: "'DM Sans', sans-serif",
         fontWeight: 600,
-        fontSize: "0.85rem",
+        fontSize: "0.82rem",
         width: fullWidth ? "100%" : "auto",
-        boxSizing: "border-box",
+        boxSizing: "border-box" as const,
+        whiteSpace: "nowrap" as const,
+        flexShrink: 0,
       }}
     >
-      <LogOut style={{ width: 14, height: 14, flexShrink: 0 }} />
+      <LogOut style={{ width: 13, height: 13, flexShrink: 0 }} />
       Logout
     </button>
   );
@@ -570,10 +609,11 @@ const Navbar = () => {
       try {
         const rideSummary = localStorage.getItem("rideSummary");
         setHasActiveRide(!!rideSummary);
-      } catch { setHasActiveRide(false); }
+      } catch {
+        setHasActiveRide(false);
+      }
     };
     checkRide();
-    // Re-check on navigation
     const interval = setInterval(checkRide, 5000);
     return () => clearInterval(interval);
   }, [location.pathname]);
@@ -584,7 +624,6 @@ const Navbar = () => {
   };
 
   const handleLogoutConfirm = async () => {
-    // Clear all ride-related data
     localStorage.removeItem("rideSummary");
     localStorage.removeItem("selectedDriver");
     localStorage.removeItem("vehicleType");
@@ -617,10 +656,14 @@ const Navbar = () => {
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isOpen]);
 
-  useEffect(() => { setIsOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const glowX = 20 + mouseX * 60;
 
@@ -663,21 +706,31 @@ const Navbar = () => {
           }}
         />
 
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 20px" }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              height: scrolled ? 60 : 68,
+              height: scrolled ? 58 : 64,
               transition: "height 0.3s ease",
+              gap: 12,
             }}
           >
             {/* Logo */}
             <Logo />
 
             {/* Desktop Nav */}
-            <div className="hidden md:flex" style={{ alignItems: "center", gap: 28 }}>
+            <div
+              className="hidden md:flex"
+              style={{
+                alignItems: "center",
+                gap: 20,
+                flex: 1,
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+            >
               {NAV_ITEMS.map((item) => (
                 <NavLink
                   key={item.label}
@@ -688,7 +741,14 @@ const Navbar = () => {
             </div>
 
             {/* Desktop CTAs */}
-            <div className="hidden md:flex" style={{ alignItems: "center", gap: 10 }}>
+            <div
+              className="hidden md:flex"
+              style={{
+                alignItems: "center",
+                gap: 8,
+                flexShrink: 0,
+              }}
+            >
               {/* Active Ride Indicator */}
               {hasActiveRide && profile && (
                 <Link
@@ -696,8 +756,8 @@ const Navbar = () => {
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 6,
-                    padding: "6px 14px",
+                    gap: 5,
+                    padding: "6px 12px",
                     borderRadius: 999,
                     background: "rgba(16,185,129,0.08)",
                     border: "1.5px solid rgba(16,185,129,0.3)",
@@ -707,10 +767,21 @@ const Navbar = () => {
                     fontWeight: 700,
                     fontSize: "0.78rem",
                     transition: "all 0.2s ease",
+                    whiteSpace: "nowrap" as const,
+                    flexShrink: 0,
                   }}
                 >
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pipPulse 2s ease-in-out infinite" }} />
-                  <Car style={{ width: 14, height: 14 }} />
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "#10B981",
+                      animation: "pipPulse 2s ease-in-out infinite",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Car style={{ width: 13, height: 13, flexShrink: 0 }} />
                   Active Ride
                 </Link>
               )}
@@ -737,8 +808,8 @@ const Navbar = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 42,
-                height: 42,
+                width: 40,
+                height: 40,
                 borderRadius: 12,
                 border: `1.5px solid ${isOpen ? T.orange + "70" : T.border}`,
                 background: isOpen
@@ -752,10 +823,7 @@ const Navbar = () => {
                 flexShrink: 0,
               }}
             >
-              {isOpen
-                ? <X style={{ width: 18, height: 18 }} />
-                : <Menu style={{ width: 18, height: 18 }} />
-              }
+              {isOpen ? <X style={{ width: 17, height: 17 }} /> : <Menu style={{ width: 17, height: 17 }} />}
             </button>
           </div>
         </div>
@@ -793,8 +861,7 @@ const Navbar = () => {
           zIndex: 999,
           width: "min(340px, 92vw)",
           background: T.white,
-          boxShadow:
-            "-12px 0 60px rgba(10,15,28,0.22), -1px 0 0 rgba(255,149,0,0.1)",
+          boxShadow: "-12px 0 60px rgba(10,15,28,0.22), -1px 0 0 rgba(255,149,0,0.1)",
           transform: isOpen ? "translateX(0)" : "translateX(105%)",
           transition: "transform 0.4s cubic-bezier(0.4,0,0.2,1)",
           display: "flex",
@@ -1008,7 +1075,15 @@ const Navbar = () => {
                     marginBottom: 4,
                   }}
                 >
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "pipPulse 2s ease-in-out infinite" }} />
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "#10B981",
+                      animation: "pipPulse 2s ease-in-out infinite",
+                    }}
+                  />
                   <Car style={{ width: 16, height: 16 }} />
                   View Active Ride
                 </Link>
