@@ -22,7 +22,12 @@ import WaitApproval from "./pages/WaitApproval";
 import RideConfirmed from "./pages/RideConfirmed";
 import RideSummary from "./pages/RideSummary";
 import AuthCallback from "./pages/AuthCallback";
+import Legal from "./pages/Legal";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+
 import BackButton from "@/components/ui/BackButton";
+import Footer from "@/components/sections/Footer";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +62,11 @@ const App = (): JSX.Element => {
             <Route path="/ride-confirmed" element={<RideConfirmed />} />
             <Route path="/ride-summary" element={<RideSummary />} />
 
+            {/* External Links */}
+            <Route path="/legal" element={<Legal />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+
             {/* Fallback */}
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -66,6 +76,7 @@ const App = (): JSX.Element => {
           >
             <Chatbot />
           </div>
+          <Footer />
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
