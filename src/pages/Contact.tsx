@@ -597,6 +597,36 @@ const Contact: FC = () => {
             </div>
           </motion.div>
 
+          {/* ── Cancellation & Refund Policy ── */}
+          <motion.div variants={!prefersReducedMotion ? fadeUp : {}} className="mb-20 max-w-4xl mx-auto bg-white/80 backdrop-blur-sm border border-amber-200/60 rounded-2xl p-6 sm:p-10 shadow-sm text-left">
+            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-4 font-syne border-b border-gray-200 pb-4">
+              Cancellation & Refund Policy
+            </h2>
+            <p className="text-sm text-gray-500 font-semibold mb-6 font-dmsans">
+              Last updated on 08-04-2026 08:47:41
+            </p>
+            
+            <div className="space-y-4 text-sm sm:text-base text-gray-600 font-dmsans leading-relaxed">
+              <p>
+                ABISHEK believes in helping its customers as far as possible, and has therefore a liberal cancellation policy. Under this policy:
+              </p>
+              <ul className="list-disc pl-5 space-y-4 mt-4">
+                <li>
+                  Cancellations will be considered only if the request is made immediately after placing the order. However, the cancellation request may not be entertained if the orders have been communicated to the vendors/merchants and they have initiated the process of shipping them.
+                </li>
+                <li>
+                  ABISHEK does not accept cancellation requests for perishable items like flowers, eatables etc. However, refund/replacement can be made if the customer establishes that the quality of product delivered is not good.
+                </li>
+                <li>
+                  In case of receipt of damaged or defective items please report the same to our Customer Service team. The request will, however, be entertained once the merchant has checked and determined the same at his own end. This should be reported within 2 Days of receipt of the products. In case you feel that the product received is not as shown on the site or as per your expectations, you must bring it to the notice of our customer service within 2 Days of receiving the product. The Customer Service Team after looking into your complaint will take an appropriate decision.
+                </li>
+                <li>
+                  In case of complaints regarding products that come with a warranty from manufacturers, please refer the issue to them. In case of any Refunds approved by the ABISHEK, it’ll take 3-5 Days for the refund to be processed to the end customer.
+                </li>
+              </ul>
+            </div>
+          </motion.div>
+
           {/* ── Final CTA ── */}
           <motion.div variants={!prefersReducedMotion ? fadeUp : {}}>
             <div className="relative bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 rounded-3xl p-12 text-center overflow-hidden">
