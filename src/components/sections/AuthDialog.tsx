@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
-import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/supabase/edgeFunctions";
+import { sendPhoneOtp } from "@/lib/supabase/edgeFunctions";
 import xpoolLogo from "@/assets/xpool-logo.jpeg";
 import {
   Dialog,
@@ -329,10 +329,9 @@ function useAuth() {
     setLoading(true);
     setError(null);
     try {
-      // Try edge function verification first
-      const edgeResult = await verifyPhoneOtp(phone, otp);
-      if (edgeResult.success) return true;
-      // Fallback to direct Supabase verify
+      // Always verify through Supabase to guarantee a client session is established.
+      // The edge function alone does NOT set the local Supabase session, so
+      // calling only it causes getUser() to return null after "success".
       const { error: e } = await supabase.auth.verifyOtp({
         phone: `+91${phone}`,
         token: otp,
@@ -535,11 +534,19 @@ const OtpStep = ({
   error: string | null;
   otpSentAt: number | null;
 }) => {
-  // Auto-submit when OTP is complete
+  // Auto-submit when OTP is complete — use a ref guard so we only fire once
+  // per complete OTP entry. Without the guard, when `loading` flips false after
+  // verification the effect re-runs and triggers a second verify call.
+  const hasAutoSubmitted = useRef(false);
   useEffect(() => {
-    if (otp.length === OTP_LENGTH && !loading) {
+    if (otp.length === OTP_LENGTH && !loading && !hasAutoSubmitted.current) {
+      hasAutoSubmitted.current = true;
       const t = setTimeout(() => onVerify(), 350);
       return () => clearTimeout(t);
+    }
+    // Reset guard when user clears/changes OTP
+    if (otp.length < OTP_LENGTH) {
+      hasAutoSubmitted.current = false;
     }
   }, [otp, loading]);
 

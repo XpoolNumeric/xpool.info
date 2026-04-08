@@ -20,7 +20,7 @@ import {
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import { supabase } from "@/lib/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
-import { validateTripStart, verifyRideOtp, completePassengerDrop, verifyCashPayment } from "@/lib/supabase/edgeFunctions";
+import { validateTripStart, completePassengerDrop, verifyCashPayment } from "@/lib/supabase/edgeFunctions";
 import { PiMotorcycleBold, PiCarProfileBold, PiVanBold } from "react-icons/pi";
 import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
 
@@ -97,23 +97,38 @@ const RideSummary = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [rideOtpInput, setRideOtpInput] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
+  const [otpGenerated, setOtpGenerated] = useState(false);
 
   // Get booking request ID from URL or localStorage
   const searchParamsRide = new URLSearchParams(window.location.search);
   const bookingRequestId = searchParamsRide.get('request_id') || '';
+  const [tripId, setTripId] = useState('');
+
+  // Fetch the trip_id from the booking request
+  useEffect(() => {
+    if (!bookingRequestId) return;
+    const fetchTripData = async () => {
+      const { data } = await supabase
+        .from('booking_requests')
+        .select('trip_id, otp_code')
+        .eq('id', bookingRequestId)
+        .single();
+      if (data?.trip_id) setTripId(data.trip_id);
+      if (data?.otp_code) setOtpGenerated(true);
+    };
+    fetchTripData();
+  }, [bookingRequestId]);
 
   // Validate & Start trip via edge function
   const handleStartTrip = async () => {
     if (actionLoading || !bookingRequestId) return;
     setActionLoading(true);
     try {
-      const tripId = ride ? `${ride.pickup}-${ride.drop}` : '';
       const result = await validateTripStart(bookingRequestId, tripId);
       if (result.success) {
         setTripStarted(true);
       } else {
         console.warn('Trip start validation failed:', result.error);
-        // Proceed anyway for UX
         setTripStarted(true);
       }
     } catch (err) {
@@ -124,17 +139,69 @@ const RideSummary = () => {
     }
   };
 
-  // Verify ride OTP at pickup
+  // Generate OTP for Passenger
+  const handleGenerateRideOtp = async () => {
+    if (actionLoading || !bookingRequestId) return;
+    setActionLoading(true);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      const session = (await supabase.auth.getSession()).data.session;
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-ride-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ booking_request_id: bookingRequestId }),
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        setOtpGenerated(true);
+        alert('OTP generated! Ask the passenger for their PIN.');
+      } else {
+        alert(result.message || result.error || 'Failed to generate OTP.');
+      }
+    } catch (err) {
+      console.error('OTP generate error:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Verify ride OTP at pickup — call edge function directly with correct params
   const handleVerifyRideOtp = async () => {
     if (!rideOtpInput || rideOtpInput.length < 4 || !bookingRequestId) return;
     setActionLoading(true);
     try {
-      const result = await verifyRideOtp(bookingRequestId, rideOtpInput);
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      const session = (await supabase.auth.getSession()).data.session;
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-ride-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          booking_request_id: bookingRequestId,
+          otp_code: rideOtpInput,
+        }),
+      });
+
+      const result = await res.json();
+      console.log('[RideSummary] verify-ride-otp response:', result);
+
       if (result.success) {
         setOtpVerified(true);
         handleStartTrip();
       } else {
-        alert('Invalid OTP. Please check and try again.');
+        alert(result.message || 'Invalid OTP. Please check and try again.');
       }
     } catch (err) {
       console.error('OTP verify error:', err);
@@ -461,7 +528,37 @@ const RideSummary = () => {
             </button>
 
             {/* Trip Lifecycle Actions */}
-            {!tripStarted && !tripCompleted && (
+            {!tripStarted && !tripCompleted && !otpGenerated && (
+              <button
+                onClick={handleGenerateRideOtp}
+                disabled={actionLoading}
+                className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-amber-500 text-white shadow-[0_8px_30px_rgba(245,158,11,0.35)] hover:bg-amber-600 disabled:opacity-50"
+              >
+                {actionLoading ? 'Generating...' : 'Generate Passenger PIN'}
+              </button>
+            )}
+
+            {!tripStarted && !tripCompleted && otpGenerated && !otpVerified && (
+              <div className="space-y-3 bg-amber-50/50 p-4 rounded-2xl border border-amber-200/50">
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={rideOtpInput}
+                  onChange={(e) => setRideOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="Enter 4-digit PIN from passenger"
+                  className="w-full text-center tracking-widest text-xl font-bold h-14 rounded-xl border border-amber-200 bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <button
+                  onClick={handleVerifyRideOtp}
+                  disabled={actionLoading || rideOtpInput.length < 4}
+                  className="w-full h-14 rounded-xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-amber-600 text-white shadow-md hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {actionLoading ? 'Verifying...' : 'Verify PIN'}
+                </button>
+              </div>
+            )}
+
+            {!tripStarted && !tripCompleted && otpVerified && (
               <button
                 onClick={handleStartTrip}
                 disabled={actionLoading}

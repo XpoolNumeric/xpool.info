@@ -25,7 +25,7 @@ import AutoRickshawIcon from "@/components/icons/AutoRickshawIcon";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
 import { supabase } from "@/lib/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
-import { searchTrips, bookTrip, calculateFareRemote, notifyDriverBooking } from "@/lib/supabase/edgeFunctions";
+import { bookTrip, calculateFareRemote, notifyDriverBooking } from "@/lib/supabase/edgeFunctions";
 
 /* ─────────────────────────────────────────────────────────
    Default Male Avatar SVG (inline data URI)
@@ -318,143 +318,143 @@ export default function AvailableRides() {
   const [allRides, setAllRides] = useState<DriverRide[]>([]);
   const [isLoadingRides, setIsLoadingRides] = useState(true);
 
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
   useEffect(() => {
+    // Don't fetch until we have pickup/drop from localStorage
+    if (!pickup || !drop) return;
+
     const fetchRides = async () => {
       setIsLoadingRides(true);
+      setAllRides([]);
+
       try {
-        // Attempt Advanced Edge Function Search (Partial Matching & Routing Containment)
-        let edgeTrips: any[] | null = null;
-        if (pickup && drop) {
-           const edgeResult = await searchTrips({
-              fromLocation: pickup,
-              toLocation: drop,
-              vehiclePreference: vehicleFilter !== "all" ? vehicleFilter : "any",
-              includePartialMatches: true,
-              page: 1,
-              pageSize: 50
-           });
-           if (edgeResult.success && edgeResult.data) {
-              edgeTrips = edgeResult.data;
-           }
+        // Today's date in YYYY-MM-DD format for filtering
+        const today = new Date().toISOString().split("T")[0];
+
+        // ═══════════════════════════════════════════════════════════════
+        // Call search-trips edge function with today's date
+        // ═══════════════════════════════════════════════════════════════
+        const edgeUrl = `${SUPABASE_URL}/functions/v1/search-trips`;
+        const edgeRes = await fetch(edgeUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            fromLocation: pickup,
+            toLocation: drop,
+            travelDate: today,
+            vehiclePreference: vehicleFilter !== "all" ? vehicleFilter : "any",
+            includePartialMatches: true,
+            page: 1,
+            pageSize: 50,
+          }),
+        });
+
+        const edgeData = await edgeRes.json();
+        console.log("[AvailableRides] Edge function response:", edgeData);
+
+        if (!edgeData?.success) {
+          console.warn("[AvailableRides] Edge function returned error:", edgeData?.error);
+          setAllRides([]);
+          return;
         }
 
-        // If edge function succeeds, map that data natively
-        if (edgeTrips && edgeTrips.length > 0) {
-           const formattedRides: DriverRide[] = edgeTrips.map((trip: any) => {
-              const vType = (trip.vehicle_type || 'car') as VehicleId;
-              const fareResult = calculateTieredFare(distanceKm || 15, Math.max(10, durationMin) || 30, vType, passengers || 1);
-              
-              const parsedFeatures: string[] = [];
-              if (trip.ladies_only) parsedFeatures.push("Ladies Only");
-              if (trip.no_smoking) parsedFeatures.push("No Smoking");
-              if (trip.pet_friendly) parsedFeatures.push("Pet Friendly");
-              if (vType === 'car' || vType === 'xl') parsedFeatures.push("AC");
+        const trips: any[] = Array.isArray(edgeData.data) ? edgeData.data : [];
 
-              return {
-                 id: trip.id,
-                 driverName: trip.driver?.name || "Driver",
-                 driverRating: trip.driver?.rating || 4.8,
-                 driverRides: trip.driver?.trips_completed || 10,
-                 driverPhone: "+91 00000 00000", // Usually private until booked
-                 driverPhoto: trip.driver?.avatar || "",
-                 vehicleType: vType,
-                 vehicleName: trip.vehicle_name || "Verified Vehicle",
-                 vehicleNumber: trip.vehicle_number || "TN XX 0000",
-                 vehicleColor: trip.vehicle_color || "Black",
-                 departureTime: trip.formatted_time || trip.travel_time?.slice(0,5) || "Next available",
-                 availableSeats: trip.available_seats || 4,
-                 pricePerSeat: trip.price_per_seat || fareResult.fare.perPerson,
-                 savingsVsTaxiAmount: fareResult.savings.vsTaxiAmount,
-                 isVerified: true,
-                 features: parsedFeatures
-              };
-           }).filter((r: DriverRide) => r.availableSeats >= passengers);
+        // Also filter client-side: only trips with travel_date >= today
+        const todayTrips = trips.filter((t: any) => {
+          if (!t.travel_date) return true; // include if no date (edge fn handles it)
+          return t.travel_date >= today;
+        });
 
-           setAllRides(formattedRides);
-           setIsLoadingRides(false);
-           return;
+        if (todayTrips.length === 0) {
+          setAllRides([]);
+          return;
         }
 
-        // --- FALLBACK TO LOCAL FETCHING IF EDGE FUNCTION FAILS/EMPTY ---
-        const { data: flatTrips, error } = await supabase.from('trips').select('*').eq('status', 'active');
-        if (error) throw error;
-        
-        if (!flatTrips || flatTrips.length === 0) {
-           setAllRides([]);
-           setIsLoadingRides(false);
-           return;
-        }
-        
-        const userIds = [...new Set(flatTrips.map((t: any) => t.user_id))].filter(Boolean);
-        const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);
-        const profileMap = Object.fromEntries(profiles?.map((p: any) => [p.id, p]) || []);
+        // ═══════════════════════════════════════════════════════════════
+        // ENRICH: Fetch driver profiles via user_id
+        // The RPC doesn't always return driver_name reliably, so we
+        // separately fetch profiles to get real names & photos
+        // ═══════════════════════════════════════════════════════════════
+        const userIds = [...new Set(todayTrips.map((t: any) => t.user_id).filter(Boolean))];
+        let profileMap: Record<string, any> = {};
 
-        const formattedRides: DriverRide[] = flatTrips.map((trip: any) => {
-          const p = profileMap[trip.user_id] || {};
-          const vType = (trip.vehicle_type as VehicleId) || 'car';
-          
-          const fareResult = calculateTieredFare(distanceKm || 15, Math.max(10, durationMin) || 30, vType, passengers || 1);
-          
-          let depTime = "Next available";
-          if (trip.travel_time) {
-            depTime = trip.travel_time.slice(0,5);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, full_name, avatar_url, phone")
+            .in("id", userIds);
+
+          if (profiles) {
+            profileMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]));
           }
-          
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // MAP trips → DriverRide[] with profile data merged
+        // ═══════════════════════════════════════════════════════════════
+        const formattedRides: DriverRide[] = todayTrips.map((trip: any) => {
+          const vType = (trip.vehicle_type || "car") as VehicleId;
+          const fareResult = calculateTieredFare(
+            distanceKm || 15,
+            Math.max(10, durationMin || 30),
+            vType,
+            passengers || 1
+          );
+
+          // Features from trip flags
           const parsedFeatures: string[] = [];
           if (trip.ladies_only) parsedFeatures.push("Ladies Only");
           if (trip.no_smoking) parsedFeatures.push("No Smoking");
           if (trip.pet_friendly) parsedFeatures.push("Pet Friendly");
-          if (vType === 'car' || vType === 'xl') parsedFeatures.push("AC");
+          if (vType === "car" || vType === "xl") parsedFeatures.push("AC");
+
+          // Driver data: profile from profiles table, fallback to edge fn fields
+          const profile = profileMap[trip.user_id] || {};
+          const driverObj = trip.driver || {};
 
           return {
             id: trip.id,
-            driverName: p.full_name || "Driver",
-            driverRating: p.rating || 4.8,
-            driverRides: p.total_rides || 10,
-            driverPhone: p.phone || "",
-            driverPhoto: p.avatar_url || "",
+            driverName:
+              profile.full_name || trip.driver_name || driverObj.name || "Driver",
+            driverRating:
+              trip.driver_rating ?? driverObj.rating ?? 0,
+            driverRides:
+              trip.driver_trips_count ?? driverObj.trips_completed ?? 0,
+            driverPhone: profile.phone || "",
+            driverPhoto:
+              profile.avatar_url || trip.driver_avatar || driverObj.avatar || "",
             vehicleType: vType,
-            vehicleName: trip.vehicle_name || "Verified Vehicle",
-            vehicleNumber: trip.vehicle_number || "TN XX 0000",
-            vehicleColor: trip.vehicle_color || "Black",
-            departureTime: depTime,
-            availableSeats: trip.available_seats || 4,
-            pricePerSeat: trip.price_per_seat || fareResult.fare.perPerson,
+            vehicleName: vType === "bike" ? "Bike" : "Car",
+            vehicleNumber: "",
+            vehicleColor: "",
+            departureTime: trip.formatted_time || trip.travel_time?.slice(0, 5) || "N/A",
+            availableSeats: trip.available_seats ?? 0,
+            pricePerSeat: Number(trip.price_per_seat) || fareResult.fare.perPerson,
             savingsVsTaxiAmount: fareResult.savings.vsTaxiAmount,
-            isVerified: true,
-            features: parsedFeatures
+            isVerified: !!(profile.full_name || trip.driver_name || driverObj.name),
+            features: parsedFeatures,
           };
-        }).filter((r: DriverRide) => r.availableSeats >= passengers);
+        }).filter((r: DriverRide) => r.availableSeats >= (passengers || 1));
 
-        let matchedRides = formattedRides;
-        if (pickup && drop) {
-          const pickupCity = pickup.split(',')[0].trim().toLowerCase();
-          const dropCity = drop.split(',')[0].trim().toLowerCase();
-          
-          const poolMatchedRides = formattedRides.filter((r) => {
-             const tripSource = flatTrips.find((t: any) => t.id === r.id)?.from_location?.toLowerCase() || '';
-             const tripDest = flatTrips.find((t: any) => t.id === r.id)?.to_location?.toLowerCase() || '';
-             
-             const matchesOrigin = tripSource.includes(pickupCity);
-             const matchesDest = tripDest.includes(dropCity);
-             
-             return matchesOrigin || matchesDest;
-          });
-
-          matchedRides = poolMatchedRides;
-        }
-        
-        setAllRides(matchedRides);
+        setAllRides(formattedRides);
       } catch (err) {
-        console.error("Error fetching rides:", err);
-        setAllRides([]); // Fallback to empty if backend fails
+        console.error("[AvailableRides] Error fetching rides:", err);
+        setAllRides([]);
       } finally {
         setIsLoadingRides(false);
       }
     };
 
     fetchRides();
-  }, [distanceKm, durationMin, passengers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickup, drop, passengers, distanceKm, durationMin]);
 
   const filteredRides = useMemo(() => {
     let rides = [...allRides];
@@ -873,8 +873,8 @@ export default function AvailableRides() {
                     <AlertCircle className="w-9 h-9 text-amber-400" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-base font-bold text-gray-800">No rides match your filters</p>
-                    <p className="text-xs font-medium text-gray-400">Try adjusting your vehicle type or search a different route</p>
+                    <p className="text-base font-bold text-gray-800">No rides available for this route</p>
+                    <p className="text-xs font-medium text-gray-400">No drivers have published trips matching your search. Try a different route or check back later.</p>
                   </div>
                   <div className="flex gap-2 justify-center pt-2">
                     <button
@@ -950,10 +950,10 @@ export default function AvailableRides() {
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="inline-flex items-center gap-0.5 bg-amber-50 border border-amber-200/60 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
                               <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                              {ride.driverRating}
+                              {ride.driverRating > 0 ? ride.driverRating : "New"}
                             </span>
                             <span className="text-[10px] font-semibold text-gray-400">
-                              {ride.driverRides.toLocaleString()} rides
+                              {ride.driverRides > 0 ? `${ride.driverRides.toLocaleString()} rides` : "New driver"}
                             </span>
                           </div>
 
@@ -964,8 +964,12 @@ export default function AvailableRides() {
                               <Icon className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-bold text-gray-700 truncate">{ride.vehicleName} · {ride.vehicleColor}</p>
-                              <p className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-widest">{ride.vehicleNumber}</p>
+                              <p className="text-[11px] font-bold text-gray-700 truncate">
+                                {ride.vehicleName}{ride.vehicleColor ? ` · ${ride.vehicleColor}` : ""}
+                              </p>
+                              {ride.vehicleNumber && (
+                                <p className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-widest">{ride.vehicleNumber}</p>
+                              )}
                             </div>
                           </div>
 

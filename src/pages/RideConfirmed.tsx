@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
-import { generateRideOtp, createCashfreeOrder, verifyCashPayment } from "@/lib/supabase/edgeFunctions";
+import { createCashfreeOrder, verifyCashPayment, generateRideOtp } from "@/lib/supabase/edgeFunctions";
 import { motion, Variants } from "framer-motion";
 import { GoogleMap, useLoadScript, Polyline, MarkerF } from "@react-google-maps/api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,8 @@ import {
   Users,
   ChevronLeft,
   Zap,
+  CreditCard,
+  Banknote,
 } from "lucide-react";
 import { XCircle } from "lucide-react";
 import { calculateTieredFare, formatDuration } from "@/utils/fareCalculator";
@@ -199,7 +201,7 @@ const OTPDisplayCard = ({ otpCode }: { otpCode: string | null }) => {
              <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
                <Zap className="w-3.5 h-3.5 text-amber-500" />
              </div>
-             <span className="text-[11px] font-black text-amber-500 uppercase tracking-[0.2em] drop-shadow-sm">Ride PIN</span>
+             <span className="text-[11px] font-black text-amber-500 uppercase tracking-[0.2em] drop-shadow-sm">Ride OTP</span>
           </div>
           <p className="text-gray-400 text-[11px] font-bold">Share with driver</p>
        </div>
@@ -468,10 +470,10 @@ const FareDetailsCard = ({
         </div>
 
         <div className="flex flex-col items-end">
-          <span className="text-[11px] text-gray-400 font-bold tracking-widest uppercase mb-1 drop-shadow-sm">Total Pooled Fare</span>
+          <span className="text-[11px] text-gray-400 font-bold tracking-widest uppercase mb-1 drop-shadow-sm">Your Total Fare</span>
           <div className="flex items-baseline gap-1">
             <span className="text-[18px] text-gray-400 font-bold -mt-2">₹</span>
-            <span className="text-[48px] leading-none font-black text-white font-syne tracking-tight">{fareInfo.fare.total}</span>
+            <span className="text-[48px] leading-none font-black text-white font-syne tracking-tight">{(fareInfo.fare.perPerson * passengers).toFixed(0)}</span>
           </div>
           <div className="mt-2 text-right">
             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] font-extrabold text-gray-300">
@@ -587,6 +589,7 @@ const RideConfirmed = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
+  const [bookingDetails, setBookingDetails] = useState<{trip_id: string; passenger_id: string; driver_id: string} | null>(null);
 
   // Helper: Create payment order via Cashfree edge function
   const handleCreatePayment = async () => {
@@ -597,16 +600,16 @@ const RideConfirmed = () => {
       const rideData = JSON.parse(localStorage.getItem("rideSummary") || "{}");
       const result = await createCashfreeOrder({
         bookingRequestId: requestId,
-        amount: priceDetails.fare.total,
+        amount: priceDetails.fare.perPerson * (ride?.passengers || 1),
         customerName: driverData.driverName || 'Passenger',
         customerPhone: driverData.driverPhone || '',
         customerEmail: '',
       });
       if (result.success && result.data?.payment_link) {
-        window.location.href = result.data.payment_link;
+        window.location.href = result.data.payment_link || result.data.payment_url;
       } else {
-        console.warn('Payment order failed:', result.error);
-        setPaymentDone(true); // Mark as attempted
+        console.warn('Payment order failed:', result.error || result.message);
+        alert('Failed to redirect to payment gateway: ' + (result.error || result.message || 'Unknown error'));
       }
     } catch (err) {
       console.error('Payment error:', err);
@@ -620,7 +623,7 @@ const RideConfirmed = () => {
     if (!requestId) return;
     setPaymentLoading(true);
     try {
-      const result = await verifyCashPayment(requestId, priceDetails.fare.total);
+      const result = await verifyCashPayment(requestId, priceDetails.fare.perPerson * (ride?.passengers || 1));
       if (result.success) {
         setPaymentDone(true);
       }
@@ -630,38 +633,109 @@ const RideConfirmed = () => {
       setPaymentLoading(false);
     }
   };
+
+
   const [searchParams] = useSearchParams();
   const requestId = searchParams.get("request_id");
   const [otpCode, setOtpCode] = useState<string | null>(null);
 
+  // ─── Fetch & listen for Ride OTP ───
+  // The DRIVER calls generate-ride-otp from their side →
+  // it sets otp_code on each booking_requests row +
+  // sends a broadcast event to this passenger's channel.
+  // Passenger side just READS the OTP from DB and real-time channels.
   useEffect(() => {
-    let channel: any;
+    const channels: any[] = [];
 
     if (requestId && !requestId.includes("mock")) {
+      // 1. Generate & Fetch OTP from edge function and DB
       const fetchOtp = async () => {
-         // Try generating OTP via edge function first
-         const edgeResult = await generateRideOtp(requestId!);
-         if (edgeResult.success && edgeResult.data?.otp_code) {
-           setOtpCode(edgeResult.data.otp_code);
-           return;
-         }
-         // Fallback: fetch from DB
-         const { data } = await supabase.from('booking_requests').select('otp_code').eq('id', requestId).single();
-         if (data?.otp_code) setOtpCode(data.otp_code);
-       };
-       fetchOtp();
+        let passengerId: string | null = null;
+        try {
+          // Tell backend the driver accepted: generate OTP for this booking!
+          const edgeResult = await generateRideOtp(requestId);
+          if (edgeResult.success && edgeResult.data?.otp_code) {
+            setOtpCode(edgeResult.data.otp_code);
+          }
 
-      channel = supabase.channel(`booking_${requestId}`)
-         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'booking_requests', filter: `id=eq.${requestId}` }, (payload) => {
-            if (payload.new.otp_code) setOtpCode(payload.new.otp_code);
-         }).subscribe();
+          // Fetch the booking row to get passenger_id and fallback otp_code
+          const { data, error } = await supabase
+            .from("booking_requests")
+            .select("otp_code, passenger_id, trip_id, payment_status, driver_id")
+            .eq("id", requestId)
+            .single();
+
+          if (error) {
+            console.error("Error fetching booking row:", error);
+            return;
+          }
+
+          if (data) {
+            passengerId = data.passenger_id;
+            setBookingDetails({
+              trip_id: data.trip_id,
+              passenger_id: data.passenger_id,
+              driver_id: data.driver_id
+            });
+            if (!edgeResult.success && data.otp_code) {
+              setOtpCode(data.otp_code);
+            }
+            if (data.payment_status === 'paid' || data.payment_status === 'completed') {
+              setPaymentDone(true);
+            }
+          }
+        } catch (err) {
+          console.error("Error generating/fetching OTP:", err);
+        }
+
+        // 2. Subscribe to postgres changes on this booking row
+        // When the driver generates OTP, the row updates with otp_code
+        const pgChannel = supabase
+          .channel(`booking_otp_${requestId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "booking_requests",
+              filter: `id=eq.${requestId}`,
+            },
+            (payload: any) => {
+              if (payload.new?.otp_code) {
+                setOtpCode(payload.new.otp_code);
+              }
+              const newStatus = payload.new?.payment_status;
+              if (newStatus === 'paid' || newStatus === 'completed') {
+                setPaymentDone(true);
+              }
+            }
+          )
+          .subscribe();
+        channels.push(pgChannel);
+
+        // 3. Subscribe to real-time broadcast for instant OTP
+        // The edge fn broadcasts to channel `passenger_${passenger_id}`
+        if (passengerId) {
+          const broadcastChannel = supabase
+            .channel(`passenger_${passengerId}`)
+            .on("broadcast", { event: "ride_otp" }, (payload: any) => {
+              if (payload.payload?.otp && payload.payload?.booking_id === requestId) {
+                setOtpCode(payload.payload.otp);
+              }
+            })
+            .subscribe();
+          channels.push(broadcastChannel);
+        }
+      };
+
+      fetchOtp();
     } else {
-      // Mock OTP for testing fallback states so UI doesn't look broken
+      // Mock OTP for testing so UI doesn't look broken
       setTimeout(() => setOtpCode(Math.floor(1000 + Math.random() * 9000).toString()), 1000);
     }
 
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      channels.forEach((ch) => supabase.removeChannel(ch));
     };
   }, [requestId]);
 
@@ -681,6 +755,39 @@ const RideConfirmed = () => {
   const handleCallDriver = useCallback(() => {
     window.location.href = `tel:${driver.phone}`;
   }, [driver.phone]);
+
+  // Helper: Record payment in DB when payment is done
+  useEffect(() => {
+    if (paymentDone && bookingDetails && requestId && priceDetails) {
+      const recordPayment = async () => {
+        try {
+          // Double check if already inserted (prevents dupes if cashfree webhook already did it, etc.)
+          const { data: existing } = await supabase
+            .from("ride_payments")
+            .select("id")
+            .eq("booking_id", requestId)
+            .maybeSingle();
+
+          if (!existing) {
+            const total = priceDetails.fare.perPerson * (ride?.passengers || 1);
+            await supabase.from("ride_payments").insert({
+              trip_id: bookingDetails.trip_id,
+              booking_id: requestId,
+              passenger_id: bookingDetails.passenger_id,
+              driver_id: bookingDetails.driver_id,
+              total_amount: total,
+              commission_amount: total * 0.15,
+              driver_amount: total * 0.85,
+              payment_status: "completed"
+            });
+          }
+        } catch (err) {
+          console.error("Failed to record ride payment:", err);
+        }
+      };
+      recordPayment();
+    }
+  }, [paymentDone, bookingDetails, requestId, priceDetails, ride?.passengers]);
 
   const isLoading = vehicleLoading || rideLoading;
 
@@ -746,6 +853,34 @@ const RideConfirmed = () => {
               <DriverCard driver={driver} onCall={handleCallDriver} />
 
               <motion.div variants={fadeUp} className="pt-4 space-y-3">
+                {/* ─── PAYMENT SECTION ─── */}
+                {!paymentDone ? (
+                  <>
+                    <button
+                      onClick={handleCreatePayment}
+                      disabled={paymentLoading}
+                      className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-blue-600 to-indigo-600 bg-[length:200%_auto] hover:bg-right text-white shadow-[0_8px_30px_rgba(79,70,229,0.35)] disabled:opacity-50"
+                    >
+                      <CreditCard className="h-5 w-5" />
+                      {paymentLoading ? "Processing..." : "Pay Now Online"}
+                    </button>
+                    <button
+                      onClick={handleCashPayment}
+                      disabled={paymentLoading}
+                      className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-white/60 text-gray-700 border border-gray-200/50 hover:bg-white/90 shadow-sm disabled:opacity-50"
+                    >
+                      <Banknote className="h-5 w-5" />
+                      Pay with Cash to Driver
+                    </button>
+                    <div className="h-px w-full bg-gray-200 my-4" />
+                  </>
+                ) : (
+                  <div className="w-full h-14 rounded-2xl flex items-center justify-center gap-2 bg-green-50 text-green-700 border border-green-200 font-bold mb-4 shadow-sm">
+                    <CheckCircle2 className="h-5 w-5" />
+                    Payment Method Confirmed
+                  </div>
+                )}
+
                 <button
                   onClick={() => navigate("/ride-summary")}
                   className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 bg-[length:200%_auto] hover:bg-right text-white shadow-[0_8px_30px_rgba(245,158,11,0.35)]"
