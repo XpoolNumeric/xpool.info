@@ -236,11 +236,8 @@ export async function completePassengerDrop(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface CreatePaymentOrderParams {
-  bookingRequestId: string;
-  amount: number;
-  customerName: string;
-  customerPhone: string;
-  customerEmail?: string;
+  bookingId?: string;
+  paymentId?: string;
 }
 
 /**
@@ -248,23 +245,24 @@ export interface CreatePaymentOrderParams {
  */
 export async function createCashfreeOrder(params: CreatePaymentOrderParams): Promise<EdgeFunctionResult> {
   return invokeEdge('create-cashfree-order', {
-    booking_request_id: params.bookingRequestId,
-    amount: params.amount,
-    customer_name: params.customerName,
-    customer_phone: params.customerPhone,
-    customer_email: params.customerEmail,
+    booking_id: params.bookingId,
+    payment_id: params.paymentId,
   });
+}
+
+export interface VerifyPaymentParams {
+  bookingId?: string;
+  paymentId?: string;
 }
 
 /**
  * Verify that a cash payment has been collected
  */
 export async function verifyCashPayment(
-  bookingRequestId: string,
-  amountCollected: number
+  params: VerifyPaymentParams
 ): Promise<EdgeFunctionResult> {
   return invokeEdge('verify-cash-payment', {
-    booking_request_id: bookingRequestId,
-    amount_collected: amountCollected,
+    booking_id: params.bookingId,
+    payment_id: params.paymentId,
   });
 }

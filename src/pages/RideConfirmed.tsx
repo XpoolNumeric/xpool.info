@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase/client";
 import { createCashfreeOrder, verifyCashPayment, generateRideOtp } from "@/lib/supabase/edgeFunctions";
+import { load } from "@cashfreepayments/cashfree-js";
 import { motion, Variants } from "framer-motion";
 import { GoogleMap, useLoadScript, Polyline, MarkerF } from "@react-google-maps/api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -596,20 +597,28 @@ const RideConfirmed = () => {
     if (!requestId || paymentLoading || paymentDone) return;
     setPaymentLoading(true);
     try {
-      const driverData = JSON.parse(localStorage.getItem("selectedDriver") || "{}");
-      const rideData = JSON.parse(localStorage.getItem("rideSummary") || "{}");
       const result = await createCashfreeOrder({
-        bookingRequestId: requestId,
-        amount: priceDetails.fare.perPerson * (ride?.passengers || 1),
-        customerName: driverData.driverName || 'Passenger',
-        customerPhone: driverData.driverPhone || '',
-        customerEmail: '',
+        bookingId: requestId,
       });
-      if (result.success && result.data?.payment_link) {
-        window.location.href = result.data.payment_link || result.data.payment_url;
+
+      if (result.success && result.data?.payment_session_id) {
+        const cashfreeMode = import.meta.env.VITE_CASHFREE_MODE === "production" ? "production" : "sandbox";
+        const cashfree = await load({
+          mode: cashfreeMode,
+        });
+
+        const checkoutOptions = {
+          paymentSessionId: result.data.payment_session_id,
+          redirectTarget: "_self" as const,
+        };
+        await cashfree.checkout(checkoutOptions);
+      } else if (result.data?.stub_mode) {
+        // Stub mode
+        alert('Payment (Stub Mode): Success!');
+        setPaymentDone(true);
       } else {
         console.warn('Payment order failed:', result.error || result.message);
-        alert('Failed to redirect to payment gateway: ' + (result.error || result.message || 'Unknown error'));
+        alert('Failed to initialize payment gateway: ' + (result.error || result.message || 'Unknown error'));
       }
     } catch (err) {
       console.error('Payment error:', err);
@@ -623,9 +632,11 @@ const RideConfirmed = () => {
     if (!requestId) return;
     setPaymentLoading(true);
     try {
-      const result = await verifyCashPayment(requestId, priceDetails.fare.perPerson * (ride?.passengers || 1));
+      const result = await verifyCashPayment({ bookingId: requestId });
       if (result.success) {
         setPaymentDone(true);
+      } else {
+        alert('Failed: ' + (result.error || result.message));
       }
     } catch (err) {
       console.error('Cash verification error:', err);
@@ -680,16 +691,23 @@ const RideConfirmed = () => {
             if (!edgeResult.success && data.otp_code) {
               setOtpCode(data.otp_code);
             }
-            if (data.payment_status === 'paid' || data.payment_status === 'completed') {
-              setPaymentDone(true);
-            }
+          }
+
+          // Fetch payment status from ride_payments table
+          const { data: paymentData } = await supabase
+            .from("ride_payments")
+            .select("payment_status")
+            .eq("booking_id", requestId)
+            .maybeSingle();
+            
+          if (paymentData && (paymentData.payment_status === 'paid' || paymentData.payment_status === 'completed')) {
+            setPaymentDone(true);
           }
         } catch (err) {
           console.error("Error generating/fetching OTP:", err);
         }
 
-        // 2. Subscribe to postgres changes on this booking row
-        // When the driver generates OTP, the row updates with otp_code
+        // 2. Subscribe to postgres changes on booking row (for OTP)
         const pgChannel = supabase
           .channel(`booking_otp_${requestId}`)
           .on(
@@ -704,6 +722,23 @@ const RideConfirmed = () => {
               if (payload.new?.otp_code) {
                 setOtpCode(payload.new.otp_code);
               }
+            }
+          )
+          .subscribe();
+        channels.push(pgChannel);
+
+        // 3. Subscribe to ride_payments table for payment success updates
+        const paymentChannel = supabase
+          .channel(`ride_payment_${requestId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "ride_payments",
+              filter: `booking_id=eq.${requestId}`,
+            },
+            (payload: any) => {
               const newStatus = payload.new?.payment_status;
               if (newStatus === 'paid' || newStatus === 'completed') {
                 setPaymentDone(true);
@@ -711,7 +746,7 @@ const RideConfirmed = () => {
             }
           )
           .subscribe();
-        channels.push(pgChannel);
+        channels.push(paymentChannel);
 
         // 3. Subscribe to real-time broadcast for instant OTP
         // The edge fn broadcasts to channel `passenger_${passenger_id}`
@@ -755,39 +790,6 @@ const RideConfirmed = () => {
   const handleCallDriver = useCallback(() => {
     window.location.href = `tel:${driver.phone}`;
   }, [driver.phone]);
-
-  // Helper: Record payment in DB when payment is done
-  useEffect(() => {
-    if (paymentDone && bookingDetails && requestId && priceDetails) {
-      const recordPayment = async () => {
-        try {
-          // Double check if already inserted (prevents dupes if cashfree webhook already did it, etc.)
-          const { data: existing } = await supabase
-            .from("ride_payments")
-            .select("id")
-            .eq("booking_id", requestId)
-            .maybeSingle();
-
-          if (!existing) {
-            const total = priceDetails.fare.perPerson * (ride?.passengers || 1);
-            await supabase.from("ride_payments").insert({
-              trip_id: bookingDetails.trip_id,
-              booking_id: requestId,
-              passenger_id: bookingDetails.passenger_id,
-              driver_id: bookingDetails.driver_id,
-              total_amount: total,
-              commission_amount: total * 0.15,
-              driver_amount: total * 0.85,
-              payment_status: "completed"
-            });
-          }
-        } catch (err) {
-          console.error("Failed to record ride payment:", err);
-        }
-      };
-      recordPayment();
-    }
-  }, [paymentDone, bookingDetails, requestId, priceDetails, ride?.passengers]);
 
   const isLoading = vehicleLoading || rideLoading;
 
