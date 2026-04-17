@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Xpool Brand Colors - Yellow & Black Theme */
+    --primary: 45 100% 51%; /* Xpool Yellow */
+    --primary-foreground: 0 0% 0%; /* Black text on yellow */
+    
+    --secondary: 0 0% 15%; /* Dark charcoal */
+    --secondary-foreground: 0 0% 100%; /* White text on dark */
+
+    --muted: 45 100% 96%; /* Very light yellow */
+    --muted-foreground: 0 0% 40%; /* Dark gray */
+
+    --accent: 45 100% 50%; /* Xpool Yellow accent */
+    --accent-foreground: 0 0% 0%; /* Black on yellow */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 45 20% 90%; /* Light yellow border */
+    --input: 45 20% 95%; /* Very light yellow input */
+    --ring: 45 100% 51%; /* Yellow focus ring */
+    
+    /* Custom Xpool Variables */
+    --xpool-yellow: 45 100% 51%;
+    --xpool-yellow-light: 45 100% 70%;
+    --xpool-yellow-dark: 45 100% 40%;
+    --xpool-black: 0 0% 8%;
+    --xpool-gray: 0 0% 50%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--xpool-yellow-dark)));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--xpool-yellow)) 0%, hsl(var(--xpool-yellow-light)) 100%);
+    
+    /* Shadows */
+    --shadow-yellow: 0 10px 30px -10px hsl(var(--primary) / 0.3);
+    --shadow-glow: 0 0 40px hsl(var(--primary) / 0.2);
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Dark mode with Xpool branding */
+    --primary: 45 100% 55%; /* Brighter yellow for dark mode */
+    --primary-foreground: 0 0% 8%; /* Dark text on yellow */
+
+    --secondary: 0 0% 20%; /* Darker secondary */
+    --secondary-foreground: 0 0% 98%; /* White text */
+
+    --muted: 0 0% 18%; /* Dark muted */
+    --muted-foreground: 0 0% 65%; /* Light gray text */
+
+    --accent: 45 100% 55%; /* Yellow accent */
+    --accent-foreground: 0 0% 8%; /* Dark text on yellow */
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 0 0% 25%; /* Dark border */
+    --input: 0 0% 18%; /* Dark input */
+    --ring: 45 100% 55%; /* Yellow focus ring */
+    
+    /* Dark mode gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(var(--xpool-yellow)) 0%, hsl(var(--xpool-yellow-light)) 100%);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Image Protection to prevent long-press download */
+  img {
+    -webkit-touch-callout: none !important;
+    -webkit-user-drag: none !important;
+    -khtml-user-drag: none !important;
+    -moz-user-drag: none !important;
+    -o-user-drag: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
